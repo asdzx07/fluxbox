@@ -307,13 +307,14 @@ export async function cleanup() {
   fs.rmSync(STATE_FILE, { force: true });
 }
 
-export async function dnsmasqStatus() {
+export async function dnsmasqStatus(targetPort = null) {
   const state = readJson(STATE_FILE, {})?.dnsmasq;
   if (!state) return { takenOver: false };
+  const portToCheck = targetPort || KERNEL.dnsPort;
   if (state.mode === 'uci') {
     const servers = await uciGet('dhcp.@dnsmasq[0].server');
     return {
-      takenOver: Boolean(servers?.some((s) => s.includes(`#${KERNEL.dnsPort}`))),
+      takenOver: Boolean(servers?.some((s) => s.includes(`#${portToCheck}`))),
       confDir: 'uci',
       servers: servers ?? [],
     };

@@ -53,6 +53,13 @@ const server = app.listen(port, '0.0.0.0', () => {
   } catch {}
   if (!isPasswordSet()) log.warn('还没有设置面板密码，请打开面板完成初始化');
   startTrafficMonitor();
+
+  // 启动时自动检查并对齐内核配置与网络栈，确保端口变更与版本升级后平滑生效
+  if (kernel.installed()) {
+    deploy.deploy({ restart: true }).catch((err) => {
+      log.warn('面板启动自动部署失败：%s', err.message);
+    });
+  }
 });
 
 /**
@@ -80,11 +87,12 @@ const watchdog = setInterval(async () => {
       // 冷却 60 秒，避免 dnsmasq 起不来时每 10 秒撞一次。
       const settings = loadSettings();
       if (settings.dns.mode === 'dnsmasq' && Date.now() - lastReapplyAt > REAPPLY_COOLDOWN_MS) {
-        const dns = await netstack.dnsmasqStatus();
+        const targetPort = settings.dns.hijackPort || KERNEL.dnsPort;
+        const dns = await netstack.dnsmasqStatus(targetPort);
         if (!dns.takenOver) {
           lastReapplyAt = Date.now();
           try {
-            await netstack.applyDnsmasq({ dnsPort: settings.dns.hijackPort || KERNEL.dnsPort });
+            await netstack.applyDnsmasq({ dnsPort: targetPort });
             log.info('检测到 dnsmasq 未被接管，已自动接管');
           } catch (err) {
             log.warn('自动接管 dnsmasq 失败：%s', err.message);
