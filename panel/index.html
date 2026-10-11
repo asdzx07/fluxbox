@@ -184,7 +184,7 @@
       <div class="page-head-with-actions">
         <div>
           <h2>目标分流</h2>
-          <p class="note" style="margin-top:2px">自上而下匹配分流 · 未命中的流量走「兜底」代理出口</p>
+          <p class="note" style="margin-top:2px">自上而下匹配分流 · 未命中的流量走「兜底」代理出口 <span id="rulesetGlobalDate" style="margin-left:8px;color:var(--text-muted)">· 规则集更新时间：<span id="rulesetDateText">未更新</span></span></p>
         </div>
         <div class="head-actions">
           <button class="small" id="btnCollapseAllPolicies">全部折叠</button>
@@ -513,7 +513,7 @@
           </div>
 
           <div class="dns-rules-foot">
-            <span class="note">远程 Geosite 规则集每日自动同步，亦可随时手动拉取</span>
+            <span class="note">远程 Geosite 规则集每日自动同步，亦可随时手动拉取 <span id="adblockRulesetDate" style="margin-left:6px;color:var(--text-muted)">(上次更新: <span id="adblockRulesetDateText">未更新</span>)</span></span>
             <button class="small" id="btnAdblockRefresh">
               <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
               <span id="btnAdblockRefreshText">更新广告规则集</span>

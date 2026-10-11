@@ -1,5 +1,7 @@
+import { loadRulesetMeta, refreshRulesets, formatDateTime } from '../lib/rulesets.mjs';
+
 export function registerOperationRoutes(app, deps) {
-  const { fs, path, spawn, ROOT, DATA_DIR, loadSettings, getTraffic, resetTrafficTotals, kernel, deploy, log } = deps;
+  const { fs, path, spawn, ROOT, DATA_DIR, loadSettings, mutateSettings, getTraffic, resetTrafficTotals, kernel, deploy, log } = deps;
 
   app.get('/api/traffic', (req, res) => {
     res.json({ ok: true, ...getTraffic() });
@@ -10,22 +12,27 @@ export function registerOperationRoutes(app, deps) {
     res.json({ ok: true });
   });
 
+  app.get('/api/rulesets/status', (req, res) => {
+    try {
+      const meta = loadRulesetMeta(DATA_DIR);
+      res.json({ ok: true, ...meta });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
   app.post('/api/adblock/refresh', async (req, res) => {
     try {
-      // 删掉缓存的广告规则集 SRS，重启内核强制重新下载
-      let deleted = 0;
-      for (const dir of [DATA_DIR, '/tmp', process.cwd()]) {
-        try {
-          for (const file of fs.readdirSync(dir)) {
-            if (file === 'adblock.srs' || file.startsWith('adblock.')) {
-              fs.unlinkSync(path.join(dir, file));
-              deleted++;
-            }
-          }
-        } catch {}
-      }
-      await kernel.restart();
-      res.json({ ok: true, deleted });
+      const settings = loadSettings();
+      const result = await refreshRulesets({
+        settings,
+        dataDir: DATA_DIR,
+        kernel,
+        mutateSettings,
+        log,
+        targetTag: 'adblock',
+      });
+      res.json(result);
     } catch (err) {
       res.status(500).json({ ok: false, error: err.message });
     }
@@ -33,20 +40,17 @@ export function registerOperationRoutes(app, deps) {
 
   app.post('/api/rulesets/refresh', async (req, res) => {
     try {
-      // 删掉所有缓存的远程规则集 SRS（策略用的 geosite/geoip），重启内核强制重新下载
-      let deleted = 0;
-      for (const dir of [DATA_DIR, '/tmp', process.cwd()]) {
-        try {
-          for (const file of fs.readdirSync(dir)) {
-            if (file.endsWith('.srs')) {
-              fs.unlinkSync(path.join(dir, file));
-              deleted++;
-            }
-          }
-        } catch {}
-      }
-      await kernel.restart();
-      res.json({ ok: true, deleted });
+      const settings = loadSettings();
+      const targetTag = req.body?.tag ? String(req.body.tag).trim() : null;
+      const result = await refreshRulesets({
+        settings,
+        dataDir: DATA_DIR,
+        kernel,
+        mutateSettings,
+        log,
+        targetTag,
+      });
+      res.json(result);
     } catch (err) {
       res.status(500).json({ ok: false, error: err.message });
     }

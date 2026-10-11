@@ -875,6 +875,7 @@ async function loadPolicies() {
     state.policies = data.policies || [];
     renderPolicies();
     loadRulesetSubs();
+    loadRulesetStatus();
   } catch (err) {
     $('policyList').innerHTML = `<p class="err-text">${escapeHtml(err.message)}</p>`;
   }
@@ -1034,6 +1035,37 @@ window.removePolicy = function(index, event) {
 
 /* ---------------------------------------------------------- 自定义规则集订阅 */
 
+async function loadRulesetStatus() {
+  try {
+    const data = await api('/rulesets/status');
+    const dateStr = data.formattedDate || '未更新';
+    const polEl = $('rulesetDateText');
+    if (polEl) polEl.textContent = dateStr;
+    const adEl = $('adblockRulesetDateText');
+    if (adEl) adEl.textContent = dateStr;
+  } catch {}
+}
+
+window.refreshSingleRulesetSub = async function(tag) {
+  try {
+    toast(`正在检查规则集「${tag}」更新...`);
+    const r = await api('/rulesets/refresh', { method: 'POST', body: { tag } });
+    if (!r.ok) {
+      toast(`更新失败：${r.error || '未知错误'}`);
+      return;
+    }
+    if (r.hasUpdate) {
+      toast(`🎉 规则集「${tag}」发现新版本并已更新（${r.formattedDate || '刚刚'}）`);
+    } else {
+      toast(`规则集「${tag}」已是最新版本，无可用更新（上次更新: ${r.formattedDate || '刚刚'}）`);
+    }
+    await loadRulesetStatus();
+    await loadRulesetSubs();
+  } catch (err) {
+    toast(`更新规则集失败：${err.message}`);
+  }
+};
+
 async function loadRulesetSubs() {
   const box = $('rulesetSubList');
   try {
@@ -1056,8 +1088,14 @@ async function loadRulesetSubs() {
             <span class="tag muted" style="font-size:11px;margin-left:6px">${r.format === 'source' ? 'Source' : 'Binary'}</span>
           </div>
           <div class="sub" style="font-size:12px;color:var(--text-2);word-break:break-all">${escapeHtml(r.url)}</div>
+          <div class="sub" style="font-size:11px;color:var(--text-muted);margin-top:2px">
+            <span>更新时间：${escapeHtml(r.formattedDate || '未更新')}</span>
+          </div>
         </div>
-        <button class="small danger" onclick="removeRulesetSub('${escapeHtml(r.id)}')">删除</button>
+        <div class="inline">
+          <button class="small" onclick="refreshSingleRulesetSub('${escapeHtml(r.tag)}')">刷新</button>
+          <button class="small danger" onclick="removeRulesetSub('${escapeHtml(r.id)}')">删除</button>
+        </div>
       </div>
     `).join('');
   } catch (err) {
@@ -1302,7 +1340,7 @@ function bindEvents() {
         if (!state.nodeList?.length) await loadNodes();
         await loadPolicies();
       }
-      if (tab === 'settings') { await loadSettings(); await loadKernelLog(); }
+      if (tab === 'settings') { await loadSettings(); await loadKernelLog(); await loadRulesetStatus(); }
       scheduleLogAuto();
     });
   });
@@ -1598,8 +1636,22 @@ function bindEvents() {
   }));
 
   $('btnRefreshRulesets').addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
-    const r = await api('/rulesets/refresh', { method: 'POST' });
-    toast(r.ok ? '规则集已更新' : ('更新失败：' + (r.error || '未知错误')));
+    try {
+      const r = await api('/rulesets/refresh', { method: 'POST' });
+      if (!r.ok) {
+        toast('更新失败：' + (r.error || '未知错误'));
+        return;
+      }
+      if (r.hasUpdate) {
+        toast(`🎉 发现新版本：已更新 ${r.updatedCount || 1} 个规则集（${r.formattedDate || '刚刚'}）`);
+      } else {
+        toast(`规则集已是最新版本，无可用更新（上次更新: ${r.formattedDate || '刚刚'}）`);
+      }
+      await loadRulesetStatus();
+      await loadRulesetSubs();
+    } catch (err) {
+      toast(`更新规则集失败：${err.message}`);
+    }
   }));
 
   $('policyList').addEventListener('click', (e) => {
@@ -1760,10 +1812,19 @@ function bindEvents() {
   $('btnAdblockRefresh')?.addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
     const txt = $('btnAdblockRefreshText');
     const prev = txt ? txt.textContent : '';
-    if (txt) txt.textContent = '更新中...';
+    if (txt) txt.textContent = '检查并更新...';
     try {
-      const r = await api('/rulesets/refresh', { method: 'POST' });
-      toast(r.ok ? '广告规则集已更新至最新' : '更新规则集失败');
+      const r = await api('/adblock/refresh', { method: 'POST' });
+      if (!r.ok) {
+        toast('更新失败：' + (r.error || '未知错误'));
+        return;
+      }
+      if (r.hasUpdate) {
+        toast(`🎉 广告规则集发现新版本并已更新（${r.formattedDate || '刚刚'}）`);
+      } else {
+        toast(`广告规则集已是最新版本，无可用更新（上次更新: ${r.formattedDate || '刚刚'}）`);
+      }
+      await loadRulesetStatus();
     } catch (err) {
       toast(`更新失败：${err.message}`);
     } finally {

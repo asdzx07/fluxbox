@@ -1,3 +1,5 @@
+import { loadRulesetMeta, formatDateTime } from '../lib/rulesets.mjs';
+
 export function registerSubscriptionRoutes(app, deps) {
   const { loadSettings, mutateSettings, newId, deploy, log, refreshSubscription } = deps;
 
@@ -74,7 +76,17 @@ export function registerSubscriptionRoutes(app, deps) {
 
   app.get('/api/ruleset-subs', (req, res) => {
     const settings = loadSettings();
-    res.json({ ok: true, items: settings.rulesetSubs || [] });
+    const meta = loadRulesetMeta(deps.DATA_DIR);
+    const items = (settings.rulesetSubs || []).map((item) => {
+      const metaItem = meta.items?.[item.tag];
+      const updatedAt = item.updatedAt || metaItem?.updatedAt || null;
+      return {
+        ...item,
+        updatedAt,
+        formattedDate: formatDateTime(updatedAt),
+      };
+    });
+    res.json({ ok: true, items });
   });
 
   app.post('/api/ruleset-subs', (req, res) => {
