@@ -284,17 +284,26 @@ async function toggleGateway() {
 async function pollTraffic() {
   try {
     const data = await fetchRemote('/traffic');
-    if (data.up !== undefined) {
-      $('dispUp').textContent = fmtRate(data.upRate || 0);
-      $('dispDown').textContent = fmtRate(data.downRate || 0);
-      $('dispUpTotal').textContent = `累计 ${fmtBytes(data.up || 0)}`;
-      $('dispDownTotal').textContent = `累计 ${fmtBytes(data.down || 0)}`;
+    if (data && (data.up !== undefined || data.upRate !== undefined)) {
+      const up = Number(data.upRate ?? data.up) || 0;
+      const down = Number(data.downRate ?? data.down) || 0;
+      const totalUp = Number(data.totalUp) || 0;
+      const totalDown = Number(data.totalDown) || 0;
+
+      $('dispUp').textContent = fmtRate(up);
+      $('dispDown').textContent = fmtRate(down);
+      $('dispUpTotal').textContent = `累计 ${fmtBytes(totalUp)}`;
+      $('dispDownTotal').textContent = `累计 ${fmtBytes(totalDown)}`;
+
+      if ($('dispConnCount') && data.connectionsCount !== undefined) {
+        $('dispConnCount').textContent = data.connectionsCount;
+      }
 
       // 更新折线历史
       trafficHistory.up.shift();
-      trafficHistory.up.push(data.upRate || 0);
+      trafficHistory.up.push(up);
       trafficHistory.down.shift();
-      trafficHistory.down.push(data.downRate || 0);
+      trafficHistory.down.push(down);
       drawMiniCharts();
     }
   } catch {}
@@ -635,6 +644,10 @@ async function pollOverview() {
           el.style.color = 'var(--danger)';
         }
       }
+    }
+    const dnsPort = data.dnsPort || data.dns?.hijackPort || 36053;
+    if ($('infoDnsMode')) {
+      $('infoDnsMode').textContent = `Fake-IP (${dnsPort})`;
     }
   } catch {}
 }

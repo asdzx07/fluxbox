@@ -13,6 +13,7 @@ export function registerSettingsRoutes(app, deps) {
       kernel: { ...k, versionOutput: await kernel.versionOutput() },
       dnsmasq: await netstack.dnsmasqStatus(),
       platform: platform.describe(),
+      dnsPort: settings.dns?.hijackPort || 36053,
       counts: {
         subscriptions: settings.subscriptions.length,
         nodes: settings.nodes.length,

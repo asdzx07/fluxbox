@@ -295,7 +295,12 @@ const server = http.createServer(async (req, res) => {
 
   const ext = path.extname(filePath);
   const mime = MIME_TYPES[ext] || 'application/octet-stream';
-  res.writeHead(200, { 'Content-Type': mime });
+  res.writeHead(200, {
+    'Content-Type': mime,
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  });
   fs.createReadStream(filePath).pipe(res);
 });
 

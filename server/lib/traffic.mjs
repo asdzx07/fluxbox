@@ -2,8 +2,9 @@
  * 流量统计：
  * 1. 优先通过 sing-box Clash API /traffic 的 WebSocket 获取实时速率；
  * 2. 支持 Node 20+ 原生 globalThis.WebSocket 与 ws 模块降级；
- * 3. 若 WebSocket 断开或无数据，自动启用 HTTP /connections 轮询及 Linux tun 网卡统计兜底；
- * 确保流量统计永不断流、永不失效。
+ * 3. 周期性从 Clash API /connections 同步权威累计流量与活动连接数，消除积分累加误差；
+ * 4. 若 WebSocket 断开或无数据，自动启用 HTTP /connections 轮询及 Linux tun 网卡统计兜底；
+ * 确保流量统计永不断流、数据真实准确。
  */
 import fs from 'node:fs';
 import { KERNEL } from './paths.mjs';
@@ -24,6 +25,9 @@ let totalDown = 0;
 let lastSampleAt = 0;
 let reconnectTimer = null;
 let fallbackTimer = null;
+
+let activeConnectionsCount = 0;
+let lastSyncAt = 0;
 
 // HTTP /connections 轮询记录
 let lastConnTotals = null;
@@ -98,19 +102,11 @@ function scheduleReconnect() {
   }, 4000);
 }
 
-/**
- * 轮询兜底逻辑：
- * 当 WebSocket 超过 2.5 秒未收到消息时，通过 HTTP /connections 接口或 tun 网卡提取速率。
- */
-async function pollFallback() {
+async function syncConnectionsStats() {
   const now = Date.now();
-  // 如果 WebSocket 正在活跃推送，不需要兜底
-  if (last.at && (now - last.at) < 2500) return;
-
   const settings = loadSettings();
   const secret = settings.kernel?.clashSecret || '';
 
-  // 1. 尝试从 Clash API /connections 读取累计上传/下载
   try {
     const res = await fetch(`http://${KERNEL.clashApiHost}:${KERNEL.clashApiPort}/connections`, {
       headers: secret ? { Authorization: `Bearer ${secret}` } : {},
@@ -118,26 +114,56 @@ async function pollFallback() {
     });
     if (res.ok) {
       const data = await res.json();
-      const upTot = Number(data?.uploadTotal) || 0;
-      const downTot = Number(data?.downloadTotal) || 0;
+      const upTot = Number(data?.uploadTotal);
+      const downTot = Number(data?.downloadTotal);
 
-      if (lastConnTotals) {
-        const dt = (now - lastConnTotals.at) / 1000;
-        if (dt > 0) {
-          const calcUp = Math.max(0, (upTot - lastConnTotals.up) / dt);
-          const calcDown = Math.max(0, (downTot - lastConnTotals.down) / dt);
-          totalUp = upTot;
-          totalDown = downTot;
-          last = { up: Math.round(calcUp), down: Math.round(calcDown), at: now };
-          return;
+      if (Array.isArray(data?.connections)) {
+        activeConnectionsCount = data.connections.length;
+      }
+
+      if (Number.isFinite(upTot)) {
+        totalUp = Math.max(totalUp, upTot);
+      }
+      if (Number.isFinite(downTot)) {
+        totalDown = Math.max(totalDown, downTot);
+      }
+
+      // 如果 WebSocket 不活跃（超过 2.5 秒无数据），利用前后两次权威总量的差值计算实时速率
+      const wsActive = last.at && (now - last.at) < 2500;
+      if (!wsActive) {
+        if (lastConnTotals) {
+          const dt = (now - lastConnTotals.at) / 1000;
+          if (dt > 0) {
+            const calcUp = Math.max(0, (upTot - lastConnTotals.up) / dt);
+            const calcDown = Math.max(0, (downTot - lastConnTotals.down) / dt);
+            last = { up: Math.round(calcUp), down: Math.round(calcDown), at: now };
+          }
         }
       }
-      lastConnTotals = { up: upTot, down: downTot, at: now };
-      if (!totalUp && upTot) totalUp = upTot;
-      if (!totalDown && downTot) totalDown = downTot;
-      return;
+      if (Number.isFinite(upTot) && Number.isFinite(downTot)) {
+        lastConnTotals = { up: upTot, down: downTot, at: now };
+      }
+      return true;
     }
   } catch {}
+  return false;
+}
+
+/**
+ * 轮询兜底与权威统计校准：
+ * 1. 周期性从 Clash API /connections 同步权威累计总量和实时连接数；
+ * 2. 当 WebSocket 断开或无数据时，通过 HTTP /connections 接口或 tun 网卡提取速率。
+ */
+async function pollFallback() {
+  const now = Date.now();
+  // 周期性同步 Clash 权威累计流量与连接数
+  if (now - lastSyncAt >= 3000) {
+    lastSyncAt = now;
+    await syncConnectionsStats();
+  }
+
+  // 如果 WebSocket 正在活跃推送，不需要兜底
+  if (last.at && (now - last.at) < 2500) return;
 
   // 2. 尝试从 Linux tun 网卡 /proc/net/dev 读取
   if (process.platform === 'linux') {
@@ -178,11 +204,18 @@ export function startTrafficMonitor() {
 
 export function getTraffic() {
   const stale = Date.now() - last.at > 6000;
+  const up = stale ? 0 : last.up;
+  const down = stale ? 0 : last.down;
+  const tUp = Number.isFinite(totalUp) ? Math.round(totalUp) : 0;
+  const tDown = Number.isFinite(totalDown) ? Math.round(totalDown) : 0;
   return {
-    up: stale ? 0 : last.up,
-    down: stale ? 0 : last.down,
-    totalUp: Number.isFinite(totalUp) ? Math.round(totalUp) : 0,
-    totalDown: Number.isFinite(totalDown) ? Math.round(totalDown) : 0,
+    up,
+    down,
+    upRate: up,
+    downRate: down,
+    totalUp: tUp,
+    totalDown: tDown,
+    connectionsCount: activeConnectionsCount,
     connected: !stale,
   };
 }
@@ -190,6 +223,7 @@ export function getTraffic() {
 export function resetTrafficTotals() {
   totalUp = 0;
   totalDown = 0;
+  activeConnectionsCount = 0;
   lastConnTotals = null;
   lastTunTotals = null;
 }
