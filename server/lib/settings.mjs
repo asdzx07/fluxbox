@@ -94,7 +94,7 @@ export function defaultSettings() {
       fakeIp: true,
       fakeIpRange: '198.19.0.0/16',
       region: 'cn',
-      hijackPort: 7853,
+      hijackPort: 36053,
       adblock: false,
       adblockAllow: [],
       adblockCustom: [],
@@ -185,6 +185,11 @@ export function loadSettings({ force = false } = {}) {
   }
 
   cache = mergeDefaults(stored, defaultSettings());
+  // 平滑迁移：若保留的是历史旧默认端口 7853，自动更新为新端口 36053
+  if (cache.dns && cache.dns.hijackPort === 7853) {
+    cache.dns.hijackPort = 36053;
+    if (stored !== undefined) saveSettings(cache);
+  }
   if (stored === undefined) saveSettings(cache);
   return cache;
 }

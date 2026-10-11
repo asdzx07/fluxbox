@@ -24,14 +24,14 @@ export const PORT_FILE = path.join(DATA_DIR, 'panel-port');
 export const VERSION_FILE = path.join(BIN_DIR, 'VERSION.json');
 
 // 内核固定占用的端口。面板端口不能和这些撞。
-export const RESERVED_PORTS = [53, 22, 80, 443, 9095, 7853, 7891];
+export const RESERVED_PORTS = [53, 22, 80, 443, 9095, 36053, 7891];
 
 export const KERNEL = {
   // Clash API
   clashApiPort: 9095,
   clashApiHost: '127.0.0.1',
   // DNS 入站（dnsmasq 指向它）
-  dnsPort: 7853,
+  dnsPort: 36053,
   // 回环入站（本机走代理用）
   loopbackPort: 7891,
   tunName: 'mybox-tun',

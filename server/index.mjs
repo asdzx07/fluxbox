@@ -84,7 +84,7 @@ const watchdog = setInterval(async () => {
         if (!dns.takenOver) {
           lastReapplyAt = Date.now();
           try {
-            await netstack.applyDnsmasq({ dnsPort: settings.dns.hijackPort });
+            await netstack.applyDnsmasq({ dnsPort: settings.dns.hijackPort || KERNEL.dnsPort });
             log.info('检测到 dnsmasq 未被接管，已自动接管');
           } catch (err) {
             log.warn('自动接管 dnsmasq 失败：%s', err.message);

@@ -18,7 +18,7 @@ function makeSettings() {
     panel: { passwordHash: null, passwordSalt: null, sessionSecret: 'test-secret' },
     kernel: { version: null, autoStart: true, logLevel: 'warn', clashSecret: null },
     network: { directBypass: false, ipv6: false, rejectQuic: false, tun: {} },
-    dns: { mode: 'system', hijackPort: 7853 },
+    dns: { mode: 'system', hijackPort: 36053 },
     meta: {},
     subscriptions: [{ id: 'sub-1', name: 'Subscription one', url: 'https://example.invalid/sub', enabled: true }],
     rulesetSubs: [],

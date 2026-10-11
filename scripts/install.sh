@@ -187,7 +187,7 @@ if [ -z "$PORT" ]; then
   [ -n "$PORT" ] || PORT=52155
 fi
 case "$PORT" in *[!0-9]*) die "端口必须是数字：$PORT" ;; esac
-for reserved in 53 22 80 443 9095 7853 7891; do
+for reserved in 53 22 80 443 9095 36053 7891; do
   [ "$PORT" = "$reserved" ] && die "端口 $PORT 被内核或系统占用，请换一个"
 done
 echo "$PORT" > "$ROOT/data/panel-port"
