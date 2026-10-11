@@ -1150,7 +1150,7 @@ async function loadSettings() {
 
     // 内核版本卡片
     const kVer = s.kernel?.installed
-      ? (s.kernel.version ? (s.kernel.version.startsWith('v') ? s.kernel.version : `v${s.kernel.version}`) : 'v1.14.2')
+      ? (s.kernel.version ? (s.kernel.version.startsWith('v') ? s.kernel.version : `v${s.kernel.version}`) : 'v1.15.0-alpha.12')
       : '未安装';
     if ($('setKernelVersion')) $('setKernelVersion').textContent = kVer;
   } catch {}
@@ -1158,10 +1158,11 @@ async function loadSettings() {
   // 面板语义化版本展示与官方源对比
   try {
     const v = await api('/system/version');
-    const cur = v.current || 'v1.0.0(e31b623)';
+    const cur = v.current || 'MyBox: v1.20 (B92)';
+    const shortVer = v.shortVersion || cur.replace(/^MyBox:\s*/, '');
     if ($('sysVersion')) $('sysVersion').textContent = cur;
-    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = cur;
-    if ($('brandVersion')) $('brandVersion').textContent = cur;
+    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = shortVer;
+    if ($('brandVersion')) $('brandVersion').textContent = shortVer;
     if ($('latestSysVersion')) $('latestSysVersion').textContent = v.latest || cur;
     if ($('panelCheckTime')) $('panelCheckTime').textContent = '刚刚检查';
 
@@ -1184,16 +1185,31 @@ async function loadSettings() {
       if (applyBtn) applyBtn.classList.add('hidden');
     }
   } catch {
-    if ($('sysVersion')) $('sysVersion').textContent = 'v1.0.0(e31b623)';
-    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v1.0.0(e31b623)';
-    if ($('brandVersion')) $('brandVersion').textContent = 'v1.0.0(e31b623)';
-    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'v1.0.0(e31b623)';
+    if ($('sysVersion')) $('sysVersion').textContent = 'MyBox: v1.20 (B92)';
+    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v1.20 (B92)';
+    if ($('brandVersion')) $('brandVersion').textContent = 'v1.20 (B92)';
+    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'MyBox: v1.20 (B92)';
   }
 
   // 获取并展示内核最新版本
   try {
     const kLatest = await api('/kernel/latest');
-    if ($('latestKernelVer')) $('latestKernelVer').textContent = kLatest.version || 'v1.14.2';
+    if (kLatest.current && $('setKernelVersion')) {
+      $('setKernelVersion').textContent = kLatest.current;
+    }
+    const latestKVer = kLatest.latest || kLatest.version || 'v1.15.0-alpha.12';
+    if ($('latestKernelVer')) $('latestKernelVer').textContent = latestKVer;
+
+    const kBadge = $('kernelStatusBadge');
+    if (kBadge) {
+      if (kLatest.hasUpdate) {
+        kBadge.textContent = `发现新内核 ${latestKVer}`;
+        kBadge.style.color = 'var(--warn)';
+      } else {
+        kBadge.textContent = '当前已是最新';
+        kBadge.style.color = '';
+      }
+    }
   } catch {}
 }
 
@@ -1699,10 +1715,11 @@ function bindEvents() {
     if (txt) txt.innerHTML = '<span class="animate-spin">↻</span> 检查中...';
     try {
       const v = await api('/system/version');
-      const cur = v.current || 'v1.0.0(e31b623)';
+      const cur = v.current || 'MyBox: v1.20 (B92)';
+      const shortVer = v.shortVersion || cur.replace(/^MyBox:\s*/, '');
       if ($('sysVersion')) $('sysVersion').textContent = cur;
-      if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = cur;
-      if ($('brandVersion')) $('brandVersion').textContent = cur;
+      if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = shortVer;
+      if ($('brandVersion')) $('brandVersion').textContent = shortVer;
       if ($('latestSysVersion')) $('latestSysVersion').textContent = v.latest || cur;
       if ($('panelCheckTime')) $('panelCheckTime').textContent = '刚刚检查';
 
@@ -1825,10 +1842,14 @@ function bindEvents() {
     if (txt) txt.innerHTML = '<span class="animate-spin">↻</span> 查询最新...';
     try {
       const latest = await api('/kernel/latest');
-      if ($('latestKernelVer')) $('latestKernelVer').textContent = latest.version;
-      const cur = state.settings?.kernel?.version || '';
-      if (cur && (cur === latest.version || `v${cur}` === latest.version)) {
-        toast(`当前内核已是最新 (${latest.version})`);
+      const targetVersion = latest.latest || latest.version;
+      if ($('latestKernelVer')) $('latestKernelVer').textContent = targetVersion;
+      if (latest.current && $('setKernelVersion')) $('setKernelVersion').textContent = latest.current;
+
+      const cur = (latest.current || state.settings?.kernel?.version || '').replace(/^v/, '');
+      const tar = (targetVersion || '').replace(/^v/, '');
+      if (cur && tar && cur === tar) {
+        toast(`当前内核已是最新 (${targetVersion})`);
         if (txt) txt.textContent = '内核已是最新';
         setTimeout(() => {
           btn.disabled = false;
@@ -1836,13 +1857,13 @@ function bindEvents() {
         }, 2000);
         return;
       }
-      if (!confirm(`下载并安装官方 sing-box ${latest.version}？（安装后自动重启内核）`)) {
+      if (!confirm(`下载并安装官方 sing-box ${targetVersion}？（安装后自动重启内核）`)) {
         btn.disabled = false;
         if (txt) txt.textContent = '内核更新';
         return;
       }
       if (txt) txt.innerHTML = '<span class="animate-spin">↻</span> 正在下载内核...';
-      const info = await api('/kernel/install', { method: 'POST', body: { version: latest.version } });
+      const info = await api('/kernel/install', { method: 'POST', body: { version: targetVersion } });
       btn.classList.add('btn-success');
       if (txt) txt.textContent = '✓ 内核更新成功';
       toast(`✓ 官方 sing-box ${info.version} 安装完成${info.restarted ? '，内核已热重启！' : ''}`);

@@ -71,37 +71,68 @@ export function registerOperationRoutes(app, deps) {
 
   app.get('/api/system/version', async (req, res) => {
     try {
-      let semver = '1.0.0';
-      try {
-        const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
-        if (pkg.version) semver = pkg.version;
-      } catch {}
-
+      let semver = 'v1.20';
+      let buildNumber = 92;
       let commitSha = null;
+
+      // 1. 优先尝试从本地 git 获取提交数与短 hash
       try {
-        const shaFile = path.join(ROOT, 'data', 'commit.sha');
-        if (fs.existsSync(shaFile)) commitSha = fs.readFileSync(shaFile, 'utf8').trim().slice(0, 7);
+        const { execSync } = await import('node:child_process');
+        const count = execSync('git rev-list --count HEAD', { cwd: ROOT, encoding: 'utf8', timeout: 1500 }).trim();
+        if (/^\d+$/.test(count)) buildNumber = Number.parseInt(count, 10);
+        const sha = execSync('git rev-parse --short HEAD', { cwd: ROOT, encoding: 'utf8', timeout: 1500 }).trim();
+        if (sha) commitSha = sha;
       } catch {}
 
+      // 2. 尝试从 VERSION 文件读取（支持纯源码部署或无 git 环境）
       try {
-        const versionText = fs.readFileSync(path.join(ROOT, 'VERSION'), 'utf8').trim();
-        if (/^[a-f0-9]{7,40}$/i.test(versionText)) {
-          if (!commitSha) commitSha = versionText.slice(0, 7);
-        } else if (/^\d+\.\d+/.test(versionText)) {
-          semver = versionText.replace(/^v/, '');
+        const versionFile = path.join(ROOT, 'VERSION');
+        if (fs.existsSync(versionFile)) {
+          const versionText = fs.readFileSync(versionFile, 'utf8').trim();
+          const bMatch = versionText.match(/B(\d+)/i) || versionText.match(/\d+\.\d+\.(\d+)/);
+          if (bMatch) buildNumber = Number.parseInt(bMatch[1], 10);
+          const vMatch = versionText.match(/v?(\d+\.\d+)/);
+          if (vMatch) semver = `v${vMatch[1]}`;
         }
       } catch {}
 
-      const currentVersion = semver.startsWith('v') ? semver : `v${semver}`;
-      const effectiveSha = commitSha || 'e31b623';
-      const current = `${currentVersion}(${effectiveSha})`;
+      // 3. 尝试从 commit.sha 文件读取 hash
+      if (!commitSha) {
+        try {
+          const shaFile = path.join(ROOT, 'data', 'commit.sha');
+          if (fs.existsSync(shaFile)) commitSha = fs.readFileSync(shaFile, 'utf8').trim().slice(0, 7);
+        } catch {}
+      }
+      const effectiveSha = commitSha || 'f4e9f8d';
+      const shortVersion = `${semver} (B${buildNumber})`;
+      const current = `MyBox: ${shortVersion}`;
 
+      // 4. 从远程 GitHub 检测是否有最新版本与构建
       let remoteCommitSha = null;
-      let changelog = null;
+      let remoteSemver = semver;
+      let remoteBuild = buildNumber;
+      let hasUpdate = false;
+
+      // 优先从 raw 读取最新 VERSION 文件
+      try {
+        const rawRes = await fetch('https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION', {
+          headers: { 'User-Agent': 'mybox' },
+          signal: AbortSignal.timeout(3000),
+        });
+        if (rawRes.ok) {
+          const rawText = (await rawRes.text()).trim();
+          const rBMatch = rawText.match(/B(\d+)/i) || rawText.match(/\d+\.\d+\.(\d+)/);
+          if (rBMatch) remoteBuild = Number.parseInt(rBMatch[1], 10);
+          const rVMatch = rawText.match(/v?(\d+\.\d+)/);
+          if (rVMatch) remoteSemver = `v${rVMatch[1]}`;
+        }
+      } catch {}
+
+      // 通过 API 检查最新 commit sha
       try {
         const response = await fetch('https://api.github.com/repos/asdzx07/MyBox/commits/main', {
           headers: { 'User-Agent': 'mybox' },
-          signal: AbortSignal.timeout(4000),
+          signal: AbortSignal.timeout(3000),
         });
         if (response.ok) {
           const json = await response.json();
@@ -109,10 +140,25 @@ export function registerOperationRoutes(app, deps) {
         }
       } catch {}
 
-      const targetLatestSha = remoteCommitSha || effectiveSha;
-      const latest = `${currentVersion}(${targetLatestSha})`;
-      const hasUpdate = Boolean(remoteCommitSha && commitSha && remoteCommitSha !== commitSha);
-      res.json({ ok: true, current, semver: currentVersion, commitSha: effectiveSha, latest, hasUpdate, changelog });
+      if (remoteCommitSha && commitSha && remoteCommitSha !== commitSha) {
+        hasUpdate = true;
+        if (remoteBuild <= buildNumber) remoteBuild = buildNumber + 1;
+      } else if (remoteBuild > buildNumber) {
+        hasUpdate = true;
+      }
+
+      const latest = hasUpdate ? `MyBox: ${remoteSemver} (B${remoteBuild})` : current;
+
+      res.json({
+        ok: true,
+        current,
+        shortVersion,
+        semver,
+        buildNumber,
+        commitSha: effectiveSha,
+        latest,
+        hasUpdate,
+      });
     } catch (err) {
       res.status(500).json({ ok: false, error: err.message });
     }
@@ -192,7 +238,20 @@ export function registerOperationRoutes(app, deps) {
     try {
       // 默认取 1.15 预发布版（用户指定）
       const includePrerelease = req.query.stable !== '1';
-      res.json(await kernel.fetchLatestVersion({ includePrerelease }));
+      const curVersion = await kernel.installedVersion();
+      const latestInfo = await kernel.fetchLatestVersion({ includePrerelease });
+
+      const cur = curVersion ? (curVersion.startsWith('v') ? curVersion : `v${curVersion}`) : '未安装';
+      const latest = latestInfo?.version ? (latestInfo.version.startsWith('v') ? latestInfo.version : `v${latestInfo.version}`) : '—';
+      const hasUpdate = Boolean(curVersion && latestInfo?.version && cur !== latest);
+
+      res.json({
+        ok: true,
+        current: cur,
+        latest,
+        hasUpdate,
+        ...latestInfo,
+      });
     } catch (err) {
       res.status(502).json({ error: err.message });
     }
