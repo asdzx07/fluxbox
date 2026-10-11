@@ -118,8 +118,8 @@ async function globalOptionAlreadySet(option, confDir) {
 /**
  * 找出真实的上游 DNS，用作接管失败时的兜底。
  *
- * 为什么不直接用备份值：如果之前已经装过别的代理面板（比如 Open-Box），
- * dnsmasq 的 server 本来就指向那个面板的 DNS 端口。这种情况下「还原备份」
+ * 为什么不直接用备份值：如果之前已经装过别的代理插件，
+ * dnsmasq 的 server 本来就指向那个插件的 DNS 端口。这种情况下「还原备份」
  * 等于还原成一个已经没人监听的地址，全 LAN 还是解析不了。
  */
 async function discoverUpstreamDns() {
