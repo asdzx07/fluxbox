@@ -115,6 +115,23 @@ export async function installServiceFiles(root) {
       fs.chmodSync(to, 0o755);
       installed.push(to);
     }
+    // 同步 LuCI 插件兜底文件并刷新 LuCI 缓存
+    try {
+      const luciCtrl = `${root}/system/openwrt/luci/controller/mybox.lua`;
+      const luciView = `${root}/system/openwrt/luci/view/mybox/status.htm`;
+      if (fs.existsSync(luciCtrl)) {
+        fs.mkdirSync('/usr/lib/lua/luci/controller', { recursive: true });
+        fs.copyFileSync(luciCtrl, '/usr/lib/lua/luci/controller/mybox.lua');
+        installed.push('/usr/lib/lua/luci/controller/mybox.lua');
+      }
+      if (fs.existsSync(luciView)) {
+        fs.mkdirSync('/usr/lib/lua/luci/view/mybox', { recursive: true });
+        fs.copyFileSync(luciView, '/usr/lib/lua/luci/view/mybox/status.htm');
+        installed.push('/usr/lib/lua/luci/view/mybox/status.htm');
+      }
+      fs.rmSync('/tmp/luci-indexcache', { force: true });
+      fs.rmSync('/tmp/luci-modulecache', { recursive: true, force: true });
+    } catch {}
     return installed;
   }
 

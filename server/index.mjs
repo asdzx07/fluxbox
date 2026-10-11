@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import {
   DEFAULT_PANEL_PORT, PORT_FILE, RESERVED_PORTS,
 } from './lib/paths.mjs';
@@ -45,6 +46,11 @@ if (problem) {
 
 const server = app.listen(port, '0.0.0.0', () => {
   log.info('MyBox 面板已启动：http://0.0.0.0:%d', port);
+  try {
+    fs.writeFileSync(PORT_FILE, `${port}\n`, 'utf8');
+    const legacyPortFile = path.join(path.dirname(PORT_FILE), 'port');
+    fs.writeFileSync(legacyPortFile, `${port}\n`, 'utf8');
+  } catch {}
   if (!isPasswordSet()) log.warn('还没有设置面板密码，请打开面板完成初始化');
   startTrafficMonitor();
 });
