@@ -7,7 +7,7 @@
 #     curl -fsSL https://raw.githubusercontent.com/asdzx07/mybox/main/scripts/install.sh | sudo sh
 #
 # 可选参数：
-#   --port <端口>      面板端口（默认 3036）
+#   --port <端口>      面板端口（默认 52155）
 #   --mirror           下载走加速镜像
 #   --src <目录>       用本地目录安装（开发用）
 #   --skip-kernel      只装面板，不下载内核
@@ -182,9 +182,9 @@ fi
 
 # ---------------------------------------------------------------- 端口
 if [ -z "$PORT" ]; then
-  printf '面板端口 [3036]: '
+  printf '面板端口 [52155]: '
   read -r PORT </dev/tty 2>/dev/null || PORT=""
-  [ -n "$PORT" ] || PORT=3036
+  [ -n "$PORT" ] || PORT=52155
 fi
 case "$PORT" in *[!0-9]*) die "端口必须是数字：$PORT" ;; esac
 for reserved in 53 22 80 443 9095 7853 7891; do

@@ -1,7 +1,7 @@
 let localState = {
   connected: false,
   gatewayIp: '192.168.3.2',
-  gatewayPort: 3036,
+  gatewayPort: 52155,
   password: '',
   hasPassword: false,
   hasSession: false,
@@ -892,7 +892,7 @@ let isExplicitExit = false;
 
 async function saveClientConfig() {
   const ip = $('cfgGatewayIp').value.trim();
-  const port = Number($('cfgGatewayPort').value) || 3036;
+  const port = Number($('cfgGatewayPort').value) || 52155;
   const pwd = $('cfgPanelPassword').value || '';
   const autoConnect = !!$('cfgAutoConnect').checked;
   const minimizeToTray = $('cfgMinimizeToTray') ? !!$('cfgMinimizeToTray').checked : true;

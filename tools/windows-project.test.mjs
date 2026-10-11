@@ -35,7 +35,7 @@ test('Windows launcher project includes required runtime files and elevation man
 test('tracked Windows configuration example contains no saved credentials', () => {
   const sample = JSON.parse(fs.readFileSync(path.join(windowsClientDir, 'config.example.json'), 'utf8'));
   assert.equal(sample.gatewayIp, '192.168.3.2');
-  assert.equal(sample.gatewayPort, 3036);
+  assert.equal(sample.gatewayPort, 52155);
   assert.equal(sample.password, '');
   assert.equal(sample.sessionCookie, '');
   assert.equal(sample.autoConnect, false);

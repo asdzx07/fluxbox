@@ -14,7 +14,7 @@ const CONFIG_FILE = path.resolve(__dirname, '../config.json');
 // 默认配置
 let config = {
   gatewayIp: '192.168.3.2',
-  gatewayPort: 3036,
+  gatewayPort: 52155,
   password: '',
   sessionCookie: '',
   autoConnect: false,
@@ -156,7 +156,7 @@ const server = http.createServer(async (req, res) => {
           saveConfig({ gatewayIp: config.gatewayIp });
         }
         if (body.gatewayPort) {
-          config.gatewayPort = Number(body.gatewayPort) || 3036;
+          config.gatewayPort = Number(body.gatewayPort) || 52155;
           saveConfig({ gatewayPort: config.gatewayPort });
         }
         const pwd = (body.password !== undefined) ? body.password.trim() : config.password;
@@ -245,7 +245,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 2. 远程 API 代理转发 (到旁路由 192.168.3.2:3036)
+  // 2. 远程 API 代理转发 (到旁路由 192.168.3.2:52155)
   if (pathname.startsWith('/remote-api/')) {
     const targetPath = pathname.replace(/^\/remote-api/, '/api');
     const targetUrl = `http://${config.gatewayIp}:${config.gatewayPort}${targetPath}${urlObj.search}`;

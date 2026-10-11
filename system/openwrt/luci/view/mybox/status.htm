@@ -37,7 +37,7 @@
 </div>
 
 <script>
-let panelPort = '3036';
+let panelPort = '52155';
 
 function updatePanelUrl(port) {
   panelPort = port || panelPort;
@@ -51,7 +51,7 @@ function openPanel() {
 }
 
 // 页面初次加载时立即初始化默认地址
-updatePanelUrl('3036');
+updatePanelUrl('52155');
 
 function load() {
   fetch('<%=url("admin/services/mybox/status")%>')

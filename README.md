@@ -78,7 +78,7 @@ curl -fsSL https://raw.githubusercontent.com/asdzx07/mybox/main/scripts/install.
 
 安装完成后，在浏览器中打开：
 ```
-http://<路由器或服务器IP>:3036
+http://<路由器或服务器IP>:52155
 ```
 首次访问将提示您设置管理密码，设置完成后即可登录控制台。
 
@@ -110,7 +110,7 @@ node /opt/mybox/server/tools/reset-password.mjs <新密码>
 │                       Web 控制台 (SPA)                       │
 │    仪表盘 / 节点管理 / 目标分流 / 局域网控制 / 实时连接 / 系统设置    │
 └──────────────────────────────┬──────────────────────────────┘
-                               │ HTTP (:3036)
+                               │ HTTP (:52155)
 ┌──────────────────────────────▼──────────────────────────────┐
 │                    MyBox 服务端 (Node.js)                    │
 │  ├─ 订阅解析引擎 (Clash / Base64 / sing-box)                 │

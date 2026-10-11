@@ -45,7 +45,7 @@ export const KERNEL = {
   rulePriority: 9000,
 };
 
-export const DEFAULT_PANEL_PORT = 3036;
+export const DEFAULT_PANEL_PORT = 52155;
 
 export function isLinux() {
   return os.platform() === 'linux';
