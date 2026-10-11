@@ -239,6 +239,7 @@ if [ "$PLATFORM" = openwrt ]; then
     rm -rf /tmp/luci-indexcache 2>/dev/null || true
   fi
 
+  chmod +x "$ROOT/scripts/"*.sh 2>/dev/null || true
   ln -sf "$ROOT/scripts/update.sh" /usr/bin/mybox-update 2>/dev/null || true
 
   KERNEL_WAS_RUNNING=0
