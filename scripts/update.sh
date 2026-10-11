@@ -239,6 +239,8 @@ if [ "$PLATFORM" = openwrt ]; then
     rm -rf /tmp/luci-indexcache 2>/dev/null || true
   fi
 
+  ln -sf "$ROOT/scripts/update.sh" /usr/bin/mybox-update 2>/dev/null || true
+
   KERNEL_WAS_RUNNING=0
   /etc/init.d/mybox-kernel status 2>/dev/null | grep -q running && KERNEL_WAS_RUNNING=1
 

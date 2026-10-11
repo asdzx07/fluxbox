@@ -235,6 +235,7 @@ if [ "$PLATFORM" = openwrt ]; then
   cp "$ROOT/system/openwrt/luci/controller/mybox.lua" /usr/lib/lua/luci/controller/mybox.lua
   cp "$ROOT/system/openwrt/luci/view/mybox/status.htm" /usr/lib/lua/luci/view/mybox/status.htm
   rm -rf /tmp/luci-indexcache 2>/dev/null || true
+  ln -sf "$ROOT/scripts/update.sh" /usr/bin/mybox-update 2>/dev/null || true
   /etc/init.d/mybox-panel enable >/dev/null 2>&1 || warn "开机自启设置失败"
   /etc/init.d/mybox-panel start >/dev/null 2>&1 || warn "面板启动失败，看 logread -e mybox"
   sleep 1

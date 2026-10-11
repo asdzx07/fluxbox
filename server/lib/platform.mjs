@@ -131,6 +131,10 @@ export async function installServiceFiles(root) {
       }
       fs.rmSync('/tmp/luci-indexcache', { force: true });
       fs.rmSync('/tmp/luci-modulecache', { recursive: true, force: true });
+      const updateScript = `${root}/scripts/update.sh`;
+      if (fs.existsSync(updateScript) && !fs.existsSync('/usr/bin/mybox-update')) {
+        try { fs.symlinkSync(updateScript, '/usr/bin/mybox-update'); } catch {}
+      }
     } catch {}
     return installed;
   }
