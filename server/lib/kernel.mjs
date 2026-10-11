@@ -16,7 +16,7 @@ const log = createLogger('kernel');
 
 const REPO = 'SagerNet/sing-box';
 const MIRRORS = ['', 'https://ghfast.top', 'https://gh-proxy.com'];
-const RELEASE_METADATA_MAX_BYTES = 2 * 1024 * 1024;
+const RELEASE_METADATA_MAX_BYTES = 16 * 1024 * 1024;
 const KERNEL_ARCHIVE_MAX_BYTES = 128 * 1024 * 1024;
 const KERNEL_DOWNLOAD_TOTAL_TIMEOUT_MS = 180000;
 const KERNEL_BINARY_MAX_BYTES = 256 * 1024 * 1024;
@@ -60,27 +60,36 @@ function archSuffix() {
 }
 
 export async function fetchLatestVersion({ includePrerelease = false } = {}) {
-  if (!includePrerelease) {
-    const url = `https://api.github.com/repos/${REPO}/releases/latest`;
-    const text = await fetchTextLimited(url, {
-      timeoutMs: 10000,
-      maxBytes: RELEASE_METADATA_MAX_BYTES,
-      headers: { 'User-Agent': 'mybox' },
-    });
-    const json = JSON.parse(text);
-    return { version: json.tag_name, publishedAt: json.published_at };
+  if (includePrerelease) {
+    try {
+      // 取最新的 1.15 预发布版，取 per_page=10 避免包体过大
+      const url = `https://api.github.com/repos/${REPO}/releases?per_page=10`;
+      const text = await fetchTextLimited(url, {
+        timeoutMs: 15000,
+        maxBytes: RELEASE_METADATA_MAX_BYTES,
+        headers: { 'User-Agent': 'mybox' },
+      });
+      const list = JSON.parse(text);
+      if (Array.isArray(list)) {
+        const hit = list.find((r) => /^v1\.15\./.test(r.tag_name));
+        if (hit) {
+          return { version: hit.tag_name, publishedAt: hit.published_at, prerelease: true };
+        }
+      }
+    } catch (err) {
+      log.warn('查询 1.15 预发布版失败，降级尝试最新正式版：%s', err.message);
+    }
   }
-  // 取最新的 1.15 预发布版
-  const url = `https://api.github.com/repos/${REPO}/releases?per_page=20`;
+
+  // 默认或降级获取官方最新正式版
+  const url = `https://api.github.com/repos/${REPO}/releases/latest`;
   const text = await fetchTextLimited(url, {
-    timeoutMs: 10000,
+    timeoutMs: 15000,
     maxBytes: RELEASE_METADATA_MAX_BYTES,
     headers: { 'User-Agent': 'mybox' },
   });
-  const list = JSON.parse(text);
-  const hit = list.find((r) => /^v1\.15\./.test(r.tag_name));
-  if (!hit) throw new Error('没找到 1.15 版本');
-  return { version: hit.tag_name, publishedAt: hit.published_at, prerelease: true };
+  const json = JSON.parse(text);
+  return { version: json.tag_name, publishedAt: json.published_at };
 }
 
 function assetName(version, suffix) {
