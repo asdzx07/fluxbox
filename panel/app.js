@@ -231,20 +231,53 @@ function renderNodeList() {
   $('nodeCount').textContent = `${state.nodeList.length} 个`;
   const box = $('nodeList');
   if (!state.nodeList.length) {
-    box.innerHTML = '<p class="note">还没有节点。先在「订阅」页添加订阅并刷新，然后部署配置。</p>';
+    box.innerHTML = '<p class="note" style="grid-column:1/-1;text-align:center;padding:16px 0">还没有节点。先在「订阅」页添加订阅并刷新，然后部署配置。</p>';
     return;
   }
   box.innerHTML = state.nodeList.map((n) => `
-    <div class="item">
+    <div class="item node-item">
       <span class="node-flag">${extractFlag(n.name)}</span>
       <div class="grow">
-        <div class="title">${escapeHtml(n.name)}</div>
+        <div class="title" title="${escapeHtml(n.name)}">${escapeHtml(n.name)}</div>
         <div class="sub">${escapeHtml(n.type)} · ${escapeHtml(n.server || '')}</div>
       </div>
-      ${delayBadge(n.name)}
-      <button class="small" data-latency="${escapeHtml(n.name)}">测速</button>
+      <div class="node-item-actions">
+        ${delayBadge(n.name)}
+        <button class="small" data-latency="${escapeHtml(n.name)}" onclick="event.stopPropagation()">测速</button>
+      </div>
     </div>
   `).join('');
+}
+
+function initNodeColsSwitcher() {
+  const switcher = $('nodeColsSwitcher');
+  const box = $('nodeList');
+  if (!switcher || !box) return;
+
+  const savedCols = localStorage.getItem('mybox_node_cols') || '2';
+  applyNodeCols(savedCols);
+
+  switcher.addEventListener('click', (e) => {
+    const btn = e.target.closest('.col-btn');
+    if (!btn) return;
+    const cols = btn.dataset.cols;
+    if (!cols) return;
+    applyNodeCols(cols);
+    try { localStorage.setItem('mybox_node_cols', cols); } catch (_) {}
+  });
+}
+
+function applyNodeCols(cols) {
+  const box = $('nodeList');
+  const switcher = $('nodeColsSwitcher');
+  if (!box) return;
+  box.classList.remove('cols-1', 'cols-2', 'cols-3', 'cols-4');
+  box.classList.add(`cols-${cols}`);
+  if (switcher) {
+    switcher.querySelectorAll('.col-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.cols === String(cols));
+    });
+  }
 }
 
 async function testLatency(name) {
@@ -1572,6 +1605,7 @@ function bindEvents() {
     const lat = e.target.dataset.latency;
     if (lat) await testLatency(lat);
   });
+  initNodeColsSwitcher();
 
   // 分组管理
   $('btnAddGroup')?.addEventListener('click', () => {

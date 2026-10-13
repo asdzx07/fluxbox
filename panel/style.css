@@ -1070,21 +1070,100 @@ label.field > span,
    11. 列表体系 (List & Item Components)
    ========================================================================== */
 
+/* 节点列数分段切换控制器 */
+.col-switcher {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+
+.col-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-2);
+  padding: 3px 9px;
+  font-size: 11.5px;
+  font-weight: 500;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  line-height: 1.25;
+  box-shadow: none;
+  transition: all var(--duration) var(--ease);
+}
+
+.col-btn:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+  transform: none;
+}
+
+.col-btn.active {
+  background: var(--surface-solid);
+  color: var(--accent);
+  font-weight: 600;
+  border-color: var(--border-subtle);
+  box-shadow: var(--shadow-xs);
+}
+
 .list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
+/* 全部节点多列网格容器 */
+#nodeList {
+  display: grid;
+  gap: 8px;
+  transition: grid-template-columns var(--duration) ease;
+}
+
+#nodeList.cols-1 {
+  grid-template-columns: 1fr;
+}
+#nodeList.cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+#nodeList.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+#nodeList.cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1180px) {
+  #nodeList.cols-4 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 860px) {
+  #nodeList.cols-4,
+  #nodeList.cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 580px) {
+  #nodeList.cols-4,
+  #nodeList.cols-3,
+  #nodeList.cols-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
 .item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 14px;
+  padding: 10px 14px;
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   transition: all var(--duration) var(--ease);
+  min-width: 0;
 }
 .item:hover {
   background: var(--surface-hover);
@@ -1092,21 +1171,36 @@ label.field > span,
   transform: translateY(-1px);
 }
 .item .grow {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  overflow: hidden;
 }
 .item .title {
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .item .sub {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-2);
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.node-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.node-item-actions .small {
+  padding: 3px 8px;
+  font-size: 11.5px;
 }
 
 /* 概览页左侧联动订阅单选列表 */
@@ -1480,41 +1574,30 @@ label.field > span,
   margin-top: 2px;
 }
 
-/* DNS 分流双列网格 */
+/* DNS 分流极简双列网格 */
 .dns-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 14px 16px;
-  margin-bottom: 16px;
+  gap: 12px 14px;
+  margin-bottom: 12px;
 }
 .dns-grid .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   margin: 0;
 }
-
-.dns-switch-sec {
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  padding: 4px 0;
-  margin: 14px 0;
+.dns-grid .field-title {
+  font-size: 12.5px;
+  margin-bottom: 2px;
 }
 
-.dns-adblock-sec {
-  background: var(--surface-2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
+/* 广告过滤规则网格与底部操作栏 */
 .dns-rules-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 14px;
+  margin-top: 4px;
 }
 .dns-rules-grid .field {
   display: flex;
@@ -1524,19 +1607,22 @@ label.field > span,
 }
 .dns-rules-grid textarea {
   resize: vertical;
-  min-height: 64px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11.5px;
-  line-height: 1.45;
-  padding: 8px 10px;
+  min-height: 72px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 8px 11px;
 }
 
 .dns-rules-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 8px;
+  padding-top: 10px;
+  margin-top: 12px;
   border-top: 1px dashed var(--border);
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* 面板密码同行自适应排版 */

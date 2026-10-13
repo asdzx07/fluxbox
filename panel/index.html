@@ -27,7 +27,7 @@
 
 <div id="app" class="hidden">
   <aside class="sidebar">
-    <div class="brand">MyBox<small id="brandVersion">v1.20 (B101)</small></div>
+    <div class="brand">MyBox<small id="brandVersion">v1.20 (B102)</small></div>
     
     <div class="sb-sec">导航</div>
     <nav class="sb-nav">
@@ -189,10 +189,16 @@
       <div class="card">
         <div class="card-head">
           <h3>全部节点</h3>
+          <span class="note" id="nodeCount" style="margin-left:8px"></span>
           <div class="spacer"></div>
-          <span class="note" id="nodeCount"></span>
+          <div class="col-switcher" id="nodeColsSwitcher" role="group" aria-label="节点列数">
+            <button type="button" class="col-btn" data-cols="1" title="单列排版">1 列</button>
+            <button type="button" class="col-btn active" data-cols="2" title="双列排版">2 列</button>
+            <button type="button" class="col-btn" data-cols="3" title="三列排版">3 列</button>
+            <button type="button" class="col-btn" data-cols="4" title="四列排版">4 列</button>
+          </div>
         </div>
-        <div class="list" id="nodeList"></div>
+        <div class="list cols-2" id="nodeList"></div>
       </div>
     </section>
 
@@ -312,7 +318,7 @@
         <div>
           <div class="page-title-row">
             <h2>核心设置</h2>
-            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B101)</span>
+            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B102)</span>
           </div>
           <p class="note" style="margin-top:2px">网络栈协议、DNS 策略、内核系统及版本更新管理</p>
         </div>
@@ -357,10 +363,10 @@
               <span class="bdg" id="panelUpdateBadge">当前已是最新</span>
             </div>
             <div class="vmc-val">
-              <span id="sysVersion">MyBox: v1.20 (B101)</span>
+              <span id="sysVersion">MyBox: v1.20 (B102)</span>
             </div>
             <div class="vmc-foot">
-              <span>最新版本：<strong id="latestSysVersion">MyBox: v1.20 (B101)</strong></span>
+              <span>最新版本：<strong id="latestSysVersion">MyBox: v1.20 (B102)</strong></span>
               <span id="panelCheckTime">刚刚检查</span>
             </div>
           </div>
@@ -387,162 +393,150 @@
       <div class="settings-two-col-grid">
         <!-- 核心卡片 2: 网络与 TUN 栈设置 -->
         <div class="card">
-        <div class="card-head">
-          <h3>网络与 TUN 栈设置</h3>
+          <div class="card-head">
+            <h3>网络与 TUN 栈设置</h3>
+          </div>
+          <div class="setting-list">
+            <div class="setting-item">
+              <div class="grow">
+                <div class="title">直连不进内核 (零损耗)</div>
+                <div class="sub">国内直连 IP 集合在 tun 路由中直接排除，流量根本不进内核，直连零开销</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setDirectBypass">
+                <span></span>
+              </label>
+            </div>
+
+            <div class="setting-item">
+              <div class="grow">
+                <div class="title">nftables 转发 (auto_redirect)</div>
+                <div class="sub">由系统 nftables 负责自动劫持和转发透明代理流量</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setAutoRedirect">
+                <span></span>
+              </label>
+            </div>
+
+            <div class="setting-item">
+              <div class="grow">
+                <div class="title">节点服务器直连</div>
+                <div class="sub">代理节点服务器自身的 IP 强制直连，防止节点握手流量产生环路</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setDirectForNodes">
+                <span></span>
+              </label>
+            </div>
+
+            <div class="setting-item">
+              <div class="grow">
+                <div class="title">屏蔽 QUIC (UDP 443)</div>
+                <div class="sub">阻止浏览器或客户端走 HTTP3/QUIC，回退至更稳定的 TCP 代理链路</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setRejectQuic">
+                <span></span>
+              </label>
+            </div>
+
+            <div class="setting-item">
+              <div class="grow">
+                <div class="title">启用 IPv6</div>
+                <div class="sub">接管并分流局域网 IPv6 流量（若局域网未配置 IPv6 建议关闭）</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setIpv6">
+                <span></span>
+              </label>
+            </div>
+          </div>
         </div>
-        <div class="setting-list">
-          <div class="setting-item">
-            <div class="grow">
-              <div class="title">直连不进内核 (零损耗)</div>
-              <div class="sub">国内直连 IP 集合在 tun 路由中直接排除，流量根本不进内核，直连零开销</div>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="setDirectBypass">
-              <span></span>
+
+        <!-- 核心卡片 3: DNS 分流与运行级别 (极简无冗余解释) -->
+        <div class="card">
+          <div class="card-head">
+            <h3>DNS 分流与运行级别</h3>
+          </div>
+
+          <!-- 核心解析与日志参数 (双列网格) -->
+          <div class="dns-grid">
+            <label class="field">
+              <span class="field-title">接管方式</span>
+              <select id="setDnsMode">
+                <option value="dnsmasq">dnsmasq 接管（推荐）</option>
+                <option value="off">不接管（自行配置系统 DNS）</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field-title">内核日志级别</span>
+              <select id="setLogLevel">
+                <option value="info">info（标准推荐）</option>
+                <option value="warn">warn（仅警告与错误）</option>
+                <option value="error">error（仅严重错误）</option>
+                <option value="debug">debug（调试详细信息）</option>
+                <option value="trace">trace（全量链路追踪）</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field-title">直连 DNS 服务器</span>
+              <input id="setDnsDirect" placeholder="223.5.5.5">
+            </label>
+
+            <label class="field">
+              <span class="field-title">代理 DNS 服务器</span>
+              <input id="setDnsProxy" placeholder="1.1.1.1">
             </label>
           </div>
 
-          <div class="setting-item">
-            <div class="grow">
-              <div class="title">nftables 转发 (auto_redirect)</div>
-              <div class="sub">由系统 nftables 负责自动劫持和转发透明代理流量</div>
+          <!-- FakeIP 选项条目 -->
+          <div class="setting-list" style="margin-top:auto;padding-top:10px;border-top:1px solid var(--border)">
+            <div class="setting-item" style="padding:10px 0">
+              <div class="grow">
+                <div class="title">代理域名使用 FakeIP</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setFakeIp">
+                <span></span>
+              </label>
             </div>
-            <label class="switch">
-              <input type="checkbox" id="setAutoRedirect">
-              <span></span>
-            </label>
-          </div>
-
-          <div class="setting-item">
-            <div class="grow">
-              <div class="title">节点服务器直连</div>
-              <div class="sub">代理节点服务器自身的 IP 强制直连，防止节点握手流量产生环路</div>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="setDirectForNodes">
-              <span></span>
-            </label>
-          </div>
-
-          <div class="setting-item">
-            <div class="grow">
-              <div class="title">屏蔽 QUIC (UDP 443)</div>
-              <div class="sub">阻止浏览器或客户端走 HTTP3/QUIC，回退至更稳定的 TCP 代理链路</div>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="setRejectQuic">
-              <span></span>
-            </label>
-          </div>
-
-          <div class="setting-item">
-            <div class="grow">
-              <div class="title">启用 IPv6</div>
-              <div class="sub">接管并分流局域网 IPv6 流量（若局域网未配置 IPv6 建议关闭）</div>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="setIpv6">
-              <span></span>
-            </label>
           </div>
         </div>
-        <p class="note" style="margin-top:12px">
-          TUN 协议栈由 sing-box 原生自动管理，无需手动维护路由表。改动后请点击右上角「保存并部署」。
-        </p>
       </div>
 
-      <!-- 核心卡片 3: DNS 分流与运行级别 (全面重构排版) -->
+      <!-- 核心卡片: DNS 广告过滤与黑白名单 (独立通栏卡片) -->
       <div class="card">
         <div class="card-head">
-          <h3>DNS 分流与运行级别</h3>
-        </div>
-        <p class="note" style="margin:-4px 0 16px">
-          配置透明代理 DNS 解析服务链、直连与代理上游分流及广告拦截策略
-        </p>
-
-        <!-- 1. 核心解析与日志参数 (规范的双列网格) -->
-        <div class="dns-grid">
-          <label class="field">
-            <span class="field-title">接管方式</span>
-            <select id="setDnsMode">
-              <option value="dnsmasq">dnsmasq 接管（推荐）</option>
-              <option value="off">不接管（自行配置系统 DNS）</option>
-            </select>
-            <span class="field-hint">将路由器 53 端口流量转发至 sing-box 独立分流解析</span>
-          </label>
-
-          <label class="field">
-            <span class="field-title">内核日志级别</span>
-            <select id="setLogLevel">
-              <option value="info">info（标准推荐）</option>
-              <option value="warn">warn（仅警告与错误）</option>
-              <option value="error">error（仅严重错误）</option>
-              <option value="debug">debug（调试详细信息）</option>
-              <option value="trace">trace（全量链路追踪）</option>
-            </select>
-            <span class="field-hint">控制 sing-box 运行日志的详细程度</span>
-          </label>
-
-          <label class="field">
-            <span class="field-title">直连 DNS 服务器</span>
-            <input id="setDnsDirect" placeholder="223.5.5.5">
-            <span class="field-hint">用于解析国内域名及直连请求（如阿里 223.5.5.5）</span>
-          </label>
-
-          <label class="field">
-            <span class="field-title">代理 DNS 服务器</span>
-            <input id="setDnsProxy" placeholder="1.1.1.1">
-            <span class="field-hint">用于解析代理域名及防 DNS 污染（如 1.1.1.1 / 8.8.8.8）</span>
+          <h3>DNS 广告过滤与黑白名单</h3>
+          <div class="spacer"></div>
+          <span class="note" style="margin-right:6px">开启拦截</span>
+          <label class="switch" title="开启/关闭广告过滤">
+            <input type="checkbox" id="setAdblock">
+            <span></span>
           </label>
         </div>
 
-        <!-- 2. 高级解析特性 (与 TUN 栈一致的高级条目 Switch 开关) -->
-        <div class="dns-switch-sec">
-          <div class="setting-item">
-            <div class="grow">
-              <div class="title">代理域名使用 FakeIP</div>
-              <div class="sub">为代理域名分配虚拟保留 IP (198.18.0.0/15)，大幅加速握手并消除本地 DNS 延迟</div>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="setFakeIp">
-              <span></span>
-            </label>
-          </div>
-
-          <div class="setting-item">
-            <div class="grow">
-              <div class="title">DNS 广告过滤（开屏广告与隐私追踪拦截）</div>
-              <div class="sub">基于 Geosite 广告规则集屏蔽移动端开屏广告与常见追踪器域名</div>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="setAdblock">
-              <span></span>
-            </label>
-          </div>
+        <div class="dns-rules-grid">
+          <label class="field">
+            <span class="field-title">手动广告黑名单（强制拦截）</span>
+            <textarea id="setAdblockCustom" rows="3" placeholder="每行一个域名，例如：&#10;ads.example.com&#10;adservice.google.com"></textarea>
+          </label>
+          <label class="field">
+            <span class="field-title">广告白名单（放行防误杀）</span>
+            <textarea id="setAdblockAllow" rows="3" placeholder="每行一个域名，例如：&#10;example.com&#10;analytics.trusted.org"></textarea>
+          </label>
         </div>
 
-        <!-- 3. 自定义规则与规则集维护 -->
-        <div class="dns-adblock-sec">
-          <div class="dns-rules-grid">
-            <label class="field">
-              <span class="field-title">手动广告黑名单（强制拦截）</span>
-              <textarea id="setAdblockCustom" rows="3" placeholder="每行一个域名，例如：&#10;ads.example.com&#10;adservice.google.com"></textarea>
-            </label>
-            <label class="field">
-              <span class="field-title">广告白名单（放行防误杀）</span>
-              <textarea id="setAdblockAllow" rows="3" placeholder="每行一个域名，例如：&#10;example.com&#10;analytics.trusted.org"></textarea>
-            </label>
-          </div>
-
-          <div class="dns-rules-foot">
-            <span class="note">远程 Geosite 规则集每日自动同步，亦可随时手动拉取 <span id="adblockRulesetDate" style="margin-left:6px;color:var(--text-muted)">(上次更新: <span id="adblockRulesetDateText">未更新</span>)</span></span>
-            <button class="small" id="btnAdblockRefresh">
-              <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              <span id="btnAdblockRefreshText">更新广告规则集</span>
-            </button>
-          </div>
+        <div class="dns-rules-foot" style="margin-top:10px">
+          <span class="note">远程 Geosite 规则集每日自动同步，亦可随时手动拉取 <span id="adblockRulesetDate" style="margin-left:6px;color:var(--text-muted)">(上次更新: <span id="adblockRulesetDateText">未更新</span>)</span></span>
+          <button class="small" id="btnAdblockRefresh">
+            <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            <span id="btnAdblockRefreshText">更新广告规则集</span>
+          </button>
         </div>
-      </div>
       </div>
 
       <!-- 核心卡片 4: 面板安全与管理密码修改 -->
