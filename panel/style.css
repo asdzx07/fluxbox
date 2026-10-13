@@ -314,9 +314,120 @@ nav.sb-nav button .bdg {
 main {
   flex: 1;
   min-width: 0;
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 28px 32px 80px;
+  max-width: 1400px;
+  margin: 0;
+  padding: 26px 36px 80px;
+}
+
+/* 概览页卡片标题链接及联动微件 */
+.card-title-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all .15s ease;
+  user-select: none;
+}
+.card-title-link:hover {
+  color: var(--accent);
+}
+.card-title-link:hover .title-arrow {
+  transform: translateX(3px);
+  color: var(--accent);
+  opacity: 1;
+}
+.title-arrow {
+  width: 16px;
+  height: 16px;
+  opacity: .45;
+  transition: all .15s ease;
+}
+
+.sub-filter-pill {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 12px;
+  background: var(--accent-weak);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  white-space: nowrap;
+}
+
+.overview-subs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ov-sub-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.ov-sub-item:hover {
+  border-color: var(--accent-weak, rgba(59, 130, 246, 0.4));
+  transform: translateY(-1px);
+}
+.ov-sub-item.active {
+  background: var(--accent-weak);
+  border-color: var(--accent);
+}
+.ov-sub-radio {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  transition: all .15s ease;
+}
+.ov-sub-item.active .ov-sub-radio {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.ov-sub-radio-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  display: none;
+}
+.ov-sub-item.active .ov-sub-radio-dot {
+  display: block;
+}
+.ov-sub-info {
+  flex: 1;
+  min-width: 0;
+}
+.ov-sub-title {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ov-sub-meta {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 1px;
+}
+.ov-sub-item.active .ov-sub-title {
+  color: var(--accent);
+}
+.ov-sub-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 @media (max-width: 768px) {

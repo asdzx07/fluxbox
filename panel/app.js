@@ -401,6 +401,10 @@ function startTrafficPoll() {
   }, 1500);
 }
 
+state.overviewSubs = [];
+state.overviewSelectedSubId = 'all';
+state.overviewGroupsData = null;
+
 async function loadOverview() {
   try {
     const data = await api('/overview');
@@ -421,48 +425,154 @@ async function loadOverview() {
     }
     $('overviewNote').textContent = note || '透明代理正常运行中 · 直连流量未进内核 (零损耗)';
 
-    $('statVersion').textContent = data.kernel?.version || '—';
-    $('statNodes').textContent = data.nodes?.total ? `${data.nodes.total} 个` : '0 个';
-    $('statPolicies').textContent = data.policies ? `${data.policies.enabled} / ${data.policies.total}` : '—';
+    if ($('statVersion')) $('statVersion').textContent = data.kernel?.version || '—';
+    if ($('statNodes')) $('statNodes').textContent = data.nodes?.total ? `${data.nodes.total} 个` : '0 个';
+    if ($('statPolicies')) $('statPolicies').textContent = data.policies ? `${data.policies.enabled} / ${data.policies.total}` : '—';
 
     const hint = $('overviewHint');
-    if (data.kernel?.error) {
-      hint.textContent = data.kernel.error;
-      hint.classList.remove('hidden');
-    } else {
-      hint.classList.add('hidden');
+    if (hint) {
+      if (data.kernel?.error) {
+        hint.textContent = data.kernel.error;
+        hint.classList.remove('hidden');
+      } else {
+        hint.classList.add('hidden');
+      }
     }
   } catch (err) {
-    $('statKernel').textContent = '读取失败';
-    $('overviewHint').textContent = err.message;
-    $('overviewHint').classList.remove('hidden');
+    if ($('statKernel')) $('statKernel').textContent = '读取失败';
+    const hint = $('overviewHint');
+    if (hint) {
+      hint.textContent = err.message;
+      hint.classList.remove('hidden');
+    }
   }
-  loadOverviewGroups();
+
+  await Promise.all([loadOverviewSubs(), loadOverviewGroups()]);
+}
+
+async function loadOverviewSubs() {
+  const box = $('overviewSubsList');
+  if (!box) return;
+  try {
+    const data = await api('/subscriptions');
+    state.overviewSubs = data.subscriptions || [];
+    if (state.overviewSelectedSubId !== 'all' && !state.overviewSubs.some((s) => s.id === state.overviewSelectedSubId)) {
+      state.overviewSelectedSubId = 'all';
+    }
+    renderOverviewSubs();
+  } catch (err) {
+    box.innerHTML = `<div class="mini-empty err-text">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderOverviewSubs() {
+  const box = $('overviewSubsList');
+  if (!box) return;
+  const subs = state.overviewSubs || [];
+  const totalNodes = subs.reduce((acc, s) => acc + (s.nodeCount || 0), 0);
+  const allActive = state.overviewSelectedSubId === 'all';
+
+  let html = `
+    <div class="ov-sub-item${allActive ? ' active' : ''}" data-ov-sub-id="all">
+      <div class="ov-sub-radio"><span class="ov-sub-radio-dot"></span></div>
+      <div class="ov-sub-info">
+        <div class="ov-sub-title">全部订阅 · 所有节点</div>
+        <div class="ov-sub-meta">全部 ${subs.length} 个订阅 · 共 ${totalNodes} 个节点</div>
+      </div>
+    </div>
+  `;
+
+  if (!subs.length) {
+    html += '<p class="note" style="padding:10px 0;text-align:center">暂无订阅，点击上方「订阅管理」前往添加</p>';
+  } else {
+    html += subs.map((s) => {
+      const active = state.overviewSelectedSubId === s.id;
+      return `
+        <div class="ov-sub-item${active ? ' active' : ''}" data-ov-sub-id="${escapeHtml(s.id)}">
+          <div class="ov-sub-radio"><span class="ov-sub-radio-dot"></span></div>
+          <div class="ov-sub-info">
+            <div class="ov-sub-title">${escapeHtml(s.name || s.id)}</div>
+            <div class="ov-sub-meta">${s.nodeCount || 0} 个节点 · ${s.enabled ? '已启用' : '<span style="color:var(--err)">已停用</span>'}</div>
+          </div>
+          <div class="ov-sub-actions" onclick="event.stopPropagation()">
+            <label class="switch" title="${s.enabled ? '停用此订阅' : '启用此订阅'}">
+              <input type="checkbox" data-ov-sub-toggle="${escapeHtml(s.id)}"${s.enabled ? ' checked' : ''}>
+              <span></span>
+            </label>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  box.innerHTML = html;
 }
 
 async function loadOverviewGroups() {
   const box = $('overviewGroups');
+  if (!box) return;
   try {
     const data = await api('/nodes/status');
-    const groups = data.groups || [];
-    if (!groups.length) {
-      box.innerHTML = '<div class="mini-empty">内核未运行或无节点组</div>';
-      return;
-    }
-    box.innerHTML = `<div class="mini">${groups.map((g) => `
-      <div class="mini-row">
-        <div class="grow">
-          <div class="name" style="font-weight:600">${escapeHtml(g.name)}</div>
-          <div class="sub">${GROUP_LABEL[g.type] || g.type} · ${g.members.length} 个可选</div>
-        </div>
-        <select data-ov-group="${escapeHtml(g.name)}">
-          ${g.members.map((m) => `<option value="${escapeHtml(m)}"${m === g.now ? ' selected' : ''}>${extractFlag(m)} ${escapeHtml(m)}</option>`).join('')}
-        </select>
-      </div>
-    `).join('')}</div>`;
+    state.overviewGroupsData = data.groups || [];
+    renderOverviewGroups();
   } catch (err) {
     box.innerHTML = `<div class="mini-empty">${escapeHtml(err.message)}</div>`;
   }
+}
+
+function renderOverviewGroups() {
+  const box = $('overviewGroups');
+  if (!box) return;
+  const groups = state.overviewGroupsData || [];
+  if (!groups.length) {
+    box.innerHTML = '<div class="mini-empty">内核未运行或无节点组</div>';
+    return;
+  }
+
+  const selectedSubId = state.overviewSelectedSubId;
+  const currSub = selectedSubId !== 'all' ? (state.overviewSubs || []).find((s) => s.id === selectedSubId) : null;
+  const subPill = $('subFilterPill');
+
+  if (currSub) {
+    if (subPill) {
+      subPill.textContent = `筛选：${currSub.name || currSub.id}`;
+      subPill.classList.remove('hidden');
+    }
+  } else {
+    if (subPill) {
+      subPill.textContent = '全部节点';
+      subPill.classList.add('hidden');
+    }
+  }
+
+  const subNodeSet = currSub?.nodeTags ? new Set(currSub.nodeTags) : null;
+
+  box.innerHTML = `<div class="mini">${groups.map((g) => {
+    let members = g.members || [];
+    if (subNodeSet) {
+      members = members.filter((m) => subNodeSet.has(m) || m === g.now);
+    }
+    const hasFilteredOut = subNodeSet && members.length === 0;
+
+    return `
+      <div class="mini-row">
+        <div class="grow">
+          <div class="name" style="font-weight:600">${escapeHtml(g.name)}</div>
+          <div class="sub">${GROUP_LABEL[g.type] || g.type} · ${members.length} 个可选${currSub ? ` (源于「${escapeHtml(currSub.name)}」)` : ''}</div>
+        </div>
+        <select data-ov-group="${escapeHtml(g.name)}"${hasFilteredOut ? ' disabled' : ''}>
+          ${hasFilteredOut
+            ? `<option value="">当前订阅无此组节点</option>`
+            : members.map((m) => {
+                const isCurrent = m === g.now;
+                const notInSub = subNodeSet && !subNodeSet.has(m) && isCurrent;
+                return `<option value="${escapeHtml(m)}"${isCurrent ? ' selected' : ''}>${extractFlag(m)} ${escapeHtml(m)}${notInSub ? ' (当前非该订阅)' : ''}</option>`;
+              }).join('')
+          }
+        </select>
+      </div>
+    `;
+  }).join('')}</div>`;
 }
 
 /* --------------------------------------------------------------- 当前连接 */
@@ -1310,39 +1420,52 @@ async function doDeploy(button) {
   });
 }
 
+async function switchTab(tab) {
+  if (!tab) return;
+  if (tab === 'logout') {
+    await api('/auth/logout', { method: 'POST' });
+    location.reload();
+    return;
+  }
+  const targetBtn = document.querySelector(`aside.sidebar button[data-tab="${tab}"]`);
+  document.querySelectorAll('aside.sidebar button[data-tab]').forEach((b) => b.classList.toggle('active', b === targetBtn));
+  document.querySelectorAll('section.page').forEach((p) => p.classList.toggle('active', p.id === `page-${tab}`));
+
+  if (tab === 'overview') { await loadOverview(); }
+  if (tab === 'nodes') { await loadNodes(); await loadGroups(); }
+  if (tab === 'connections') {
+    startConnAutoPoll();
+  } else {
+    stopConnAutoPoll();
+  }
+  if (tab === 'clients') loadClients();
+  if (tab === 'subscriptions') await loadSubscriptions();
+  if (tab === 'policies') {
+    if (!state.groups?.length) await loadGroups();
+    if (!state.nodeList?.length) await loadNodes();
+    await loadPolicies();
+  }
+  if (tab === 'settings') { await loadSettings(); await loadKernelLog(); await loadRulesetStatus(); }
+  scheduleLogAuto();
+}
+
 function bindEvents() {
   $('gateSubmit').addEventListener('click', submitGate);
   $('gatePassword').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitGate(); });
   $('gateConfirm').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitGate(); });
 
   // 导航切换
-  document.querySelectorAll('aside.sidebar nav.sb-nav button, .sb-foot button').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const tab = btn.dataset.tab;
-      if (tab === 'logout') {
-        await api('/auth/logout', { method: 'POST' });
-        location.reload();
-        return;
-      }
-      document.querySelectorAll('aside.sidebar button[data-tab]').forEach((b) => b.classList.toggle('active', b === btn));
-      document.querySelectorAll('section.page').forEach((p) => p.classList.toggle('active', p.id === `page-${tab}`));
+  document.querySelectorAll('aside.sidebar nav.sb-nav button, .sb-foot button[data-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
 
-      if (tab === 'nodes') { await loadNodes(); await loadGroups(); }
-      if (tab === 'connections') {
-        startConnAutoPoll();
-      } else {
-        stopConnAutoPoll();
-      }
-      if (tab === 'clients') loadClients();
-      if (tab === 'subscriptions') await loadSubscriptions();
-      if (tab === 'policies') {
-        if (!state.groups?.length) await loadGroups();
-        if (!state.nodeList?.length) await loadNodes();
-        await loadPolicies();
-      }
-      if (tab === 'settings') { await loadSettings(); await loadKernelLog(); await loadRulesetStatus(); }
-      scheduleLogAuto();
-    });
+  // 支持所有带有 data-nav-tab 的卡片标题或元素点击跳转
+  document.addEventListener('click', (e) => {
+    const navEl = e.target.closest('[data-nav-tab]');
+    if (navEl) {
+      const tab = navEl.dataset.navTab;
+      if (tab) switchTab(tab);
+    }
   });
 
   // 全局常驻与概览部署
@@ -1357,6 +1480,34 @@ function bindEvents() {
     loadTraffic();
   });
   startTrafficPoll();
+
+  // 概览页订阅管理与节点联动
+  $('btnOverviewRefreshSubs')?.addEventListener('click', (e) => withBusy(e.currentTarget, loadOverviewSubs));
+  $('overviewSubsList')?.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-ov-sub-id]');
+    if (!item) return;
+    const subId = item.dataset.ovSubId;
+    if (subId) {
+      state.overviewSelectedSubId = subId;
+      renderOverviewSubs();
+      renderOverviewGroups();
+    }
+  });
+  $('overviewSubsList')?.addEventListener('change', async (e) => {
+    const toggle = e.target.closest('[data-ov-sub-toggle]');
+    if (!toggle) return;
+    const subId = toggle.dataset.ovSubToggle;
+    const enabled = toggle.checked;
+    try {
+      await api(`/subscriptions/${encodeURIComponent(subId)}`, { method: 'PUT', body: { enabled } });
+      toast(`订阅已${enabled ? '启用' : '停用'}并部署生效`);
+      await loadOverviewSubs();
+      await loadOverviewGroups();
+    } catch (err) {
+      toast(`切换订阅失败：${err.message}`);
+      toggle.checked = !enabled;
+    }
+  });
 
   $('btnRestart').addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
     await api('/kernel/restart', { method: 'POST' });

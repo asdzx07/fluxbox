@@ -124,16 +124,27 @@
       </div>
 
       <div class="grid-2">
-        <div class="card">
-          <div class="card-head"><h3>内核状态</h3></div>
-          <div class="stat-row"><span>官方版本</span><strong id="statVersion">—</strong></div>
-          <div class="stat-row"><span>总节点数</span><strong id="statNodes">—</strong></div>
-          <div class="stat-row"><span>已启用策略</span><strong id="statPolicies">—</strong></div>
-        </div>
-        <div class="card">
+        <div class="card" id="cardOverviewSubs">
           <div class="card-head">
-            <h3>出口节点组</h3>
+            <h3 class="card-title-link" data-nav-tab="subscriptions" title="点击前往「订阅管理」页面">
+              <span>订阅管理</span>
+              <svg class="title-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </h3>
             <div class="spacer"></div>
+            <button class="small" id="btnOverviewRefreshSubs">刷新</button>
+          </div>
+          <p class="note" style="margin:-4px 0 10px">点击选择订阅，右侧出口节点组将联动展示该订阅节点</p>
+          <div id="overviewSubsList" class="overview-subs-list"></div>
+        </div>
+
+        <div class="card" id="cardOverviewGroups">
+          <div class="card-head">
+            <h3 class="card-title-link" data-nav-tab="nodes" title="点击前往「节点分组」页面">
+              <span>出口节点组</span>
+              <svg class="title-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </h3>
+            <div class="spacer"></div>
+            <span class="sub-filter-pill hidden" id="subFilterPill" title="当前节点过滤订阅">全部节点</span>
             <button class="small" id="btnOverviewNodes">刷新</button>
           </div>
           <div id="overviewGroups"></div>

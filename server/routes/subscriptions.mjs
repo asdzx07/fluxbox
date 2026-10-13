@@ -11,6 +11,7 @@ export function registerSubscriptionRoutes(app, deps) {
         return {
           ...subscription,
           nodeCount: subNodes.length,
+          nodeTags: subNodes.map((node) => node.tag),
           sampleNodes: subNodes.slice(0, 4).map((node) => node.tag),
         };
       }),
