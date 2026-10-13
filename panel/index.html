@@ -27,7 +27,7 @@
 
 <div id="app" class="hidden">
   <aside class="sidebar">
-    <div class="brand">MyBox<small id="brandVersion">v1.20 (B92)</small></div>
+    <div class="brand">MyBox<small id="brandVersion">v1.20 (B100)</small></div>
     
     <div class="sb-sec">导航</div>
     <nav class="sb-nav">
@@ -312,7 +312,7 @@
         <div>
           <div class="page-title-row">
             <h2>核心设置</h2>
-            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B92)</span>
+            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B100)</span>
           </div>
           <p class="note" style="margin-top:2px">网络栈协议、DNS 策略、内核系统及版本更新管理</p>
         </div>
@@ -357,10 +357,10 @@
               <span class="bdg" id="panelUpdateBadge">当前已是最新</span>
             </div>
             <div class="vmc-val">
-              <span id="sysVersion">MyBox: v1.20 (B92)</span>
+              <span id="sysVersion">MyBox: v1.20 (B100)</span>
             </div>
             <div class="vmc-foot">
-              <span>最新版本：<strong id="latestSysVersion">MyBox: v1.20 (B92)</strong></span>
+              <span>最新版本：<strong id="latestSysVersion">MyBox: v1.20 (B100)</strong></span>
               <span id="panelCheckTime">刚刚检查</span>
             </div>
           </div>
@@ -383,8 +383,10 @@
         </div>
       </div>
 
-      <!-- 核心卡片 2: 网络与 TUN 栈设置 -->
-      <div class="card">
+      <!-- 核心设置双列网格: 左侧网络与TUN, 右侧DNS分流 -->
+      <div class="settings-two-col-grid">
+        <!-- 核心卡片 2: 网络与 TUN 栈设置 -->
+        <div class="card">
         <div class="card-head">
           <h3>网络与 TUN 栈设置</h3>
         </div>
@@ -541,6 +543,7 @@
           </div>
         </div>
       </div>
+      </div>
 
       <!-- 核心卡片 4: 面板安全与管理密码修改 -->
       <div class="card">
@@ -553,7 +556,7 @@
           修改旁路由 MyBox 面板的管理访问密码。保存后所有已发放的历史登录凭据将立即失效。
         </p>
 
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px;max-width:800px">
+        <div class="pwd-row-form">
           <label class="field">
             <span class="field-title">当前管理密码</span>
             <input type="password" id="setCurrPassword" autocomplete="current-password" placeholder="请输入当前密码">
@@ -571,14 +574,14 @@
             <input type="password" id="setConfirmPassword" autocomplete="new-password" placeholder="再次输入新密码">
             <span class="field-hint">确保两次输入一致</span>
           </label>
-        </div>
 
-        <div style="margin-top:16px;display:flex;align-items:center;gap:12px">
-          <button class="primary" id="btnUpdatePassword" style="min-width:110px">
-            <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-            修改密码
-          </button>
-          <span class="note" id="pwdChangeHint">修改密码后将自动轮换安全密钥</span>
+          <div class="pwd-btn-box">
+            <button class="primary" id="btnUpdatePassword">
+              <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+              修改密码
+            </button>
+            <span class="field-hint" id="pwdChangeHint">自动轮换安全密钥</span>
+          </div>
         </div>
       </div>
 

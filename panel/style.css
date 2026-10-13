@@ -1262,3 +1262,60 @@ button.btn-warn {
     max-width: 140px;
   }
 }
+
+/* 核心设置双列响应式网格布局 */
+.settings-two-col-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+.settings-two-col-grid > .card {
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 面板安全设置同行排版 */
+.pwd-row-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+.pwd-row-form .field {
+  flex: 1 1 200px;
+  min-width: 180px;
+  margin: 0;
+}
+.pwd-btn-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.pwd-btn-box button {
+  height: 38px;
+  white-space: nowrap;
+  min-width: 110px;
+  margin-top: 23px;
+}
+.pwd-btn-box .field-hint {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+@media (max-width: 960px) {
+  .settings-two-col-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 768px) {
+  .pwd-btn-box button {
+    margin-top: 0;
+    width: 100%;
+  }
+}
+

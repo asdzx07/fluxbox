@@ -492,7 +492,7 @@ function renderOverviewSubs() {
           <div class="ov-sub-radio"><span class="ov-sub-radio-dot"></span></div>
           <div class="ov-sub-info">
             <div class="ov-sub-title">${escapeHtml(s.name || s.id)}</div>
-            <div class="ov-sub-meta">${s.nodeCount || 0} 个节点 · ${s.enabled ? '已启用' : '<span style="color:var(--err)">已停用</span>'}</div>
+            <div class="ov-sub-meta">${s.nodeCount || 0} 个节点</div>
           </div>
           <div class="ov-sub-actions" onclick="event.stopPropagation()">
             <label class="switch" title="${s.enabled ? '停用此订阅' : '启用此订阅'}">
