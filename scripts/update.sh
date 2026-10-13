@@ -166,6 +166,7 @@ if [ -f "$SRCDIR/VERSION" ]; then
 else
   echo "1.0.0" > "$STAGE/VERSION"
 fi
+[ -f "$SRCDIR/commit.sha" ] && cp "$SRCDIR/commit.sha" "$STAGE/commit.sha"
 [ -d "$STAGE/server" ] && [ -d "$STAGE/panel" ] && [ -d "$STAGE/tools" ] || die "暂存源码缺少必需目录"
 
 # Node / npm 依赖先在 staging 中准备；失败时正式目录保持不动。
@@ -222,7 +223,8 @@ COMMIT=$(curl -fsSL ${AUTH_HDR:+-H "$AUTH_HDR"} "https://api.github.com/repos/$R
 
 say "原子切换代码（data/ 不动）"
 UPDATE_APPLIED=1
-"$NODE_BIN" "$TXN_HELPER" apply "$ROOT" "$STAGE" "$BACKUP" server panel system tools scripts package.json VERSION node_modules
+"$NODE_BIN" "$TXN_HELPER" apply "$ROOT" "$STAGE" "$BACKUP" server panel system tools scripts package.json VERSION commit.sha node_modules
+[ -f "$ROOT/commit.sha" ] && cp -f "$ROOT/commit.sha" "$ROOT/data/commit.sha"
 [ -z "$COMMIT" ] || printf '%s\n' "$COMMIT" > "$ROOT/data/commit.sha"
 
 if [ "$PLATFORM" = openwrt ]; then

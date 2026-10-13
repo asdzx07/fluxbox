@@ -79,16 +79,7 @@ export function registerOperationRoutes(app, deps) {
       let buildNumber = 92;
       let commitSha = null;
 
-      // 1. 优先尝试从本地 git 获取提交数与短 hash
-      try {
-        const { execSync } = await import('node:child_process');
-        const count = execSync('git rev-list --count HEAD', { cwd: ROOT, encoding: 'utf8', timeout: 1500 }).trim();
-        if (/^\d+$/.test(count)) buildNumber = Number.parseInt(count, 10);
-        const sha = execSync('git rev-parse --short HEAD', { cwd: ROOT, encoding: 'utf8', timeout: 1500 }).trim();
-        if (sha) commitSha = sha;
-      } catch {}
-
-      // 2. 尝试从 VERSION 文件读取（支持纯源码部署或无 git 环境）
+      // 1. 优先尝试从 VERSION 文件读取（官方权威版本文件）
       try {
         const versionFile = path.join(ROOT, 'VERSION');
         if (fs.existsSync(versionFile)) {
@@ -100,12 +91,27 @@ export function registerOperationRoutes(app, deps) {
         }
       } catch {}
 
-      // 3. 尝试从 commit.sha 文件读取 hash
-      if (!commitSha) {
+      // 2. 本地 git 计数兜底（仅在无 VERSION 文件时）
+      if (!fs.existsSync(path.join(ROOT, 'VERSION'))) {
         try {
-          const shaFile = path.join(ROOT, 'data', 'commit.sha');
-          if (fs.existsSync(shaFile)) commitSha = fs.readFileSync(shaFile, 'utf8').trim().slice(0, 7);
+          const { execSync } = await import('node:child_process');
+          const count = execSync('git rev-list --count HEAD', { cwd: ROOT, encoding: 'utf8', timeout: 1500 }).trim();
+          if (/^\d+$/.test(count)) buildNumber = Number.parseInt(count, 10);
+          const sha = execSync('git rev-parse --short HEAD', { cwd: ROOT, encoding: 'utf8', timeout: 1500 }).trim();
+          if (sha) commitSha = sha;
         } catch {}
+      }
+
+      // 3. 读取本地 commit.sha（展示用）
+      if (!commitSha) {
+        for (const sf of [path.join(ROOT, 'commit.sha'), path.join(ROOT, 'data', 'commit.sha')]) {
+          try {
+            if (fs.existsSync(sf)) {
+              commitSha = fs.readFileSync(sf, 'utf8').trim().slice(0, 7);
+              if (commitSha) break;
+            }
+          } catch {}
+        }
       }
       const effectiveSha = commitSha || 'f4e9f8d';
       const shortVersion = `${semver} (B${buildNumber})`;
@@ -180,11 +186,11 @@ export function registerOperationRoutes(app, deps) {
         } catch {}
       }
 
-      if (remoteCommitSha && commitSha && remoteCommitSha !== commitSha) {
+      // 严格以远程构建号是否大于本地构建号为准判定更新，杜绝假版本死循环
+      if (remoteBuild > buildNumber) {
         hasUpdate = true;
-        if (remoteBuild <= buildNumber) remoteBuild = buildNumber + 1;
-      } else if (remoteBuild > buildNumber) {
-        hasUpdate = true;
+      } else {
+        hasUpdate = false;
       }
 
       const latest = hasUpdate ? `MyBox: ${remoteSemver} (B${remoteBuild})` : current;
