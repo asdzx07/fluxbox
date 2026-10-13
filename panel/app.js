@@ -1345,9 +1345,13 @@ function bindEvents() {
     });
   });
 
-  // 概览
-  $('btnDeploy').addEventListener('click', (e) => doDeploy(e.currentTarget));
-  $('btnTrafficReset').addEventListener('click', async () => {
+  // 全局常驻与概览部署
+  $('btnGlobalDeploy')?.addEventListener('click', (e) => doDeploy(e.currentTarget));
+  $('btnDeployFromNodes')?.addEventListener('click', (e) => doDeploy(e.currentTarget));
+  $('btnDeploySubs')?.addEventListener('click', (e) => doDeploy(e.currentTarget));
+  $('btnDeployClients')?.addEventListener('click', (e) => doDeploy(e.currentTarget));
+  $('btnDeploy')?.addEventListener('click', (e) => doDeploy(e.currentTarget));
+  $('btnTrafficReset')?.addEventListener('click', async () => {
     await api('/traffic/reset', { method: 'POST' });
     toast('流量统计已清零');
     loadTraffic();
@@ -1428,8 +1432,7 @@ function bindEvents() {
     toast('已添加新分组，请填写名称和关键词后点击「保存分组」');
   });
 
-  $('btnSaveGroups')?.addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
-    // 强制从 DOM 元素提取所有分组字段的最新输入值
+  async function commitGroupsFromDOM() {
     document.querySelectorAll('#groupList input[data-g-name]').forEach((input) => {
       const idx = Number(input.dataset.gName);
       if (state.groups[idx]) {
@@ -1459,7 +1462,19 @@ function bindEvents() {
     renderGroups();
     // 联动刷新策略下拉框中的分组列表
     if (state.policies?.length) renderPolicies();
-    toast('分组配置已保存；如内核未应用，请查看服务端日志');
+  }
+
+  $('btnSaveGroups')?.addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
+    await commitGroupsFromDOM();
+    toast('分组配置已保存（尚未部署生效）');
+  }));
+
+  $('btnSaveDeployGroups')?.addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
+    await commitGroupsFromDOM();
+    const report = await api('/deploy', { method: 'POST', body: { restart: true } });
+    const warns = report.warnings?.length ? `（${report.warnings.length} 条提示）` : '';
+    toast(`分组已保存并成功部署！${warns}`);
+    await loadOverview();
   }));
 
   $('groupList')?.addEventListener('input', (e) => {
@@ -1581,7 +1596,7 @@ function bindEvents() {
   });
 
   // 策略页
-  $('btnSavePolicies').addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
+  async function commitPoliciesFromDOM() {
     // 强制从 DOM 提取所有策略控件的最新值
     document.querySelectorAll('#policyList select[data-p-target]').forEach((sel) => {
       const idx = Number(sel.dataset.pTarget);
@@ -1611,7 +1626,19 @@ function bindEvents() {
     const res = await api('/policies', { method: 'PUT', body: { policies: state.policies } });
     if (res?.policies) state.policies = res.policies;
     renderPolicies();
-    toast('策略配置已保存；如内核未应用，请查看服务端日志');
+  }
+
+  $('btnSavePolicies')?.addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
+    await commitPoliciesFromDOM();
+    toast('策略配置已保存（尚未部署生效）');
+  }));
+
+  $('btnSaveDeployPolicies')?.addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
+    await commitPoliciesFromDOM();
+    const report = await api('/deploy', { method: 'POST', body: { restart: true } });
+    const warns = report.warnings?.length ? `（${report.warnings.length} 条提示）` : '';
+    toast(`分流策略已保存并成功部署！${warns}`);
+    await loadOverview();
   }));
 
   $('btnAddPolicy').addEventListener('click', () => {

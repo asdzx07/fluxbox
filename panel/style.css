@@ -250,6 +250,50 @@ nav.sb-nav button .bdg {
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
+.sb-deploy-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  background: var(--accent);
+  color: #fff !important;
+  font-weight: 600;
+  padding: 8.5px 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  margin-bottom: 6px;
+  transition: all .15s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+.sb-deploy-btn:hover {
+  background: var(--accent-hover, #2563eb);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+}
+.sb-deploy-btn:active {
+  transform: translateY(0);
+}
+.sb-deploy-btn .ic {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.sb-deploy-btn .ic svg {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+}
+.sb-deploy-btn .nav-text {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+}
+
 .sb-foot button.ghost {
   width: 100%;
   justify-content: flex-start;
@@ -296,7 +340,29 @@ main {
     padding: 7px 11px;
     font-size: 13px;
   }
-  .sb-sec, .sb-foot { display: none; }
+  .sb-sec { display: none; }
+  .sb-foot {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .sb-foot .sb-deploy-btn {
+    margin-bottom: 0;
+    flex: 1;
+    justify-content: center;
+    padding: 6.5px 12px;
+    font-size: 13px;
+  }
+  .sb-foot button.ghost {
+    width: auto;
+    flex: 0 0 auto;
+    padding: 6.5px 10px;
+    font-size: 13px;
+  }
   main { padding: 18px 16px 80px; }
 }
 

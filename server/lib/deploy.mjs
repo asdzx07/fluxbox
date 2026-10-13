@@ -21,6 +21,42 @@ const log = createLogger('deploy');
 
 const RULESET_CHECK_FILE = path.join(DATA_DIR, 'ruleset-check.json');
 const RULESET_RECHECK_MS = 24 * 3600 * 1000;
+const PROBE_MIRRORS = ['', 'https://ghfast.top/', 'https://gh-proxy.com/'];
+
+async function probeRuleSetUrl(rawUrl, timeoutMs = 4000) {
+  const candidates = [];
+  if (rawUrl.startsWith('https://raw.githubusercontent.com/')) {
+    for (const mirror of PROBE_MIRRORS) {
+      candidates.push(mirror ? `${mirror.replace(/\/+$/, '')}/${rawUrl}` : rawUrl);
+    }
+  } else {
+    candidates.push(rawUrl);
+  }
+
+  let isNotFound = false;
+  let lastErr = null;
+
+  for (const targetUrl of candidates) {
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(timeoutMs),
+        headers: { 'User-Agent': 'mybox/1.20' },
+      });
+      if (res.ok) {
+        return { ok: true, status: res.status };
+      }
+      if (res.status === 404 || res.status === 410) {
+        isNotFound = true;
+      }
+      lastErr = new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  return { ok: false, isNotFound, error: lastErr?.message || '探测失败' };
+}
 
 let deployQueue = Promise.resolve();
 let pendingDeploys = 0;
@@ -31,11 +67,11 @@ export function isDeploying() {
 }
 
 /**
- * 部署前确认每个规则集都能下载。
+ * 部署前确认每个规则集合法性。
  *
- * 为什么必须做：sing-box 启动时某个 rule-set 拉不到（比如 tag 写错、官方仓库
- * 改名了）会直接 FATAL，内核起不来还被 procd 反复重启，日志里只有一行 404。
- * 在这里提前拦下来，报清楚是哪个 tag 有问题，旧配置还能继续跑。
+ * 为什么必须做：sing-box 启动时若某个 remote rule-set 明确 404 或 tag 非法会直接 FATAL。
+ * 在这里提前拦下命名错误或 404，旧配置还能继续跑。
+ * 但若仅因网络瞬断（fetch failed / 超时），内核自身可通过代理出站拉取或使用本地缓存，不应阻断部署。
  *
  * 结果缓存 24 小时，避免每次部署都打一遍网络。
  */
@@ -45,15 +81,26 @@ async function validateRuleSets(settings) {
     if (!p.enabled) continue;
     for (const t of p.rulesets || []) tags.add(t);
   }
-  if (!tags.size) return { ok: true, checked: 0 };
+  if (!tags.size) return { ok: true, checked: 0, fatalFailures: [], warnings: [] };
 
   const cache = readJson(RULESET_CHECK_FILE, { at: 0, good: [], bad: {} });
   const fresh = Date.now() - (cache.at || 0) < RULESET_RECHECK_MS;
   const knownGood = new Set(fresh ? cache.good || [] : []);
-  const knownBad = fresh ? cache.bad || {} : {};
+
+  // 过滤掉历史中非致命的瞬态错误（如旧版本记录的「暂时探测不到」）
+  const knownBad = {};
+  if (fresh && cache.bad && typeof cache.bad === 'object') {
+    for (const [t, why] of Object.entries(cache.bad)) {
+      if (typeof why === 'string' && !why.includes('暂时探测不到')) {
+        knownBad[t] = why;
+      }
+    }
+  }
 
   const todo = [...tags].filter((t) => !knownGood.has(t));
   const bad = { ...knownBad };
+  const warnings = [];
+  const rsDir = path.join(DATA_DIR, 'rulesets');
 
   await Promise.all(todo.map(async (tag) => {
     const url = ruleSetUrl(tag);
@@ -61,24 +108,48 @@ async function validateRuleSets(settings) {
       bad[tag] = '规则集名不认识（只支持 geosite-* / geoip-* 前缀）';
       return;
     }
+
+    // 检查本地磁盘是否已存在已缓存的规则集文件
+    const localSrs = path.join(rsDir, `${tag}.srs`);
+    const localJson = path.join(rsDir, `${tag}.json`);
+    let hasLocalCache = false;
     try {
-      const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(10000) });
-      if (res.ok) {
-        knownGood.add(tag);
-        delete bad[tag];
-      } else {
-        bad[tag] = `HTTP ${res.status}`;
-      }
-    } catch (err) {
-      // 网络不通不算「坏」，别因为一次超时就把用户的策略判死
-      bad[tag] = `暂时探测不到（${err.message}）`;
+      hasLocalCache = (fs.existsSync(localSrs) && fs.statSync(localSrs).size > 0) ||
+                      (fs.existsSync(localJson) && fs.statSync(localJson).size > 0);
+    } catch {}
+
+    const probe = await probeRuleSetUrl(url);
+    if (probe.ok) {
+      knownGood.add(tag);
+      delete bad[tag];
+      return;
+    }
+
+    if (probe.isNotFound) {
+      bad[tag] = '远程规则集不存在（HTTP 404）';
+      return;
+    }
+
+    // 若只是网络直连不通（fetch failed / 超时）
+    if (hasLocalCache) {
+      knownGood.add(tag);
+      delete bad[tag];
+      warnings.push(`规则集「${tag}」在线探测超时，已使用本地缓存放行`);
+    } else {
+      delete bad[tag];
+      warnings.push(`规则集「${tag}」在线探测超时（${probe.error}），内核启动时将通过代理出站尝试拉取`);
     }
   }));
 
   writeJsonAtomic(RULESET_CHECK_FILE, { at: Date.now(), good: [...knownGood], bad });
 
-  const failures = Object.entries(bad).filter(([t]) => tags.has(t));
-  return { ok: failures.length === 0, checked: tags.size, failures };
+  const fatalFailures = Object.entries(bad).filter(([t]) => tags.has(t));
+  return {
+    ok: fatalFailures.length === 0,
+    checked: tags.size,
+    fatalFailures,
+    warnings,
+  };
 }
 
 /**
@@ -147,18 +218,21 @@ async function deployInner({ restart = true, skipNetwork = false } = {}) {
     step('写入手动广告规则', `${(custom.rules[0]?.domain_suffix || []).length} 个域名`);
   }
 
-  // ---- 2. 校验规则集能下载（内核拉不到会直接 FATAL）
+  // ---- 2. 校验规则集（防止非法 tag 或 404 导致内核启动 FATAL）
   const rsCheck = await validateRuleSets(settings);
+  if (rsCheck.warnings?.length) {
+    report.warnings.push(...rsCheck.warnings);
+  }
   if (!rsCheck.ok) {
-    const detail = rsCheck.failures.map(([t, why]) => `${t}（${why}）`).join('；');
-    const msg = `这些规则集拉不下来，内核会起不来，已中止部署：${detail}`;
+    const detail = (rsCheck.fatalFailures || []).map(([t, why]) => `${t}（${why}）`).join('；');
+    const msg = `存在无法识别或不存在的规则集，内核无法启动，已中止部署：${detail}`;
     report.errors.push(msg);
     mutateSettings((s) => {
       s.meta.lastDeployError = msg;
     });
     throw new Error(msg);
   }
-  step('校验规则集', `${rsCheck.checked} 个可下载`);
+  step('校验规则集', `${rsCheck.checked} 个规则集已确认`);
 
   // ---- 3. 生成配置
   const { config, warnings, bypassSets } = generateConfig(settings);

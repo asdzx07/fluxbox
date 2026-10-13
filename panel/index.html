@@ -75,6 +75,10 @@
     </nav>
 
     <div class="sb-foot">
+      <button id="btnGlobalDeploy" class="sb-deploy-btn" title="立即部署当前所有配置到内核">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
+        <span class="nav-text">部署配置</span>
+      </button>
       <button data-tab="logout" class="ghost">
         <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg></span>
         退出登录
@@ -147,6 +151,7 @@
           <div class="spacer"></div>
           <button class="small" id="btnCollapseAll">全部折叠</button>
           <button class="small" id="btnReloadNodes">刷新</button>
+          <button class="small" id="btnDeployFromNodes" title="立即部署当前配置">部署配置</button>
           <button class="small primary" id="btnTestAll">⚡ 全部测速</button>
         </div>
         <p class="note" style="margin:-4px 0 14px">
@@ -164,8 +169,9 @@
         </div>
         <p class="note" style="margin:-4px 0 12px">「自动择优」组按延迟选最快节点；「手动选择」组自己挑。动态组会按关键词自动收编新节点。</p>
         <div id="groupList"></div>
-        <div style="margin-top:14px">
-          <button class="primary" id="btnSaveGroups">保存分组</button>
+        <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+          <button class="primary" id="btnSaveDeployGroups">⚡ 保存并部署</button>
+          <button id="btnSaveGroups">仅保存分组</button>
         </div>
       </div>
 
@@ -191,7 +197,8 @@
           <button class="small" id="btnRefreshRulesets">更新规则集</button>
           <button class="small" id="btnResetPolicies">恢复默认</button>
           <button class="small" id="btnAddPolicy">＋ 新增策略</button>
-          <button class="primary" id="btnSavePolicies">保存策略</button>
+          <button class="primary" id="btnSaveDeployPolicies">⚡ 保存并部署</button>
+          <button class="small" id="btnSavePolicies">仅保存</button>
         </div>
       </div>
 
@@ -252,6 +259,7 @@
           <h3>局域网设备控制</h3>
           <div class="spacer"></div>
           <button class="small" id="btnScanClients">刷新设备列表</button>
+          <button class="small" id="btnDeployClients" title="立即部署当前配置">部署配置</button>
           <button class="small primary" id="btnAddClient">＋ 添加设备</button>
         </div>
         <div id="clientList"></div>
@@ -280,6 +288,7 @@
           <h3>已有订阅</h3>
           <div class="spacer"></div>
           <button class="small" id="btnRefreshSubs">全部刷新</button>
+          <button class="small primary" id="btnDeploySubs">⚡ 部署配置</button>
         </div>
         <p class="note" id="subSwitchNote" style="margin:-4px 0 12px"></p>
         <div class="list" id="subList"></div>
