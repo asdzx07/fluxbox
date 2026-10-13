@@ -1343,32 +1343,49 @@ label.field > span,
    12. 实时当前连接体系 (Connections)
    ========================================================================== */
 
+/* 当前连接容器双列网格 */
+#connsList .list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 960px) {
+  #connsList .list {
+    grid-template-columns: 1fr;
+  }
+}
+
 .conn-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   padding: 9px 12px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  margin-bottom: 6px;
+  margin-bottom: 0;
   transition: all var(--duration) ease;
+  min-width: 0;
 }
 .conn-item:hover {
   border-color: var(--accent-border);
   background: var(--surface-hover);
+  transform: translateY(-1px);
 }
 
 .conn-main {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  overflow: hidden;
 }
 .conn-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 .conn-target {
   font-weight: 600;
@@ -1377,13 +1394,13 @@ label.field > span,
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 320px;
-  flex-shrink: 0;
+  max-width: 220px;
+  flex: 0 1 auto;
 }
 .conn-proto {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
-  padding: 1px 5px;
+  padding: 1px 4px;
   border-radius: var(--radius-xs);
   flex-shrink: 0;
 }
@@ -1392,16 +1409,16 @@ label.field > span,
   color: var(--text-2);
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
-  padding: 1px 6px;
+  padding: 1px 5px;
   border-radius: var(--radius-xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 240px;
+  max-width: 140px;
   flex: 0 1 auto;
 }
 .conn-meta-sub {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text-3);
   margin-top: 2px;
   white-space: nowrap;
@@ -1420,31 +1437,30 @@ label.field > span,
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 6px;
 }
 .conn-traffic {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
   color: var(--text-2);
   background: var(--surface-2);
-  padding: 3px 8px;
+  padding: 3px 6px;
   border-radius: var(--radius-xs);
   border: 1px solid var(--border-subtle);
   white-space: nowrap;
-  min-width: 156px;
   text-align: right;
   font-variant-numeric: tabular-nums;
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 5px;
+  gap: 4px;
 }
 .conn-traffic .tf-down { color: var(--ok); }
 .conn-traffic .tf-up { color: var(--accent); }
 .conn-traffic .tf-sep { opacity: 0.4; }
 .conn-btn-close {
-  min-width: 48px;
-  padding: 3px 8px;
+  min-width: 44px;
+  padding: 2.5px 7px;
   font-size: 11px;
   flex-shrink: 0;
 }
@@ -1453,16 +1469,30 @@ label.field > span,
    13. 内网分流设备体系 (Clients)
    ========================================================================== */
 
+/* 内网分流设备容器双列网格 */
+#clientList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 860px) {
+  #clientList {
+    grid-template-columns: 1fr;
+  }
+}
+
 .client-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 12px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  margin-bottom: 8px;
+  margin-bottom: 0;
   transition: border-color var(--duration) ease, transform var(--duration) ease;
+  min-width: 0;
 }
 .client-item:hover {
   border-color: var(--accent-border);

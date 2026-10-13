@@ -93,6 +93,7 @@ export function defaultSettings() {
       proxyPort: 53,
       fakeIp: true,
       fakeIpRange: '198.19.0.0/16',
+      strategy: 'prefer_ipv4',
       region: 'cn',
       hijackPort: 36053,
       adblock: false,

@@ -27,7 +27,7 @@
 
 <div id="app" class="hidden">
   <aside class="sidebar">
-    <div class="brand">MyBox<small id="brandVersion">v1.20 (B102)</small></div>
+    <div class="brand">MyBox<small id="brandVersion">v1.20 (B103)</small></div>
     
     <div class="sb-sec">导航</div>
     <nav class="sb-nav">
@@ -318,7 +318,7 @@
         <div>
           <div class="page-title-row">
             <h2>核心设置</h2>
-            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B102)</span>
+            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B103)</span>
           </div>
           <p class="note" style="margin-top:2px">网络栈协议、DNS 策略、内核系统及版本更新管理</p>
         </div>
@@ -363,10 +363,10 @@
               <span class="bdg" id="panelUpdateBadge">当前已是最新</span>
             </div>
             <div class="vmc-val">
-              <span id="sysVersion">MyBox: v1.20 (B102)</span>
+              <span id="sysVersion">MyBox: v1.20 (B103)</span>
             </div>
             <div class="vmc-foot">
-              <span>最新版本：<strong id="latestSysVersion">MyBox: v1.20 (B102)</strong></span>
+              <span>最新版本：<strong id="latestSysVersion">MyBox: v1.20 (B103)</strong></span>
               <span id="panelCheckTime">刚刚检查</span>
             </div>
           </div>
@@ -490,16 +490,45 @@
               <span class="field-title">代理 DNS 服务器</span>
               <input id="setDnsProxy" placeholder="1.1.1.1">
             </label>
+
+            <label class="field">
+              <span class="field-title">解析策略 (Strategy)</span>
+              <select id="setDnsStrategy">
+                <option value="prefer_ipv4">优先 IPv4（推荐，最稳定）</option>
+                <option value="ipv4_only">仅 IPv4（屏蔽 AAAA 记录）</option>
+                <option value="prefer_ipv6">优先 IPv6（纯 IPv6 环境）</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field-title">代理 DNS 传输协议</span>
+              <select id="setDnsProxyProtocol">
+                <option value="tcp">TCP 传输（推荐，防 DNS 污染）</option>
+                <option value="udp">UDP 传输（极速低延迟）</option>
+              </select>
+            </label>
           </div>
 
-          <!-- FakeIP 选项条目 -->
+          <!-- 实用 DNS 特性开关列表 -->
           <div class="setting-list" style="margin-top:auto;padding-top:10px;border-top:1px solid var(--border)">
-            <div class="setting-item" style="padding:10px 0">
+            <div class="setting-item" style="padding:8px 0">
               <div class="grow">
                 <div class="title">代理域名使用 FakeIP</div>
+                <div class="sub">分配虚拟保留保留 IP，加速握手并消除本地延迟</div>
               </div>
               <label class="switch">
                 <input type="checkbox" id="setFakeIp">
+                <span></span>
+              </label>
+            </div>
+
+            <div class="setting-item" style="padding:8px 0">
+              <div class="grow">
+                <div class="title">国内外域名智能分流解析</div>
+                <div class="sub">国内域名直连 DNS、国外代理 DNS，防解析污染</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setDnsSplit">
                 <span></span>
               </label>
             </div>

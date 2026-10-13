@@ -394,7 +394,7 @@ function buildDns(settings, names) {
     // 注意不能用 FakeIP 当默认——sing-box 会直接 FATAL：
     // "default server cannot be fakeip"。FakeIP 只能通过显式规则命中。
     final: 'dns-proxy',
-    strategy: network.ipv6 ? 'prefer_ipv4' : 'ipv4_only',
+    strategy: dns.strategy || (network.ipv6 ? 'prefer_ipv4' : 'ipv4_only'),
   };
 }
 

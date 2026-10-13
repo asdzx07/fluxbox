@@ -1323,6 +1323,9 @@ async function loadSettings() {
     if ($('setDnsMode')) $('setDnsMode').value = s.dns?.mode || 'dnsmasq';
     if ($('setDnsDirect')) $('setDnsDirect').value = s.dns?.direct === 'wan' ? '' : (s.dns?.directAddress || '');
     if ($('setDnsProxy')) $('setDnsProxy').value = s.dns?.proxy || '';
+    if ($('setDnsStrategy')) $('setDnsStrategy').value = s.dns?.strategy || 'prefer_ipv4';
+    if ($('setDnsProxyProtocol')) $('setDnsProxyProtocol').value = s.dns?.proxyProtocol || 'tcp';
+    if ($('setDnsSplit')) $('setDnsSplit').checked = s.dns?.split !== false;
     if ($('setFakeIp')) $('setFakeIp').checked = Boolean(s.dns?.fakeIp);
     if ($('setAdblock')) $('setAdblock').checked = Boolean(s.dns?.adblock);
     if ($('setAdblockAllow')) $('setAdblockAllow').value = (s.dns?.adblockAllow || []).join('\n');
@@ -1948,6 +1951,9 @@ function bindEvents() {
           direct: $('setDnsDirect').value.trim() ? 'custom' : 'wan',
           directAddress: $('setDnsDirect').value.trim(),
           proxy: $('setDnsProxy').value.trim() || '1.1.1.1',
+          strategy: $('setDnsStrategy') ? $('setDnsStrategy').value : 'prefer_ipv4',
+          proxyProtocol: $('setDnsProxyProtocol') ? $('setDnsProxyProtocol').value : 'tcp',
+          split: $('setDnsSplit') ? $('setDnsSplit').checked : true,
           fakeIp: $('setFakeIp').checked,
           adblock: $('setAdblock').checked,
           adblockAllow: $('setAdblockAllow').value.split('\n').map((s) => s.trim()).filter(Boolean),
