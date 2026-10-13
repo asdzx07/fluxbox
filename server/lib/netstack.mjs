@@ -34,18 +34,36 @@ async function readSysctl(key) {
 }
 
 /** 作为旁路由/主路由给局域网分流，必须打开 IP 转发。 */
-export async function enableForwarding() {
+export async function enableForwarding(ipv6 = false) {
   const key = 'net.ipv4.ip_forward';
   const before = await readSysctl(key);
   if (before !== '1') {
     await run('sysctl', ['-w', `${key}=1`]);
     log.info('已打开 IPv4 转发（原值 %s）', before ?? '未知');
   }
-  return { key, before };
+
+  let v6Before = null;
+  if (ipv6) {
+    v6Before = await readSysctl('net.ipv6.conf.all.forwarding');
+    if (v6Before !== '1') {
+      await run('sysctl', ['-w', 'net.ipv6.conf.all.forwarding=1']);
+      await run('sysctl', ['-w', 'net.ipv6.conf.default.forwarding=1']);
+      log.info('已打开 IPv6 转发（原值 %s）', v6Before ?? '未知');
+    }
+  }
+
+  return { key, before, v6Before };
 }
 
-export async function restoreForwarding(before) {
-  if (before === '0') await run('sysctl', ['-w', 'net.ipv4.ip_forward=0']);
+export async function restoreForwarding(forwardingState) {
+  const v4Before = typeof forwardingState === 'object' ? forwardingState?.before : forwardingState;
+  if (v4Before === '0') await run('sysctl', ['-w', 'net.ipv4.ip_forward=0']);
+
+  const v6Before = typeof forwardingState === 'object' ? forwardingState?.v6Before : null;
+  if (v6Before === '0') {
+    await run('sysctl', ['-w', 'net.ipv6.conf.all.forwarding=0']);
+    await run('sysctl', ['-w', 'net.ipv6.conf.default.forwarding=0']);
+  }
 }
 
 /* -------------------------------------------------------- dnsmasq 接管 */
@@ -285,7 +303,10 @@ export async function apply(settings) {
     return result;
   }
 
-  result.forwarding = await enableForwarding();
+  result.forwarding = await enableForwarding(Boolean(settings.network?.ipv6));
+  if (result.forwarding) {
+    writeJsonAtomic(STATE_FILE, { ...readJson(STATE_FILE, {}), forwarding: result.forwarding });
+  }
 
   if (settings.dns.mode === 'dnsmasq') {
     try {
@@ -303,7 +324,7 @@ export async function apply(settings) {
 export async function cleanup() {
   const state = readJson(STATE_FILE, {});
   await restoreDnsmasq();
-  if (state.forwarding?.before === '0') await restoreForwarding('0');
+  if (state.forwarding) await restoreForwarding(state.forwarding);
   fs.rmSync(STATE_FILE, { force: true });
 }
 

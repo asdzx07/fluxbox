@@ -199,7 +199,14 @@ function buildOutbounds(settings) {
   for (const b of BUILTIN_OUTBOUND_LIST) {
     if (!tags.has(b.tag)) {
       tags.add(b.tag);
-      outbounds.push({ ...b });
+      if (b.tag === DIRECT_TAG && settings.network.ipv6) {
+        outbounds.push({
+          ...b,
+          inet6_bind_address: '::',
+        });
+      } else {
+        outbounds.push({ ...b });
+      }
     }
   }
 
@@ -569,7 +576,10 @@ function buildInbounds(settings, bypassSets = []) {
     };
     if (network.ipv6) {
       tun.address.push('fdfe:dcba:9876::1/126');
-      tun.route_exclude_address.push('fc00::/7', 'fe80::/10', 'ff00::/8');
+      tun.dns_address.push('fdfe:dcba:9876::2');
+      // 注意：千万不能排除 fc00::/7！因为开启 FakeIP 时 IPv6 FakeIP 地址池正是 fc00::/18，
+      // 若排除 fc00::/7 会将 FakeIP 流量丢出 TUN 导致全网断网。仅需排除链路本地与组播即可。
+      tun.route_exclude_address.push('fe80::/10', 'ff00::/8');
     }
     if (network.tun.autoRedirect && process.platform === 'linux') {
       // auto_redirect 依赖 nftables，只在 Linux 上有意义
@@ -583,7 +593,7 @@ function buildInbounds(settings, bypassSets = []) {
     inbounds.push({
       type: 'direct',
       tag: 'dns-in',
-      listen: '0.0.0.0',
+      listen: network.ipv6 ? '::' : '0.0.0.0',
       listen_port: Number(dns.hijackPort) || KERNEL.dnsPort,
     });
   }

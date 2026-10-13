@@ -126,3 +126,26 @@ test('VLESS and VMess parsing preserves transport and TLS output', () => {
     nodes: [expectedVless, expectedVmess],
   });
 });
+
+test('config generation supports IPv6 dual-stack and prevents FakeIP route exclusion collision', () => {
+  const settings = defaultSettings();
+  settings.network.ipv6 = true;
+  const { config } = generateConfig(settings);
+
+  const tun = config.inbounds.find((i) => i.tag === 'tun-in');
+  assert.ok(tun.address.includes('fdfe:dcba:9876::1/126'));
+  assert.ok(tun.dns_address.includes('fdfe:dcba:9876::2'));
+  assert.ok(tun.route_exclude_address.includes('fe80::/10'));
+  assert.ok(tun.route_exclude_address.includes('ff00::/8'));
+  // 核心断言：绝对不能包含 fc00::/7，否则与 FakeIP 的 fc00::/18 冲突导致断网
+  assert.equal(tun.route_exclude_address.includes('fc00::/7'), false);
+
+  const direct = config.outbounds.find((o) => o.tag === '直连');
+  assert.equal(direct.inet4_bind_address, '0.0.0.0');
+  assert.equal(direct.inet6_bind_address, '::');
+
+  const dnsIn = config.inbounds.find((i) => i.tag === 'dns-in');
+  assert.equal(dnsIn.listen, '::');
+
+  assert.equal(config.dns.strategy, 'prefer_ipv4');
+});
