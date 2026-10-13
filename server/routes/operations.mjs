@@ -117,26 +117,34 @@ export function registerOperationRoutes(app, deps) {
       let remoteBuild = buildNumber;
       let hasUpdate = false;
 
-      // 优先从 raw 读取最新 VERSION 文件
-      try {
-        const rawRes = await fetch('https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION', {
-          headers: { 'User-Agent': 'mybox' },
-          signal: AbortSignal.timeout(3000),
-        });
-        if (rawRes.ok) {
-          const rawText = (await rawRes.text()).trim();
-          const rBMatch = rawText.match(/B(\d+)/i) || rawText.match(/\d+\.\d+\.(\d+)/);
-          if (rBMatch) remoteBuild = Number.parseInt(rBMatch[1], 10);
-          const rVMatch = rawText.match(/v?(\d+\.\d+)/);
-          if (rVMatch) remoteSemver = `v${rVMatch[1]}`;
-        }
-      } catch {}
+      // 优先从 raw 读取最新 VERSION 文件（带国内镜像重试）
+      const versionCandidates = [
+        'https://ghfast.top/https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION',
+        'https://gh-proxy.com/https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION',
+        'https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION',
+      ];
+      for (const vUrl of versionCandidates) {
+        try {
+          const rawRes = await fetch(vUrl, {
+            headers: { 'User-Agent': 'mybox/1.20' },
+            signal: AbortSignal.timeout(5000),
+          });
+          if (rawRes.ok) {
+            const rawText = (await rawRes.text()).trim();
+            const rBMatch = rawText.match(/B(\d+)/i) || rawText.match(/\d+\.\d+\.(\d+)/);
+            if (rBMatch) remoteBuild = Number.parseInt(rBMatch[1], 10);
+            const rVMatch = rawText.match(/v?(\d+\.\d+)/);
+            if (rVMatch) remoteSemver = `v${rVMatch[1]}`;
+            break;
+          }
+        } catch {}
+      }
 
       // 通过 API 检查最新 commit sha
       try {
         const response = await fetch('https://api.github.com/repos/asdzx07/MyBox/commits/main', {
-          headers: { 'User-Agent': 'mybox' },
-          signal: AbortSignal.timeout(3000),
+          headers: { 'User-Agent': 'mybox/1.20' },
+          signal: AbortSignal.timeout(5000),
         });
         if (response.ok) {
           const json = await response.json();
