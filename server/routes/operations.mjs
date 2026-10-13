@@ -117,12 +117,19 @@ export function registerOperationRoutes(app, deps) {
       let remoteBuild = buildNumber;
       let hasUpdate = false;
 
-      // 优先从 raw 读取最新 VERSION 文件（带国内镜像重试）
+      // 优先从 raw 读取最新 VERSION 文件与 commit.sha（带国内镜像重试）
       const versionCandidates = [
         'https://ghfast.top/https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION',
         'https://gh-proxy.com/https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION',
         'https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION',
       ];
+      const shaCandidates = [
+        'https://ghfast.top/https://raw.githubusercontent.com/asdzx07/mybox/main/commit.sha',
+        'https://gh-proxy.com/https://raw.githubusercontent.com/asdzx07/mybox/main/commit.sha',
+        'https://raw.githubusercontent.com/asdzx07/mybox/main/commit.sha',
+      ];
+
+      let fetchSucceeded = false;
       for (const vUrl of versionCandidates) {
         try {
           const rawRes = await fetch(vUrl, {
@@ -135,22 +142,43 @@ export function registerOperationRoutes(app, deps) {
             if (rBMatch) remoteBuild = Number.parseInt(rBMatch[1], 10);
             const rVMatch = rawText.match(/v?(\d+\.\d+)/);
             if (rVMatch) remoteSemver = `v${rVMatch[1]}`;
+            fetchSucceeded = true;
             break;
           }
         } catch {}
       }
 
-      // 通过 API 检查最新 commit sha
-      try {
-        const response = await fetch('https://api.github.com/repos/asdzx07/MyBox/commits/main', {
-          headers: { 'User-Agent': 'mybox/1.20' },
-          signal: AbortSignal.timeout(5000),
-        });
-        if (response.ok) {
-          const json = await response.json();
-          remoteCommitSha = json.sha?.slice(0, 7) || null;
-        }
-      } catch {}
+      for (const sUrl of shaCandidates) {
+        try {
+          const shaRes = await fetch(sUrl, {
+            headers: { 'User-Agent': 'mybox/1.20' },
+            signal: AbortSignal.timeout(5000),
+          });
+          if (shaRes.ok) {
+            const shaText = (await shaRes.text()).trim();
+            if (shaText) {
+              remoteCommitSha = shaText.slice(0, 7);
+              fetchSucceeded = true;
+              break;
+            }
+          }
+        } catch {}
+      }
+
+      // 通过 API 检查最新 commit sha（兜底）
+      if (!remoteCommitSha) {
+        try {
+          const response = await fetch('https://api.github.com/repos/asdzx07/mybox/commits/main', {
+            headers: { 'User-Agent': 'mybox/1.20' },
+            signal: AbortSignal.timeout(5000),
+          });
+          if (response.ok) {
+            const json = await response.json();
+            remoteCommitSha = json.sha?.slice(0, 7) || null;
+            if (remoteCommitSha) fetchSucceeded = true;
+          }
+        } catch {}
+      }
 
       if (remoteCommitSha && commitSha && remoteCommitSha !== commitSha) {
         hasUpdate = true;
@@ -170,6 +198,8 @@ export function registerOperationRoutes(app, deps) {
         commitSha: effectiveSha,
         latest,
         hasUpdate,
+        checkFailed: !fetchSucceeded,
+        checkError: !fetchSucceeded ? '无法连接到更新服务器，请检查旁路由网络连接' : null,
       });
     } catch (err) {
       res.status(500).json({ ok: false, error: err.message });

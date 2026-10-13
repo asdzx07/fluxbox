@@ -1316,7 +1316,13 @@ async function loadSettings() {
 
     const pBadge = $('panelUpdateBadge');
     const applyBtn = $('btnSysUpdate');
-    if (v.hasUpdate) {
+    if (v.checkFailed) {
+      if (pBadge) {
+        pBadge.textContent = '检查失败';
+        pBadge.style.color = 'var(--err)';
+      }
+      if (applyBtn) applyBtn.classList.add('hidden');
+    } else if (v.hasUpdate) {
       if (pBadge) {
         pBadge.textContent = `发现新版本 ${v.latest}`;
         pBadge.style.color = 'var(--warn)';
@@ -1955,6 +1961,16 @@ function bindEvents() {
 
       const pBadge = $('panelUpdateBadge');
       const applyBtn = $('btnSysUpdate');
+      if (v.checkFailed) {
+        if (pBadge) {
+          pBadge.textContent = '检查失败';
+          pBadge.style.color = 'var(--err)';
+        }
+        if (applyBtn) applyBtn.classList.add('hidden');
+        if (txt) txt.textContent = '检查更新';
+        toast(`检查更新失败：${v.checkError || '网络连接超时'}`);
+        return;
+      }
       if (v.hasUpdate) {
         if (pBadge) {
           pBadge.textContent = `发现新版本 ${v.latest}`;
