@@ -223,8 +223,8 @@ COMMIT=$(curl -fsSL ${AUTH_HDR:+-H "$AUTH_HDR"} "https://api.github.com/repos/$R
 
 say "原子切换代码（data/ 不动）"
 UPDATE_APPLIED=1
-"$NODE_BIN" "$TXN_HELPER" apply "$ROOT" "$STAGE" "$BACKUP" server panel system tools scripts package.json VERSION commit.sha node_modules
-[ -f "$ROOT/commit.sha" ] && cp -f "$ROOT/commit.sha" "$ROOT/data/commit.sha"
+"$NODE_BIN" "$TXN_HELPER" apply "$ROOT" "$STAGE" "$BACKUP" server panel system tools scripts package.json VERSION node_modules
+[ -f "$SRCDIR/commit.sha" ] && cp -f "$SRCDIR/commit.sha" "$ROOT/data/commit.sha" 2>/dev/null || true
 [ -z "$COMMIT" ] || printf '%s\n' "$COMMIT" > "$ROOT/data/commit.sha"
 
 if [ "$PLATFORM" = openwrt ]; then

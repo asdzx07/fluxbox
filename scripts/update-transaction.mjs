@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const manifestName = '.update-changed';
 const allowedItems = new Set([
   'server', 'panel', 'system', 'tools', 'scripts',
-  'package.json', 'VERSION', 'node_modules',
+  'package.json', 'VERSION', 'commit.sha', 'node_modules',
 ]);
 
 function exists(target) {
