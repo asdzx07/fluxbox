@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -16,6 +19,7 @@ namespace MyBox.Client
         public static Mutex AppMutex = null;
         public static string BrowserExe = "";
         public static string NodeExe = "";
+        public static DateTime LastLaunchTime = DateTime.MinValue;
         private static bool isCleaningUp = false;
 
         [STAThread]
@@ -35,15 +39,19 @@ namespace MyBox.Client
                 }
             }
 
-            // 2. 单实例检查：若已有托盘常驻实例运行，唤醒已有界面后本进程直接退出
+            // 2. 单实例检查：若已有托盘常驻实例运行，唤醒已有唯一界面后本进程直接退出
             bool createdNew;
             AppMutex = new Mutex(true, "Global\\MyBox_Windows_Client_Singleton_Mutex", out createdNew);
             if (!createdNew)
             {
-                string browser = FindBrowserExecutable();
-                if (!string.IsNullOrEmpty(browser))
+                IntPtr hWnd = EnsureSingleWindow();
+                if (hWnd == IntPtr.Zero)
                 {
-                    LaunchAppWindow(browser);
+                    string browser = FindBrowserExecutable();
+                    if (!string.IsNullOrEmpty(browser))
+                    {
+                        LaunchAppWindow(browser);
+                    }
                 }
                 return;
             }
@@ -252,11 +260,179 @@ namespace MyBox.Client
             catch { }
         }
 
+        #region 单窗口管理与 Win32 原生激活
+
+        public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        [DllImport("kernel32.dll")]
+        public static extern uint GetCurrentThreadId();
+
+        [DllImport("user32.dll")]
+        public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        public const int SW_RESTORE = 9;
+        public const int SW_SHOW = 5;
+        public const uint WM_CLOSE = 0x0010;
+
+        /// <summary>
+        /// 确保桌面上仅保留唯一一个 MyBox 窗口：若已有窗口则激活至最前台，并关闭意外残留的多余窗口
+        /// </summary>
+        public static IntPtr EnsureSingleWindow()
+        {
+            List<IntPtr> list = new List<IntPtr>();
+            EnumWindows((hWnd, lParam) =>
+            {
+                if (!IsWindowVisible(hWnd)) return true;
+
+                StringBuilder titleSb = new StringBuilder(512);
+                GetWindowText(hWnd, titleSb, 512);
+                string title = titleSb.ToString().Trim();
+                if (string.IsNullOrEmpty(title)) return true;
+
+                if (title == "MyBox" || title.StartsWith("MyBox ") || title.StartsWith("MyBox -") || title.Contains("127.0.0.1:3038"))
+                {
+                    StringBuilder clsSb = new StringBuilder(256);
+                    GetClassName(hWnd, clsSb, 256);
+                    string cls = clsSb.ToString();
+
+                    if (cls.IndexOf("Chrome_WidgetWin", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        list.Add(hWnd);
+                    }
+                }
+                return true;
+            }, IntPtr.Zero);
+
+            if (list.Count == 0) return IntPtr.Zero;
+
+            // 激活第一个窗口至最前台
+            IntPtr primary = list[0];
+            BringWindowToFront(primary);
+
+            // 若存在多开的重复窗口，异步关闭其余窗口，保证全局唯一
+            for (int i = 1; i < list.Count; i++)
+            {
+                try { PostMessage(list[i], WM_CLOSE, IntPtr.Zero, IntPtr.Zero); } catch { }
+            }
+
+            return primary;
+        }
+
+        /// <summary>
+        /// 强制将指定窗口恢复并提升到系统最前台（突破 Windows 焦点窃取限制）
+        /// </summary>
+        public static void BringWindowToFront(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero) return;
+
+            if (IsIconic(hWnd))
+            {
+                ShowWindow(hWnd, SW_RESTORE);
+            }
+            else
+            {
+                ShowWindow(hWnd, SW_SHOW);
+            }
+
+            IntPtr fg = GetForegroundWindow();
+            uint dummy;
+            uint fgThread = GetWindowThreadProcessId(fg, out dummy);
+            uint curThread = GetCurrentThreadId();
+
+            if (fgThread != curThread && fgThread != 0)
+            {
+                AttachThreadInput(curThread, fgThread, true);
+                SetForegroundWindow(hWnd);
+                AttachThreadInput(curThread, fgThread, false);
+            }
+            else
+            {
+                SetForegroundWindow(hWnd);
+            }
+        }
+
+        /// <summary>
+        /// 关闭桌面上所有属于 MyBox 的网页应用窗口
+        /// </summary>
+        public static void CloseAllMyBoxWindows()
+        {
+            EnumWindows((hWnd, lParam) =>
+            {
+                if (!IsWindowVisible(hWnd)) return true;
+
+                StringBuilder titleSb = new StringBuilder(512);
+                GetWindowText(hWnd, titleSb, 512);
+                string title = titleSb.ToString().Trim();
+                if (string.IsNullOrEmpty(title)) return true;
+
+                if (title == "MyBox" || title.StartsWith("MyBox ") || title.StartsWith("MyBox -") || title.Contains("127.0.0.1:3038"))
+                {
+                    StringBuilder clsSb = new StringBuilder(256);
+                    GetClassName(hWnd, clsSb, 256);
+                    string cls = clsSb.ToString();
+
+                    if (cls.IndexOf("Chrome_WidgetWin", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        try { PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero); } catch { }
+                    }
+                }
+                return true;
+            }, IntPtr.Zero);
+        }
+
+        #endregion
+
         public static void LaunchAppWindow(string browserExe)
         {
-            string profileDir = Path.Combine(AppDir, ".profile");
+            // 启动前再次检测：若已有窗口，直接激活，绝不产生多余新窗口
+            IntPtr existing = EnsureSingleWindow();
+            if (existing != IntPtr.Zero)
+            {
+                return;
+            }
+
+            LastLaunchTime = DateTime.Now;
+
+            string profileDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MyBoxClient", "cache");
             string appUrl = "http://127.0.0.1:3038";
-            string args = string.Format("--app=\"{0}\" --window-size=1120,760 --user-data-dir=\"{1}\" --no-first-run --no-default-browser-check", appUrl, profileDir);
+            string args = string.Format(
+                "--app=\"{0}\" --window-size=1120,760 --user-data-dir=\"{1}\" " +
+                "--no-first-run --no-default-browser-check " +
+                "--disable-features=EdgeEntityExtraction,EdgeVisualSearch,ComponentUpdate,TranslateUI,OptimizationHints " +
+                "--disable-component-update --disable-background-networking --disable-sync --disable-extensions " +
+                "--disk-cache-size=10485760 --media-cache-size=5242880",
+                appUrl, profileDir);
 
             ProcessStartInfo psi = new ProcessStartInfo
             {
@@ -362,12 +538,16 @@ namespace MyBox.Client
         {
             trayIcon = new NotifyIcon();
 
-            // 1. 加载应用专属图标
+            // 1. 加载应用专属图标 (优先匹配当前屏幕 DPI 小图标尺寸，绝无插值模糊)
             Icon loadIcon = null;
             string icoPath = Path.Combine(Program.AppDir, "app.ico");
             if (File.Exists(icoPath))
             {
-                try { loadIcon = new Icon(icoPath); } catch { }
+                try { loadIcon = new Icon(icoPath, SystemInformation.SmallIconSize); } catch { }
+                if (loadIcon == null)
+                {
+                    try { loadIcon = new Icon(icoPath); } catch { }
+                }
             }
             if (loadIcon == null)
             {
@@ -380,7 +560,7 @@ namespace MyBox.Client
             trayIcon.Icon = loadIcon;
 
             // 2. 初始提示文本 (最多 63 字符)
-            trayIcon.Text = "MyBox 旁路由客户端";
+            trayIcon.Text = "MyBox";
 
             // 3. 构建原生右键菜单
             contextMenu = new ContextMenu();
@@ -446,6 +626,19 @@ namespace MyBox.Client
 
         private void ShowMainWindow()
         {
+            // 1. 若已有 MyBox 窗口存在，直接激活并拉到最前台，绝不重复创建
+            IntPtr hWnd = Program.EnsureSingleWindow();
+            if (hWnd != IntPtr.Zero)
+            {
+                return;
+            }
+
+            // 2. 1.5 秒启动防抖保护，避免用户连续点击托盘造成并发拉起
+            if ((DateTime.Now - Program.LastLaunchTime).TotalMilliseconds < 1500)
+            {
+                return;
+            }
+
             if (string.IsNullOrEmpty(Program.BrowserExe))
             {
                 Program.BrowserExe = Program.FindBrowserExecutable();
@@ -484,8 +677,8 @@ namespace MyBox.Client
 
                         // 格式化悬停提示与菜单文本
                         string tipText = conn
-                            ? ("MyBox 旁路由 (已连接: " + gwIp + ")")
-                            : "MyBox 旁路由 (未连接)";
+                            ? ("MyBox (已连接: " + gwIp + ")")
+                            : "MyBox (未连接)";
                         if (tipText.Length > 63) tipText = tipText.Substring(0, 63);
 
                         string menuText = conn
@@ -605,6 +798,7 @@ namespace MyBox.Client
                 trayIcon = null;
             }
 
+            Program.CloseAllMyBoxWindows();
             Program.CleanupAndRestoreNetwork();
             ExitThread();
         }

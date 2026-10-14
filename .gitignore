@@ -10,3 +10,8 @@ bin/
 .profile/
 .edge-profile/
 package-lock.json
+*.bak
+*.old
+windows-client/obj/
+windows-client/bin/
+

@@ -42,23 +42,44 @@ aside.sidebar {
 
 .brand {
   margin-bottom: 24px;
-  padding-left: 10px;
+  padding-left: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.brand h1 {
+.brand-logo {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  display: block;
+}
+
+.brand-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.brand-info h1 {
   font-family: "Georgia", "Times New Roman", serif;
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 700;
   letter-spacing: -0.5px;
   color: #111;
+  line-height: 1.15;
 }
 
-.brand span {
-  font-size: 11px;
+.brand-info span {
+  font-size: 10.5px;
   color: var(--text-muted);
   font-family: monospace;
   display: block;
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 nav.nav-list {
@@ -839,13 +860,15 @@ header.top-header {
   gap: 10px;
 }
 
-/* Web 风格滑动胶囊开关 */
+/* 现代化高精度胶囊 Switch 开关 */
 .switch {
   position: relative;
-  width: 44px;
-  height: 24px;
+  width: 38px;
+  height: 20px;
   flex: 0 0 auto;
   display: inline-block;
+  cursor: pointer;
+  vertical-align: middle;
 }
 .switch input {
   position: absolute;
@@ -861,25 +884,25 @@ header.top-header {
   inset: 0;
   border-radius: 999px;
   background: #cbd5e1;
-  transition: background .15s ease;
+  transition: background .18s ease;
 }
 .switch span::after {
   content: "";
   position: absolute;
-  top: 3.5px;
-  left: 3.5px;
-  width: 17px;
-  height: 17px;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #fff;
-  transition: transform .15s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform .18s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 .switch input:checked + span {
-  background: #2563eb;
+  background: var(--accent);
 }
 .switch input:checked + span::after {
-  transform: translateX(20px);
+  transform: translateX(18px);
 }
 
 /* Web 端订阅列表项 */
@@ -932,4 +955,241 @@ header.top-header {
   background: #fef2f2;
   border-color: #fca5a5;
 }
+
+/* ==========================================================================
+   客户端节点组卡片头与折叠样式
+   ========================================================================== */
+.group-card-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: #ffffff;
+  transition: all 0.15s ease;
+}
+.group-card-item:hover {
+  border-color: #cbd5e1;
+}
+
+.group-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 0;
+}
+.group-card-head:hover .group-name-title {
+  color: var(--accent);
+}
+
+.chevron {
+  font-size: 13px;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.group-name-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.group-type-badge {
+  font-size: 11px;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.group-count-badge {
+  font-size: 11px;
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  padding: 1.5px 6px;
+  border-radius: 6px;
+}
+
+.group-cur-exit {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.spacer {
+  margin-left: auto;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ==========================================================================
+   客户端目标分流策略卡片 (双列网格、折叠编辑与拖拽排序)
+   ========================================================================== */
+.policy-grid-stack {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 860px) {
+  .policy-grid-stack {
+    grid-template-columns: 1fr;
+  }
+}
+
+.policy-card-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.policy-card-item:hover {
+  border-color: #cbd5e1;
+}
+
+.policy-card-item.dragging {
+  opacity: 0.35;
+  transform: scale(0.98);
+  border: 1.5px dashed var(--accent) !important;
+}
+
+.policy-card-item.drag-over {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  transform: translateY(-2px);
+}
+
+.policy-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.drag-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: #94a3b8;
+  padding: 2px;
+  border-radius: 4px;
+  touch-action: none;
+}
+.drag-grip:hover {
+  color: var(--accent);
+  background: #f1f5f9;
+}
+.drag-grip:active {
+  cursor: grabbing;
+}
+
+.policy-idx-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 1px 5px;
+  min-width: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.policy-title-text {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.policy-target-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.policy-body {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.policy-row-dual {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.policy-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.policy-field label {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.policy-field input,
+.policy-field select {
+  width: 100%;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12.5px;
+  background: #f8fafc;
+  color: #0f172a;
+  outline: none;
+}
+.policy-field input:focus,
+.policy-field select:focus {
+  border-color: var(--accent);
+  background: #fff;
+}
+
+.policy-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.small-btn.danger-mini {
+  padding: 3px 8px;
+  font-size: 11.5px;
+  border-radius: 6px;
+  background: #fff;
+  color: #ef4444;
+  border: 1px solid #fee2e2;
+}
+.small-btn.danger-mini:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
 

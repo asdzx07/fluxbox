@@ -1,3 +1,5 @@
+document.title = 'MyBox';
+
 let localState = {
   connected: false,
   gatewayIp: '192.168.3.2',
@@ -9,6 +11,8 @@ let localState = {
   latency: null,
   activeInterface: {},
   nodeLatency: {},
+  groupCollapsed: JSON.parse(localStorage.getItem('mybox_client_collapsed_groups') || '{}'),
+  policyCollapsed: {},
 };
 
 let remoteData = {
@@ -352,16 +356,20 @@ async function loadGroups() {
       container.innerHTML = '<p class="empty-tip">暂无可用代理分组</p>';
       return;
     }
-    container.innerHTML = remoteData.groups.map(g => `
+    const isCol = (name) => localState.groupCollapsed[name] === true;
+    container.innerHTML = remoteData.groups.map(g => {
+      const collapsed = isCol(g.name);
+      return `
       <div class="group-card-item">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <div>
-            <strong style="font-size:14px">${escapeHtml(g.name)}</strong>
-            <span style="font-size:12px;color:var(--text-muted);margin-left:8px">当前: <span style="color:var(--accent);font-weight:600">${escapeHtml(g.now || '—')}</span></span>
-          </div>
-          <span style="font-size:11px;background:#f3f4f6;padding:3px 8px;border-radius:6px;font-weight:500">${escapeHtml(g.type)}</span>
+        <div class="group-card-head" onclick="toggleGroupCollapse('${escapeHtml(g.name)}')" title="点击折叠/展开「${escapeHtml(g.name)}」">
+          <span class="chevron">${collapsed ? '▸' : '▾'}</span>
+          <strong class="group-name-title">${escapeHtml(g.name)}</strong>
+          <span class="group-type-badge">${escapeHtml(g.type)}</span>
+          <span class="group-count-badge">${(g.members || []).length} 个节点</span>
+          <div class="spacer"></div>
+          <span class="group-cur-exit">当前出口：<strong style="color:var(--accent)">${escapeHtml(g.now || '—')}</strong></span>
         </div>
-        <div class="node-pill-grid">
+        <div class="node-pill-grid${collapsed ? ' hidden' : ''}">
           ${(g.members || []).map(m => {
             const lat = localState.nodeLatency?.[m];
             let latClass = '';
@@ -400,7 +408,8 @@ async function loadGroups() {
           }).join('')}
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
   } catch (err) {
     if (err.message === 'unauthorized') {
       container.innerHTML = `
@@ -416,6 +425,30 @@ async function loadGroups() {
     }
   }
 }
+
+window.toggleGroupCollapse = function(name) {
+  if (!localState.groupCollapsed) localState.groupCollapsed = {};
+  localState.groupCollapsed[name] = !localState.groupCollapsed[name];
+  try {
+    localStorage.setItem('mybox_client_collapsed_groups', JSON.stringify(localState.groupCollapsed));
+  } catch {}
+  loadGroups();
+};
+
+window.toggleAllGroupsCollapse = function() {
+  if (!remoteData.groups || !remoteData.groups.length) return;
+  if (!localState.groupCollapsed) localState.groupCollapsed = {};
+  const anyExpanded = remoteData.groups.some(g => !localState.groupCollapsed[g.name]);
+  remoteData.groups.forEach(g => {
+    localState.groupCollapsed[g.name] = anyExpanded;
+  });
+  try {
+    localStorage.setItem('mybox_client_collapsed_groups', JSON.stringify(localState.groupCollapsed));
+  } catch {}
+  const btn = $('btnToggleAllGroups');
+  if (btn) btn.textContent = anyExpanded ? '全部展开' : '全部折叠';
+  loadGroups();
+};
 
 window.selectNode = async function(group, name) {
   try {
@@ -700,33 +733,241 @@ function buildTargetOptionsHtml(currentTarget = '', targets = []) {
   return html;
 }
 
+function policyIcon(name = '') {
+  const n = (name || '').toLowerCase();
+  if (n.includes('ai') || n.includes('openai') || n.includes('gpt') || n.includes('claude')) return '🤖 ';
+  if (n.includes('google') || n.includes('谷歌') || n.includes('gemini')) return '🌐 ';
+  if (n.includes('media') || n.includes('媒体') || n.includes('youtube') || n.includes('netflix') || n.includes('bili')) return '🎬 ';
+  if (n.includes('telegram') || n.includes('tg') || n.includes('电报')) return '✈️ ';
+  if (n.includes('github') || n.includes('git')) return '🐙 ';
+  if (n.includes('国内') || n.includes('直连') || n.includes('cn') || n.includes('china')) return '🇨🇳 ';
+  if (n.includes('广告') || n.includes('block') || n.includes('reject') || n.includes('拦截')) return '🛡️ ';
+  return '🎯 ';
+}
+
+function formatTargetLabel(target) {
+  if (!target) return '默认';
+  if (target === 'direct' || target === 'builtin-direct') return '直连 (DIRECT)';
+  if (target === 'block' || target === 'reject' || target === 'builtin-block') return '拒绝 (REJECT)';
+  if (target === 'all-auto') return '所有-自动';
+  if (target === 'all-manual') return '所有-手动';
+  return target;
+}
+
+function renderPolicies() {
+  const container = $('policyListContainer');
+  if (!container) return;
+  if (!remoteData.policies.length) {
+    container.innerHTML = '<p class="empty-tip" style="grid-column:1/-1">暂无策略配置，点击上方「+ 添加策略」创建</p>';
+    return;
+  }
+
+  const isCol = (idx) => localState.policyCollapsed?.[idx] !== false; // 默认全部折叠
+
+  container.innerHTML = remoteData.policies.map((p, i) => {
+    const collapsed = isCol(i);
+    const targetVal = p.target || 'direct';
+    return `
+      <div class="policy-card-item" draggable="true" data-pol-idx="${i}">
+        <div class="policy-card-head" onclick="togglePolicyCollapse(${i})" title="点击折叠/展开">
+          <span class="drag-grip" title="长按或拖拽调整策略优先级" onclick="event.stopPropagation()">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+          </span>
+          <span class="policy-idx-badge">${i + 1}</span>
+          <span class="chevron">${collapsed ? '▸' : '▾'}</span>
+          <strong class="policy-title-text">${policyIcon(p.name)}${escapeHtml(p.name || '未命名策略')}</strong>
+          <span class="policy-target-note">出口: <strong style="color:var(--accent)" id="polTargetText-${i}">${escapeHtml(formatTargetLabel(targetVal))}</strong></span>
+          <div class="spacer"></div>
+          <div class="policy-head-actions" onclick="event.stopPropagation()">
+            <label class="switch" title="${p.enabled !== false ? '点击停用策略' : '点击启用策略'}">
+              <input type="checkbox" data-p-toggle="${i}" onchange="togglePolicyEnabled(${i}, this.checked)"${p.enabled !== false ? ' checked' : ''}>
+              <span></span>
+            </label>
+            <button class="small-btn danger-mini" onclick="removePolicy(${i})">删除</button>
+          </div>
+        </div>
+        <div class="policy-body${collapsed ? ' hidden' : ''}">
+          <div class="policy-row-dual">
+            <div class="policy-field" style="flex:1">
+              <label>策略名称</label>
+              <input data-p-name="${i}" value="${escapeHtml(p.name || '')}" placeholder="策略名称">
+            </div>
+            <div class="policy-field" style="flex:1">
+              <label>出口目标（直连/拒绝/分组/节点）</label>
+              <select data-p-target="${i}" onchange="updatePolicyTargetText(${i}, this.value)">
+                ${buildTargetOptionsHtml(targetVal, remoteData.targets)}
+              </select>
+            </div>
+          </div>
+          <div class="policy-field">
+            <label>规则集 (rulesets，多个逗号隔开)</label>
+            <input data-p-rulesets="${i}" value="${escapeHtml((p.rulesets || []).join(', '))}" placeholder="如 geoip-cn, geosite-cn">
+          </div>
+          <div class="policy-field">
+            <label>域名后缀 (domain_suffix，多个逗号隔开)</label>
+            <input data-p-suffix="${i}" value="${escapeHtml((p.domainSuffix || []).join(', '))}" placeholder="如 google.com, github.com">
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.togglePolicyCollapse = function(idx) {
+  syncPoliciesFromDOM();
+  if (!localState.policyCollapsed) localState.policyCollapsed = {};
+  const cur = localState.policyCollapsed[idx] !== false;
+  localState.policyCollapsed[idx] = !cur;
+  renderPolicies();
+};
+
+window.togglePolicyEnabled = function(idx, checked) {
+  if (remoteData.policies[idx]) {
+    remoteData.policies[idx].enabled = checked;
+  }
+};
+
+window.updatePolicyTargetText = function(idx, val) {
+  if (remoteData.policies[idx]) {
+    remoteData.policies[idx].target = val;
+    const txtEl = $(`polTargetText-${idx}`);
+    if (txtEl) txtEl.textContent = formatTargetLabel(val);
+  }
+};
+
+function syncPoliciesFromDOM() {
+  document.querySelectorAll('#policyListContainer input[data-p-name]').forEach(input => {
+    const idx = Number(input.dataset.pName);
+    if (remoteData.policies[idx]) remoteData.policies[idx].name = input.value.trim();
+  });
+  document.querySelectorAll('#policyListContainer select[data-p-target]').forEach(sel => {
+    const idx = Number(sel.dataset.pTarget);
+    if (remoteData.policies[idx]) remoteData.policies[idx].target = sel.value;
+  });
+  document.querySelectorAll('#policyListContainer input[data-p-rulesets]').forEach(input => {
+    const idx = Number(input.dataset.pRulesets);
+    if (remoteData.policies[idx]) {
+      remoteData.policies[idx].rulesets = input.value.split(',').map(s => s.trim()).filter(Boolean);
+    }
+  });
+  document.querySelectorAll('#policyListContainer input[data-p-suffix]').forEach(input => {
+    const idx = Number(input.dataset.pSuffix);
+    if (remoteData.policies[idx]) {
+      remoteData.policies[idx].domainSuffix = input.value.split(',').map(s => s.trim()).filter(Boolean);
+    }
+  });
+  document.querySelectorAll('#policyListContainer input[data-p-toggle]').forEach(chk => {
+    const idx = Number(chk.dataset.pToggle);
+    if (remoteData.policies[idx]) remoteData.policies[idx].enabled = chk.checked;
+  });
+}
+
+window.addNewPolicy = function() {
+  syncPoliciesFromDOM();
+  const defaultTarget = (remoteData.targets && remoteData.targets[0]?.value) || 'direct';
+  const newPol = {
+    name: `新策略 ${remoteData.policies.length + 1}`,
+    target: defaultTarget,
+    rulesets: [],
+    domainSuffix: [],
+    enabled: true,
+  };
+  remoteData.policies.push(newPol);
+  const newIdx = remoteData.policies.length - 1;
+  if (!localState.policyCollapsed) localState.policyCollapsed = {};
+  localState.policyCollapsed[newIdx] = false;
+  renderPolicies();
+  toast('已添加新策略，请编辑规则并点击「保存策略并应用」');
+};
+
+window.removePolicy = function(idx) {
+  syncPoliciesFromDOM();
+  const p = remoteData.policies[idx];
+  if (!p) return;
+  if (!confirm(`确定删除分流策略「${p.name || '未命名'}」吗？`)) return;
+  remoteData.policies.splice(idx, 1);
+  renderPolicies();
+  toast('已删除策略，记得点击「保存策略并应用」生效');
+};
+
+window.toggleAllPolicies = function() {
+  if (!remoteData.policies || !remoteData.policies.length) return;
+  syncPoliciesFromDOM();
+  if (!localState.policyCollapsed) localState.policyCollapsed = {};
+  const anyExpanded = remoteData.policies.some((_, i) => localState.policyCollapsed[i] === false);
+  remoteData.policies.forEach((_, i) => {
+    localState.policyCollapsed[i] = anyExpanded;
+  });
+  const btn = $('btnToggleAllPolicies');
+  if (btn) btn.textContent = anyExpanded ? '全部展开' : '全部折叠';
+  renderPolicies();
+};
+
+function initPolicyDragSort() {
+  const listEl = $('policyListContainer');
+  if (!listEl || listEl._dragInited) return;
+  listEl._dragInited = true;
+
+  let dragSrcIdx = null;
+
+  listEl.addEventListener('dragstart', (e) => {
+    const card = e.target.closest('.policy-card-item');
+    if (!card) return;
+    syncPoliciesFromDOM();
+    dragSrcIdx = Number(card.dataset.polIdx);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(dragSrcIdx));
+    setTimeout(() => card.classList.add('dragging'), 0);
+  });
+
+  listEl.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const card = e.target.closest('.policy-card-item');
+    if (!card) return;
+    const overIdx = Number(card.dataset.polIdx);
+    if (overIdx === dragSrcIdx) return;
+    document.querySelectorAll('.policy-card-item.drag-over').forEach(el => {
+      if (el !== card) el.classList.remove('drag-over');
+    });
+    card.classList.add('drag-over');
+  });
+
+  listEl.addEventListener('dragleave', (e) => {
+    const card = e.target.closest('.policy-card-item');
+    if (card && !card.contains(e.relatedTarget)) {
+      card.classList.remove('drag-over');
+    }
+  });
+
+  listEl.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const card = e.target.closest('.policy-card-item');
+    document.querySelectorAll('.policy-card-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+    if (!card) return;
+    const dropTargetIdx = Number(card.dataset.polIdx);
+    if (!isNaN(dragSrcIdx) && !isNaN(dropTargetIdx) && dragSrcIdx !== dropTargetIdx) {
+      const [moved] = remoteData.policies.splice(dragSrcIdx, 1);
+      remoteData.policies.splice(dropTargetIdx, 0, moved);
+      renderPolicies();
+      toast(`已将「${moved.name || '策略'}」移至第 ${dropTargetIdx + 1} 位，请保存应用`);
+    }
+  });
+
+  listEl.addEventListener('dragend', () => {
+    document.querySelectorAll('.policy-card-item.dragging').forEach(el => el.classList.remove('dragging'));
+    document.querySelectorAll('.policy-card-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+  });
+}
+
 async function loadPolicies() {
   const container = $('policyListContainer');
   try {
     const data = await fetchRemote('/policies');
     remoteData.policies = data.policies || [];
-    const targets = data.targets || [];
-
-    if (!remoteData.policies.length) {
-      container.innerHTML = '<p class="empty-tip">暂无策略配置</p>';
-      return;
-    }
-
-    container.innerHTML = remoteData.policies.map((p, i) => `
-      <div class="policy-card-item">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <strong style="font-size:13.5px">${escapeHtml(p.name)}</strong>
-          <span style="font-size:11px;color:${p.enabled ? 'var(--ok)' : 'var(--text-muted)'}">${p.enabled ? '已启用' : '已停用'}</span>
-        </div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <label style="font-size:12px;color:var(--text-muted)">出口目标:</label>
-          <select data-pol-idx="${i}" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);font-size:12px">
-            ${buildTargetOptionsHtml(p.target, targets)}
-          </select>
-          <span style="font-size:11px;color:var(--text-muted)">规则: ${(p.rulesets || []).concat(p.domainSuffix || []).join(', ') || '无'}</span>
-        </div>
-      </div>
-    `).join('');
+    remoteData.targets = data.targets || [];
+    renderPolicies();
+    initPolicyDragSort();
   } catch (err) {
     if (err.message === 'unauthorized') {
       container.innerHTML = `
@@ -744,21 +985,15 @@ async function loadPolicies() {
 }
 
 async function savePolicies() {
-  document.querySelectorAll('#policyListContainer select[data-pol-idx]').forEach(sel => {
-    const idx = Number(sel.dataset.polIdx);
-    if (remoteData.policies[idx]) {
-      remoteData.policies[idx].target = sel.value;
-    }
-  });
-
+  syncPoliciesFromDOM();
   try {
-    toast('正在保存策略并触发内核部署...');
+    toast('正在保存策略并同步至旁路由...');
     await fetchRemote('/policies', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ policies: remoteData.policies }),
     });
-    toast('策略配置已保存；如内核未应用，请查看服务端日志');
+    toast('分流策略已保存并同步至旁路由生效！');
     await loadPolicies();
   } catch (err) {
     toast(`保存策略失败: ${err.message}`);
@@ -1025,9 +1260,10 @@ function bindEvents() {
     pollTraffic();
   });
 
-  // 节点列表与延迟测速
+  // 节点列表与折叠、延迟测速
   $('btnReloadGroups')?.addEventListener('click', loadGroups);
   $('btnTestLatencyAll')?.addEventListener('click', testAllLatency);
+  $('btnToggleAllGroups')?.addEventListener('click', () => window.toggleAllGroupsCollapse?.());
 
   // 订阅添加与刷新
   $('btnInlineAddSub')?.addEventListener('click', () => {
@@ -1038,6 +1274,8 @@ function bindEvents() {
   $('btnRefreshAllSubs')?.addEventListener('click', refreshAllSubs);
 
   // 策略与连接
+  $('btnAddPolicyLocal')?.addEventListener('click', () => window.addNewPolicy?.());
+  $('btnToggleAllPolicies')?.addEventListener('click', () => window.toggleAllPolicies?.());
   $('btnSavePoliciesLocal')?.addEventListener('click', savePolicies);
   $('btnResetPoliciesLocal')?.addEventListener('click', resetPolicies);
 
