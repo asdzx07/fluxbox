@@ -447,9 +447,8 @@ async function loadOverview() {
     if (!running) {
       $('statKernel').textContent = '未运行';
     } else {
-      const pidStr = data.kernel?.pid ? `PID ${data.kernel.pid}` : (data.kernel?.supervisor ? `${data.kernel.supervisor} 守护` : '系统托管');
-      const timeStr = data.kernel?.uptime ? ` · 运行 ${data.kernel.uptime}` : '';
-      $('statKernel').textContent = `运行中 (${pidStr}${timeStr})`;
+      const timeStr = data.kernel?.uptime ? ` 运行 ${data.kernel.uptime}` : '';
+      $('statKernel').textContent = `运行中 (内核${timeStr})`;
     }
 
     let note = '';
@@ -1110,21 +1109,25 @@ function getTargetOptionsHtml(currentTarget = '') {
 function renderPolicies() {
   const box = $('policyList');
   if (!state.policies.length) {
-    box.innerHTML = '<p class="note">还没有策略。</p>';
+    box.innerHTML = '<p class="note" style="grid-column:1/-1;text-align:center;padding:16px 0">还没有策略。</p>';
     return;
   }
-  const isCol = (idx) => state.policyCollapsed?.[idx] === true;
+  const isCol = (idx) => state.policyCollapsed?.[idx] !== false;
 
   box.innerHTML = state.policies.map((p, i) => {
     const collapsed = isCol(i);
     const targetVal = p.target || 'all-auto';
     return `
-    <div class="card" style="background:var(--surface-2);margin-bottom:12px">
+    <div class="card policy-card" draggable="true" data-policy-index="${i}">
       <div class="card-head group-head" data-policy-collapse="${i}" style="cursor:pointer;margin-bottom:${collapsed ? '0' : '12px'}">
+        <span class="drag-grip" title="长按或拖拽调整策略优先级" onclick="event.stopPropagation()">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+        </span>
+        <span class="policy-idx-badge">${i + 1}</span>
         <span class="chevron">${collapsed ? '▸' : '▾'}</span>
         <h3 style="display:flex;align-items:center;gap:6px">${policyIcon(p.name)}${escapeHtml(p.name)}</h3>
         <span class="tag muted" data-p-status="${i}">${p.enabled ? '已启用' : '已关闭'}</span>
-        <span class="note" style="font-size:12px;margin-left:6px">出口：<strong style="color:var(--accent)" id="policyTargetLabel-${i}">${escapeHtml(formatTargetLabel(targetVal))}</strong></span>
+        <span class="note policy-target-note" style="font-size:12px;margin-left:4px">出口：<strong style="color:var(--accent)" id="policyTargetLabel-${i}">${escapeHtml(formatTargetLabel(targetVal))}</strong></span>
         <div class="spacer"></div>
         <label class="switch" onclick="event.stopPropagation()">
           <input type="checkbox" data-p-enabled="${i}"${p.enabled ? ' checked' : ''}>
@@ -1134,11 +1137,11 @@ function renderPolicies() {
       </div>
       <div data-p-body="${i}" class="${collapsed ? 'hidden' : ''}">
         <div class="row">
-          <label class="field" style="flex:1 1 200px">
+          <label class="field" style="flex:1 1 180px">
             <span>策略名称</span>
             <input data-p-name="${i}" value="${escapeHtml(p.name || '')}">
           </label>
-          <label class="field" style="flex:1 1 240px">
+          <label class="field" style="flex:1 1 200px">
             <span>出口目标（直连/拒绝/分组/节点）</span>
             <select data-p-target="${i}" onchange="updatePolicyTarget(${i}, this.value)">
               ${getTargetOptionsHtml(targetVal)}
@@ -1175,6 +1178,147 @@ window.removePolicy = function(index, event) {
   renderPolicies();
   toast('已删除策略，记得点击下方「保存策略」生效');
 };
+
+function syncPoliciesFromDOM() {
+  document.querySelectorAll('#policyList input[data-p-name]').forEach((input) => {
+    const idx = Number(input.dataset.pName);
+    if (state.policies[idx]) state.policies[idx].name = input.value.trim();
+  });
+  document.querySelectorAll('#policyList input[data-p-rulesets]').forEach((input) => {
+    const idx = Number(input.dataset.pRulesets);
+    if (state.policies[idx]) state.policies[idx].rulesets = input.value.split(',').map((s) => s.trim()).filter(Boolean);
+  });
+  document.querySelectorAll('#policyList input[data-p-suffix]').forEach((input) => {
+    const idx = Number(input.dataset.pSuffix);
+    if (state.policies[idx]) state.policies[idx].domainSuffix = input.value.split(',').map((s) => s.trim()).filter(Boolean);
+  });
+}
+
+function initPolicyDragSort() {
+  const listEl = $('policyList');
+  if (!listEl || listEl._dragInited) return;
+  listEl._dragInited = true;
+
+  let dragSrcIdx = null;
+
+  listEl.addEventListener('dragstart', (e) => {
+    const card = e.target.closest('.policy-card');
+    if (!card) return;
+    syncPoliciesFromDOM();
+    dragSrcIdx = Number(card.dataset.policyIndex);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(dragSrcIdx));
+    setTimeout(() => card.classList.add('dragging'), 0);
+  });
+
+  listEl.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const card = e.target.closest('.policy-card');
+    if (!card) return;
+    const overIdx = Number(card.dataset.policyIndex);
+    if (overIdx === dragSrcIdx) return;
+    document.querySelectorAll('.policy-card.drag-over').forEach((el) => {
+      if (el !== card) el.classList.remove('drag-over');
+    });
+    card.classList.add('drag-over');
+  });
+
+  listEl.addEventListener('dragleave', (e) => {
+    const card = e.target.closest('.policy-card');
+    if (card && !card.contains(e.relatedTarget)) {
+      card.classList.remove('drag-over');
+    }
+  });
+
+  listEl.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const card = e.target.closest('.policy-card');
+    document.querySelectorAll('.policy-card').forEach((el) => el.classList.remove('dragging', 'drag-over'));
+    if (!card) return;
+    const dropTargetIdx = Number(card.dataset.policyIndex);
+    if (isNaN(dragSrcIdx) || isNaN(dropTargetIdx) || dragSrcIdx === dropTargetIdx) return;
+
+    const [movedPolicy] = state.policies.splice(dragSrcIdx, 1);
+    state.policies.splice(dropTargetIdx, 0, movedPolicy);
+
+    if (state.policyCollapsed) {
+      const newCol = {};
+      state.policies.forEach((_, i) => { newCol[i] = true; });
+      state.policyCollapsed = newCol;
+    }
+
+    renderPolicies();
+    toast(`已将「${movedPolicy.name || '策略'}」移至第 ${dropTargetIdx + 1} 位，请保存部署`);
+    dragSrcIdx = null;
+  });
+
+  listEl.addEventListener('dragend', () => {
+    document.querySelectorAll('.policy-card').forEach((el) => el.classList.remove('dragging', 'drag-over'));
+    dragSrcIdx = null;
+  });
+
+  // 支持移动端/触屏长按拖拽排序
+  let touchTimer = null;
+  let touchCard = null;
+  let touchStartIdx = null;
+
+  listEl.addEventListener('touchstart', (e) => {
+    const grip = e.target.closest('.drag-grip');
+    if (!grip) return;
+    const card = grip.closest('.policy-card');
+    if (!card) return;
+    touchCard = card;
+    touchStartIdx = Number(card.dataset.policyIndex);
+
+    touchTimer = setTimeout(() => {
+      syncPoliciesFromDOM();
+      card.classList.add('dragging');
+      if (navigator.vibrate) navigator.vibrate(35);
+    }, 200);
+  }, { passive: true });
+
+  listEl.addEventListener('touchmove', (e) => {
+    if (!touchCard || !touchCard.classList.contains('dragging')) {
+      clearTimeout(touchTimer);
+      return;
+    }
+    const touch = e.touches[0];
+    const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetCard = elem?.closest('.policy-card');
+    document.querySelectorAll('.policy-card.drag-over').forEach((el) => {
+      if (el !== targetCard) el.classList.remove('drag-over');
+    });
+    if (targetCard && targetCard !== touchCard) {
+      targetCard.classList.add('drag-over');
+    }
+  }, { passive: true });
+
+  listEl.addEventListener('touchend', (e) => {
+    clearTimeout(touchTimer);
+    if (!touchCard) return;
+    const isDragging = touchCard.classList.contains('dragging');
+    touchCard.classList.remove('dragging');
+    document.querySelectorAll('.policy-card.drag-over').forEach((el) => el.classList.remove('drag-over'));
+
+    if (isDragging) {
+      const touch = e.changedTouches[0];
+      const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+      const targetCard = elem?.closest('.policy-card');
+      if (targetCard && targetCard !== touchCard) {
+        const dropTargetIdx = Number(targetCard.dataset.policyIndex);
+        if (!isNaN(touchStartIdx) && !isNaN(dropTargetIdx) && touchStartIdx !== dropTargetIdx) {
+          const [moved] = state.policies.splice(touchStartIdx, 1);
+          state.policies.splice(dropTargetIdx, 0, moved);
+          renderPolicies();
+          toast(`已将「${moved.name || '策略'}」移至第 ${dropTargetIdx + 1} 位，请保存部署`);
+        }
+      }
+    }
+    touchCard = null;
+    touchStartIdx = null;
+  });
+}
 
 /* ---------------------------------------------------------- 自定义规则集订阅 */
 
@@ -1876,15 +2020,17 @@ function bindEvents() {
   }));
 
   $('policyList').addEventListener('click', (e) => {
-    // 点击卡片头折叠/展开 (同节点分组效果)
+    // 点击卡片头折叠/展开
     const collapseEl = e.target.closest('[data-policy-collapse]');
-    if (collapseEl && !e.target.closest('.switch') && !e.target.closest('button')) {
+    if (collapseEl && !e.target.closest('.switch') && !e.target.closest('button') && !e.target.closest('.drag-grip')) {
       const idx = Number(collapseEl.dataset.policyCollapse);
       if (!state.policyCollapsed) state.policyCollapsed = {};
-      state.policyCollapsed[idx] = !state.policyCollapsed[idx];
+      const curCol = state.policyCollapsed[idx] !== false;
+      state.policyCollapsed[idx] = !curCol;
       renderPolicies();
     }
   });
+  initPolicyDragSort();
 
   $('policyList').addEventListener('input', (e) => {
     const t = e.target;

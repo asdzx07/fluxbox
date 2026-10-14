@@ -264,7 +264,7 @@ a:hover {
 
 /* Linear / macOS 风格侧边栏 */
 aside.sidebar {
-  width: 236px;
+  width: 264px;
   flex: 0 0 auto;
   position: sticky;
   top: 0;
@@ -324,28 +324,32 @@ aside.sidebar {
   color: var(--text-3);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  padding: 14px 10px 6px;
+  padding: 10px 10px 4px;
 }
 
 nav.sb-nav {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  justify-content: space-evenly;
+  gap: 4px;
+  margin: 4px 0 12px;
+  min-height: 0;
 }
 
 nav.sb-nav button {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-2);
-  padding: 8.5px 12px;
+  padding: 10px 14px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 550;
   text-align: left;
   width: 100%;
   box-shadow: none;
@@ -353,19 +357,19 @@ nav.sb-nav button {
 }
 
 nav.sb-nav button .ic {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  opacity: 0.72;
+  opacity: 0.75;
   transition: opacity var(--duration) ease, transform var(--duration) ease;
 }
 
 nav.sb-nav button .ic svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 nav.sb-nav button:hover {
@@ -1497,6 +1501,94 @@ label.field > span,
 .client-item:hover {
   border-color: var(--accent-border);
   transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   目标分流双栏网格与拖拽排序体系 (Policies)
+   ========================================================================== */
+
+#policyList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  #policyList {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card.policy-card {
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-2);
+  transition: transform var(--duration) ease, border-color var(--duration) ease, box-shadow var(--duration) ease, opacity var(--duration) ease;
+  user-select: none;
+}
+
+.card.policy-card .card-head {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.card.policy-card:hover {
+  border-color: var(--accent-border);
+}
+
+.card.policy-card.dragging {
+  opacity: 0.35;
+  transform: scale(0.98);
+  border: 1.5px dashed var(--accent) !important;
+  box-shadow: 0 4px 14px var(--accent-glow);
+}
+
+.card.policy-card.drag-over {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px var(--accent-glow);
+  transform: translateY(-2px);
+}
+
+.drag-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: var(--text-3);
+  padding: 3px 4px;
+  border-radius: var(--radius-xs);
+  transition: all var(--duration) ease;
+  user-select: none;
+  touch-action: none;
+  flex-shrink: 0;
+}
+.drag-grip:hover {
+  color: var(--accent);
+  background: var(--surface-hover);
+}
+.drag-grip:active {
+  cursor: grabbing;
+}
+
+.policy-idx-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  background: var(--surface-solid);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  padding: 1px 6px;
+  font-variant-numeric: tabular-nums;
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
+.policy-target-note {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 170px;
 }
 
 /* ==========================================================================
