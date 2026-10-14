@@ -40,9 +40,23 @@ export function registerSubscriptionRoutes(app, deps) {
     }
   });
 
-  /** 启用 / 停用一条订阅。停用后它的节点不进配置，自动部署生效。 */
+  /** 启用 / 停用一条订阅（或全部订阅）。停用后它的节点不进配置，自动部署生效。 */
   app.put('/api/subscriptions/:id', async (req, res) => {
     const enabled = req.body?.enabled !== false;
+    if (req.params.id === 'all') {
+      mutateSettings((settings) => {
+        for (const subscription of settings.subscriptions) {
+          subscription.enabled = enabled;
+        }
+      });
+      try {
+        await deploy.deploy({ restart: true });
+        log.info('全部订阅已%s 并已部署生效', enabled ? '启用' : '停用');
+      } catch (depErr) {
+        log.warn('全部订阅已保存为%s，但内核部署未完成；运行配置可能仍是旧版本：%s', enabled ? '启用' : '停用', depErr.message);
+      }
+      return res.json({ ok: true, id: 'all', enabled });
+    }
     let found = false;
     mutateSettings((settings) => {
       const subscription = settings.subscriptions.find((item) => item.id === req.params.id);

@@ -455,7 +455,15 @@ async function loadOverview() {
     if (data.kernel?.reloadedAt) {
       note = `上次热重载：${new Date(data.kernel.reloadedAt).toLocaleTimeString()}`;
     }
-    $('overviewNote').textContent = note || '透明代理正常运行中 · 直连流量未进内核 (零损耗)';
+    const noteEl = $('overviewNote');
+    if (noteEl) {
+      noteEl.textContent = note;
+      if (note) {
+        noteEl.classList.remove('hidden');
+      } else {
+        noteEl.classList.add('hidden');
+      }
+    }
 
     if ($('statVersion')) $('statVersion').textContent = data.kernel?.version || '—';
     if ($('statNodes')) $('statNodes').textContent = data.nodes?.total ? `${data.nodes.total} 个` : '0 个';
@@ -503,6 +511,7 @@ function renderOverviewSubs() {
   const subs = state.overviewSubs || [];
   const totalNodes = subs.reduce((acc, s) => acc + (s.nodeCount || 0), 0);
   const allActive = state.overviewSelectedSubId === 'all';
+  const allEnabled = subs.length > 0 && subs.every((s) => s.enabled);
 
   let html = `
     <div class="ov-sub-item${allActive ? ' active' : ''}" data-ov-sub-id="all">
@@ -510,6 +519,12 @@ function renderOverviewSubs() {
       <div class="ov-sub-info">
         <div class="ov-sub-title">全部订阅 · 所有节点</div>
         <div class="ov-sub-meta">全部 ${subs.length} 个订阅 · 共 ${totalNodes} 个节点</div>
+      </div>
+      <div class="ov-sub-actions" onclick="event.stopPropagation()">
+        <label class="switch" title="${allEnabled ? '一键停用全部订阅' : '一键启用全部订阅'}">
+          <input type="checkbox" data-ov-sub-toggle="all"${allEnabled ? ' checked' : ''}${subs.length === 0 ? ' disabled' : ''}>
+          <span></span>
+        </label>
       </div>
     </div>
   `;
@@ -1686,7 +1701,7 @@ function bindEvents() {
     const enabled = toggle.checked;
     try {
       await api(`/subscriptions/${encodeURIComponent(subId)}`, { method: 'PUT', body: { enabled } });
-      toast(`订阅已${enabled ? '启用' : '停用'}并部署生效`);
+      toast(subId === 'all' ? `已${enabled ? '启用全部' : '停用全部'}订阅并部署生效` : `订阅已${enabled ? '启用' : '停用'}并部署生效`);
       await loadOverviewSubs();
       await loadOverviewGroups();
     } catch (err) {
