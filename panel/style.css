@@ -328,27 +328,25 @@ aside.sidebar {
 }
 
 nav.sb-nav {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: space-evenly;
   gap: 4px;
-  margin: 4px 0 12px;
+  margin: 6px 0 auto;
   min-height: 0;
 }
 
 nav.sb-nav button {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-2);
-  padding: 10px 14px;
+  padding: 8.5px 12px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   font: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 550;
   text-align: left;
   width: 100%;
@@ -1207,18 +1205,61 @@ label.field > span,
   font-size: 11.5px;
 }
 
-/* 概览页左侧联动订阅单选列表 */
+/* 概览页联动订阅与出口节点组 (固定卡片尺寸与紧凑滚动布局) */
+#cardOverviewSubs,
+#cardOverviewGroups {
+  display: flex;
+  flex-direction: column;
+  height: 290px;
+}
+
+#cardOverviewSubs .card-head,
+#cardOverviewGroups .card-head {
+  flex: 0 0 auto;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+}
+
+.overview-subs-list,
+#overviewGroups {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.overview-subs-list::-webkit-scrollbar,
+#overviewGroups::-webkit-scrollbar {
+  width: 5px;
+}
+.overview-subs-list::-webkit-scrollbar-track,
+#overviewGroups::-webkit-scrollbar-track {
+  background: transparent;
+}
+.overview-subs-list::-webkit-scrollbar-thumb,
+#overviewGroups::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-full);
+}
+.overview-subs-list::-webkit-scrollbar-thumb:hover,
+#overviewGroups::-webkit-scrollbar-thumb:hover {
+  background: var(--text-3);
+}
+
 .overview-subs-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .ov-sub-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
@@ -1237,8 +1278,8 @@ label.field > span,
 }
 
 .ov-sub-radio {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   border: 2px solid var(--text-3);
   display: flex;
@@ -1253,8 +1294,8 @@ label.field > span,
 }
 
 .ov-sub-radio-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: #fff;
   display: none;
@@ -1274,11 +1315,13 @@ label.field > span,
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.3;
 }
 .ov-sub-meta {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text-2);
-  margin-top: 2px;
+  margin-top: 1px;
+  line-height: 1.3;
 }
 .ov-sub-item.active .ov-sub-title {
   color: var(--accent);
@@ -1294,15 +1337,15 @@ label.field > span,
 .mini {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .mini-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 8px 12px;
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
@@ -1320,16 +1363,18 @@ label.field > span,
   font-weight: 600;
   font-size: 13px;
   color: var(--text);
+  line-height: 1.3;
 }
 .mini-row .sub {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text-2);
-  margin-top: 2px;
+  margin-top: 1px;
+  line-height: 1.3;
 }
 .mini-row select {
-  max-width: 200px;
-  font-size: 12.5px;
-  padding: 5px 9px;
+  max-width: 190px;
+  font-size: 12px;
+  padding: 4px 8px;
   border-radius: var(--radius-xs);
 }
 
