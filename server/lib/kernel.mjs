@@ -431,32 +431,57 @@ async function readLogFileTail(file, lines) {
   }
 }
 
+/**
+ * 服务管理器返回的空占位不算日志内容。
+ *
+ * journalctl 在没有任何条目时会输出「-- No entries --」，logread 也可能只回一行提示；
+ * 这类结果必须当成「没拿到日志」，否则界面会显示一行占位符而不是真正的日志尾部。
+ */
+export function usableSupervisorLog(text) {
+  const trimmed = String(text ?? '').trim();
+  return Boolean(trimmed) && !/^-- No entries --$/.test(trimmed);
+}
+
+async function readSupervisorLogAsync(cmd, args, limit) {
+  try {
+    const { stdout } = await execFileAsync(cmd, args, {
+      timeout: LOG_READ_TIMEOUT_MS, maxBuffer: LOG_MAX_BYTES, encoding: 'utf8',
+    });
+    return usableSupervisorLog(stdout) ? sliceLogTail(stdout, limit) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readSupervisorLogSync(cmd, args) {
+  try {
+    const stdout = execFileSync(cmd, args, {
+      timeout: LOG_READ_TIMEOUT_MS, maxBuffer: LOG_MAX_BYTES, encoding: 'utf8',
+    });
+    return usableSupervisorLog(stdout) ? stdout : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function tailLogAsync(lines = 200) {
   const limit = normalizeLogLines(lines);
   const plat = platform.detect();
   if (supervised() && plat.id === 'systemd') {
-    try {
-      const { stdout } = await execFileAsync(
-        'journalctl',
-        ['-u', platform.SERVICES.kernel, '-n', String(limit), '--no-pager'],
-        { timeout: LOG_READ_TIMEOUT_MS, maxBuffer: LOG_MAX_BYTES, encoding: 'utf8' },
-      );
-      return sliceLogTail(stdout, limit);
-    } catch {
-      return '';
-    }
+    const fromJournal = await readSupervisorLogAsync(
+      'journalctl',
+      ['-u', platform.SERVICES.kernel, '-n', String(limit), '--no-pager'],
+      limit,
+    );
+    if (fromJournal !== null) return fromJournal;
   }
   if (supervised() && plat.id === 'openwrt') {
-    try {
-      const { stdout } = await execFileAsync(
-        'logread',
-        ['-e', 'sing-box', '-l', String(limit)],
-        { timeout: LOG_READ_TIMEOUT_MS, maxBuffer: LOG_MAX_BYTES, encoding: 'utf8' },
-      );
-      return sliceLogTail(stdout, limit);
-    } catch {
-      return '';
-    }
+    const fromLogread = await readSupervisorLogAsync(
+      'logread',
+      ['-e', 'sing-box', '-l', String(limit)],
+      limit,
+    );
+    if (fromLogread !== null) return fromLogread;
   }
   return readLogFileTail(LOG_FILE, limit);
 }
@@ -466,26 +491,18 @@ export function tailLog(lines = 200) {
   const limit = normalizeLogLines(lines);
   const plat = platform.detect();
   if (supervised() && plat.id === 'systemd') {
-    try {
-      return execFileSync(
-        'journalctl',
-        ['-u', platform.SERVICES.kernel, '-n', String(limit), '--no-pager'],
-        { timeout: LOG_READ_TIMEOUT_MS, maxBuffer: LOG_MAX_BYTES, encoding: 'utf8' },
-      );
-    } catch {
-      return '';
-    }
+    const fromJournal = readSupervisorLogSync(
+      'journalctl',
+      ['-u', platform.SERVICES.kernel, '-n', String(limit), '--no-pager'],
+    );
+    if (fromJournal !== null) return fromJournal;
   }
   if (supervised() && plat.id === 'openwrt') {
-    try {
-      return execFileSync(
-        'logread',
-        ['-e', 'sing-box', '-l', String(limit)],
-        { timeout: LOG_READ_TIMEOUT_MS, maxBuffer: LOG_MAX_BYTES, encoding: 'utf8' },
-      );
-    } catch {
-      return '';
-    }
+    const fromLogread = readSupervisorLogSync(
+      'logread',
+      ['-e', 'sing-box', '-l', String(limit)],
+    );
+    if (fromLogread !== null) return fromLogread;
   }
   let fd;
   try {

@@ -12,7 +12,8 @@ const testArea = fs.mkdtempSync(path.join(projectRoot, 'runtime-tests-'));
 const runtime = path.join(testArea, 'runtime');
 process.env.MYBOX_ROOT = runtime;
 
-after(() => fs.rmSync(testArea, { recursive: true, force: true }));
+// 临时目录清理失败（Windows 文件占用、删除钩子/沙箱拦截）不该算测试失败。
+after(() => { try { fs.rmSync(testArea, { recursive: true, force: true }); } catch {} });
 
 const { loadSettings, mutateSettings } = await import('../server/lib/settings.mjs');
 const deployModule = await import('../server/lib/deploy.mjs');

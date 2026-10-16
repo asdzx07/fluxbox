@@ -10,7 +10,8 @@ import { applyUpdate, finalizeUpdate, rollbackUpdate } from '../scripts/update-t
 const toolsDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(toolsDir, '..');
 const testArea = fs.mkdtempSync(path.join(projectRoot, 'runtime-tests-'));
-after(() => fs.rmSync(testArea, { recursive: true, force: true }));
+// 临时目录清理失败（Windows 文件占用、删除钩子/沙箱拦截）不该算测试失败。
+after(() => { try { fs.rmSync(testArea, { recursive: true, force: true }); } catch {} });
 
 function write(file, content) {
   fs.mkdirSync(path.dirname(file), { recursive: true });

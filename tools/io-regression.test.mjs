@@ -10,7 +10,8 @@ const testArea = fs.mkdtempSync(path.join(projectRoot, 'runtime-tests-'));
 const runtime = path.join(testArea, 'runtime');
 process.env.MYBOX_ROOT = runtime;
 
-after(() => fs.rmSync(testArea, { recursive: true, force: true }));
+// 临时目录清理失败（Windows 文件占用、删除钩子/沙箱拦截）不该算测试失败。
+after(() => { try { fs.rmSync(testArea, { recursive: true, force: true }); } catch {} });
 
 const { fetchTextLimited, downloadToFile } = await import('../server/lib/http-io.mjs');
 const kernel = await import('../server/lib/kernel.mjs');
@@ -116,4 +117,15 @@ test('kernel log tail is async, bounded to requested lines and capped at 1000 li
   const legacyResult = kernel.tailLog(2);
   assert.equal(typeof legacyResult, 'string');
   assert.deepEqual(legacyResult.split('\n'), ['line-1199', 'line-1200']);
+});
+
+test('supervisor log placeholders are treated as empty so the local log file can serve as fallback', () => {
+  // journalctl 在没有条目时只回一行占位符；必须当成「没拿到日志」，
+  // 否则 systemd 环境下会显示占位符而不是本地 kernel.log 的真实尾部。
+  assert.equal(kernel.usableSupervisorLog('-- No entries --'), false);
+  assert.equal(kernel.usableSupervisorLog('-- No entries --\n'), false);
+  assert.equal(kernel.usableSupervisorLog('   '), false);
+  assert.equal(kernel.usableSupervisorLog(''), false);
+  assert.equal(kernel.usableSupervisorLog(null), false);
+  assert.equal(kernel.usableSupervisorLog('Oct 17 00:10:02 host sing-box[1]: started'), true);
 });
