@@ -43,39 +43,45 @@ function delayBadge(name) {
 
 export function renderNodeGroups() {
   const box = $('nodeGroups');
+  if (!box) return;
   if (!state.nodeGroups.length) {
     box.innerHTML = '<p class="note">内核没有返回任何分组。可能内核没在运行，或还没有部署配置。</p>';
     return;
   }
-  const collapsed = (name) => state.collapsed[name] !== false;
 
-  box.innerHTML = state.nodeGroups.map((g) => {
-    const isCollapsed = collapsed(g.name);
+  box.innerHTML = state.nodeGroups.map((g, i) => {
+    const isCollapsed = state.collapsed[g.name] !== undefined ? state.collapsed[g.name] : i > 0;
+    const isManualSelector = g.type === 'Selector' || g.type === 'selector';
+
     return `
-    <div class="card" style="background:var(--surface-2);margin-bottom:14px">
+    <div class="card group-wrapper-card" style="margin-bottom:14px">
       <div class="card-head group-head" data-collapse="${escapeHtml(g.name)}" style="cursor:pointer;margin-bottom:${isCollapsed ? '0' : '14px'}">
         <span class="chevron">${isCollapsed ? '▸' : '▾'}</span>
-        <h3>${escapeHtml(g.name)}</h3>
-        <span class="tag">${GROUP_LABEL[g.type] || g.type}</span>
+        <h3 style="font-size:15px;font-weight:700">${escapeHtml(g.name)}</h3>
+        <span class="tag ${isManualSelector ? 'blue-tag' : 'muted-tag'}">${GROUP_LABEL[g.type] || g.type}</span>
         <span class="tag muted">${g.members.length} 个节点</span>
         <div class="spacer"></div>
-        <span class="note">当前出口：<strong style="color:var(--accent)">${escapeHtml(g.now || '—')}</strong></span>
+        <span class="note" style="font-size:12px">当前出口：<strong style="color:var(--accent)">${escapeHtml(g.now || '—')}</strong></span>
       </div>
-      <div class="node-grid${isCollapsed ? ' hidden' : ''}">
+      <div class="node-grid-three-col${isCollapsed ? ' hidden' : ''}">
         ${g.members.map((m) => {
           const isActive = (m === g.now);
           const flag = extractFlagFn(m);
           const proto = extractProtoFn(m);
+          const delayHtml = delayBadge(m) || '<span class="lat na">未测速</span>';
+
           return `
-          <div class="node-card ${isActive ? 'active' : ''}" data-select-group="${escapeHtml(g.name)}" data-select-name="${escapeHtml(m)}">
-            <div class="node-card-head">
-              <span class="node-flag">${flag}</span>
-              <div class="node-title" title="${escapeHtml(m)}">${escapeHtml(m)}</div>
-              <span class="node-proto">${proto}</span>
+          <div class="node-tile-card ${isActive ? 'active-tile' : ''}" data-select-group="${escapeHtml(g.name)}" data-select-name="${escapeHtml(m)}">
+            <div class="node-tile-left">
+              <span class="node-radio-circle ${isActive ? 'is-selected' : ''}"></span>
+              <div class="node-tile-info">
+                <div class="node-tile-name" title="${escapeHtml(m)}">${flag} ${escapeHtml(m)}</div>
+                <div class="node-tile-sub">${proto} · 代理节点</div>
+              </div>
             </div>
-            <div class="node-card-foot">
-              <div>${delayBadge(m) || '<span class="lat na">未测试</span>'}</div>
-              <button class="small" data-latency="${escapeHtml(m)}" data-action="test-latency" data-name="${escapeHtml(m)}" style="padding:2px 8px;font-size:11px">测速</button>
+            <div class="node-tile-right">
+              <div class="node-tile-lat">${delayHtml}</div>
+              <div class="node-tile-status ${isActive ? 'is-current' : ''}">${isActive ? '当前出口' : '选择节点'}</div>
             </div>
           </div>`;
         }).join('')}

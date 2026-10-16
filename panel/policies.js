@@ -97,64 +97,95 @@ export async function loadPolicies() {
   }
 }
 
+const BADGE_COLORS = [
+  { bg: '#edf3ff', color: '#416de8' },
+  { bg: '#f3efff', color: '#775ed4' },
+  { bg: '#eaf7f2', color: '#16866f' },
+  { bg: '#fff4e8', color: '#b4762c' },
+  { bg: '#f1f3f7', color: '#75839b' }
+];
+
 export function renderPolicies() {
   const box = $('policyList');
   if (!box) return;
   const policies = state.policies || [];
   const enabledCount = policies.filter((policy) => policy.enabled).length;
-  if ($('policyEnabledSummary')) $('policyEnabledSummary').textContent = `已启用 ${enabledCount} / ${policies.length} 条`;
+  if ($('policyEnabledSummary')) $('policyEnabledSummary').textContent = `已启用 ${enabledCount} 条 · 首个匹配规则优先`;
   if (!policies.length) {
     box.innerHTML = '<p class="note" style="grid-column:1/-1;text-align:center;padding:16px 0">还没有策略，点击右上角「＋ 新增策略」。</p>';
     return;
   }
-  const isCol = (idx) => state.policyCollapsed?.[idx] !== false;
+  const isExpanded = (idx) => state.policyExpanded?.[idx] === true;
 
   box.innerHTML = policies.map((p, i) => {
-    const collapsed = isCol(i);
+    const expanded = isExpanded(i);
     const targetVal = p.target || 'all-auto';
     const isFallback = i === policies.length - 1 && (p.name.includes('兜底') || p.id === 'final');
     const badgeNum = String(i + 1).padStart(2, '0');
+    const colorStyle = isFallback
+      ? { bg: '#f1f3f7', color: '#75839b' }
+      : (BADGE_COLORS[i % (BADGE_COLORS.length - 1)] || BADGE_COLORS[0]);
+
+    const rulesetSummary = (p.rulesets && p.rulesets.length)
+      ? `ruleset: ${p.rulesets.join(', ')}`
+      : (p.domainSuffix && p.domainSuffix.length)
+        ? `domain_suffix: ${p.domainSuffix.join(', ')}`
+        : (isFallback ? '未命中前序规则的流量 · 作为最终出口兜底' : '无特殊过滤条件 (全匹配)');
 
     return `
-    <div class="card policy-card ${isFallback ? 'is-fallback' : ''}" draggable="${isFallback ? 'false' : 'true'}" data-policy-index="${i}">
-      <div class="card-head group-head" data-policy-collapse="${i}" style="cursor:pointer;margin-bottom:${collapsed ? '0' : '12px'}">
-        ${isFallback ? '<span class="drag-grip fallback-fixed" title="兜底规则固定末位，防漏路由">⚓</span>' : `
-          <span class="drag-grip" title="长按或拖拽调整策略优先级" data-stop-propagation>
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
-          </span>
-          <button type="button" class="small policy-move" data-action="move-policy" data-index="${i}" data-direction="-1" aria-label="将${escapeHtml(p.name)}上移"${i === 0 ? ' disabled' : ''}>↑</button>
-          <button type="button" class="small policy-move" data-action="move-policy" data-index="${i}" data-direction="1" aria-label="将${escapeHtml(p.name)}下移"${i >= policies.length - 2 ? ' disabled' : ''}>↓</button>
-        `}
-        <span class="policy-idx-badge ${isFallback ? 'fallback-badge' : ''}">${badgeNum}</span>
-        <span class="chevron">${collapsed ? '▸' : '▾'}</span>
-        <h3 style="display:flex;align-items:center;gap:6px">${policyIcon(p.name)}${escapeHtml(p.name)}</h3>
-        <span class="tag ${p.enabled ? 'good' : 'muted'}" data-p-status="${i}">${p.enabled ? '已启用' : '已关闭'}</span>
-        <span class="note policy-target-note" style="font-size:12px;margin-left:4px">出口：<strong style="color:var(--accent)" id="policyTargetLabel-${i}">${escapeHtml(formatTargetLabel(targetVal))}</strong></span>
-        <div class="spacer"></div>
-        <label class="switch" data-stop-propagation>
-          <input type="checkbox" data-p-enabled="${i}"${p.enabled ? ' checked' : ''}${isFallback ? ' disabled' : ''}>
-          <span></span>
-        </label>
-        ${isFallback ? '<span class="tag muted" style="font-size:11px">固定末位</span>' : `<button class="small danger" data-action="remove-policy" data-index="${i}">删除</button>`}
+    <div class="card policy-row-card ${isFallback ? 'is-fallback' : ''}" draggable="${isFallback ? 'false' : 'true'}" data-policy-index="${i}">
+      <div class="policy-card-main">
+        <div class="policy-left-col">
+          <span class="policy-idx-badge" style="background:${colorStyle.bg};color:${colorStyle.color}">${badgeNum}</span>
+          ${isFallback ? '<span class="drag-grip fallback-fixed" title="兜底规则固定末位，防漏路由">⚓</span>' : `
+            <span class="drag-grip" title="长按或拖拽调整策略优先级" data-stop-propagation>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 5v14M15 5v14"/></svg>
+            </span>
+          `}
+          <div class="policy-title-col">
+            <div class="policy-name-row">
+              <span class="policy-name">${policyIcon(p.name)}${escapeHtml(p.name)}</span>
+              <button type="button" class="policy-edit-btn" data-action="toggle-policy-expand" data-index="${i}">${expanded ? '收起配置 ▴' : '编辑详情 ▾'}</button>
+            </div>
+            <div class="policy-subtext" title="${escapeHtml(rulesetSummary)}">${escapeHtml(rulesetSummary)}</div>
+          </div>
+        </div>
+
+        <div class="policy-right-col" data-stop-propagation>
+          <div class="policy-target-select-wrap">
+            <select data-p-target="${i}" class="policy-select">
+              ${getTargetOptionsHtml(targetVal)}
+            </select>
+          </div>
+          <span class="policy-status-pill ${p.enabled ? 'good' : 'muted'}">${p.enabled ? '已启用' : '已停用'}</span>
+          ${isFallback ? `
+            <span class="policy-fallback-pill">兜底规则</span>
+            <span class="policy-move-label muted">固定末位</span>
+          ` : `
+            <button type="button" class="policy-action-link" data-action="move-policy" data-index="${i}" data-direction="-1" aria-label="上移"${i === 0 ? ' disabled' : ''}>↑ 上移</button>
+            <button type="button" class="policy-action-link" data-action="move-policy" data-index="${i}" data-direction="1" aria-label="下移"${i >= policies.length - 2 ? ' disabled' : ''}>↓ 下移</button>
+            <button type="button" class="policy-action-link danger" data-action="remove-policy" data-index="${i}">删除</button>
+          `}
+        </div>
       </div>
-      <div data-p-body="${i}" class="${collapsed ? 'hidden' : ''}">
+
+      <div class="policy-expand-body ${expanded ? '' : 'hidden'}" data-p-body="${i}">
         <div class="row">
-          <label class="field" style="flex:1 1 180px">
+          <label class="field" style="flex:1 1 200px">
             <span>策略名称</span>
             <input data-p-name="${i}" value="${escapeHtml(p.name || '')}" ${isFallback ? 'readonly' : ''}>
           </label>
-          <label class="field" style="flex:1 1 200px">
-            <span>出口目标（直连 / 拒绝 / 分组 / 单节点）</span>
-            <select data-p-target="${i}">
-              ${getTargetOptionsHtml(targetVal)}
-            </select>
+          <label class="field" style="flex:2 1 260px">
+            <span>规则集 (rulesets，逗号分隔)</span>
+            <input data-p-rulesets="${i}" value="${escapeHtml(p.rulesets?.join(', ') || '')}" placeholder="例如：geosite-openai, geosite-netflix">
           </label>
         </div>
         <div class="row">
-          <label class="field"><span>规则集 (rulesets)</span><input data-p-rulesets="${i}" value="${escapeHtml(p.rulesets?.join(', ') || '')}" placeholder="例如：geosite-openai, geosite-netflix"></label>
-          <label class="field"><span>域名后缀 (domain_suffix)</span><input data-p-suffix="${i}" value="${escapeHtml(p.domainSuffix?.join(', ') || '')}" placeholder="例如：openai.com, google.com"></label>
+          <label class="field" style="flex:1 1 100%">
+            <span>域名后缀 (domain_suffix，逗号分隔)</span>
+            <input data-p-suffix="${i}" value="${escapeHtml(p.domainSuffix?.join(', ') || '')}" placeholder="例如：openai.com, google.com">
+          </label>
         </div>
-        ${isFallback ? '<p class="note" style="margin-top:6px;font-size:11px">作为最终出口，所有未被前序规则命中的流量都将由此出口处理，避免未匹配流量无路由。</p>' : ''}
       </div>
     </div>
   `;
@@ -225,6 +256,12 @@ export async function commitPoliciesFromDOM() {
   renderPolicies();
 }
 
+export function togglePolicyExpand(index) {
+  if (!state.policyExpanded) state.policyExpanded = {};
+  state.policyExpanded[index] = !state.policyExpanded[index];
+  renderPolicies();
+}
+
 export function initPolicyDragSort() {
   const listEl = $('policyList');
   if (!listEl || listEl._dragInited) return;
@@ -233,7 +270,7 @@ export function initPolicyDragSort() {
   let dragSrcIdx = null;
 
   listEl.addEventListener('dragstart', (e) => {
-    const card = e.target.closest('.policy-card');
+    const card = e.target.closest('.policy-row-card');
     if (!card || card.classList.contains('is-fallback')) return;
     syncPoliciesFromDOM();
     dragSrcIdx = Number(card.dataset.policyIndex);
@@ -245,11 +282,11 @@ export function initPolicyDragSort() {
   listEl.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    const card = e.target.closest('.policy-card');
+    const card = e.target.closest('.policy-row-card');
     if (!card || card.classList.contains('is-fallback')) return;
     const overIdx = Number(card.dataset.policyIndex);
     if (overIdx === dragSrcIdx) return;
-    document.querySelectorAll('.policy-card.drag-over').forEach((el) => {
+    document.querySelectorAll('.policy-row-card.drag-over').forEach((el) => {
       if (el !== card) el.classList.remove('drag-over');
     });
     card.classList.add('drag-over');

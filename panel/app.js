@@ -10,7 +10,7 @@ import { GROUP_LABEL, configureNodes, loadNodes, renderNodeGroups, renderNodeLis
 import { loadClients, renderClients, setClientPage, openClientModal, closeClientModal, saveClientModal, updateClientMode, removeClient } from './clients.js';
 import { loadSubscriptions } from './subscriptions.js';
 import { loadGroups, renderGroups, removeGroup, commitGroupsFromDOM } from './groups.js';
-import { loadPolicies, renderPolicies, movePolicy, removePolicy, updatePolicyTarget, commitPoliciesFromDOM, initPolicyDragSort } from './policies.js';
+import { loadPolicies, renderPolicies, movePolicy, removePolicy, updatePolicyTarget, commitPoliciesFromDOM, initPolicyDragSort, togglePolicyExpand } from './policies.js';
 import { bindSettingsEvents, loadSettings, loadKernelLog, scheduleLogAuto } from './settings.js';
 import { loadRulesetStatus, loadRulesetSubs, refreshSingleRulesetSub, openRulesetModal, closeRulesetModal, saveRulesetModal, toggleRulesetSub, removeRulesetSub } from './rulesets.js';
 
@@ -206,6 +206,7 @@ function bindEvents() {
     else if (name === 'remove-group') removeGroup(Number(index));
     else if (name === 'remove-policy') removePolicy(Number(index), e);
     else if (name === 'move-policy') movePolicy(Number(index), Number(direction));
+    else if (name === 'toggle-policy-expand') togglePolicyExpand(Number(index));
     else if (name === 'refresh-ruleset') refreshSingleRulesetSub(tag);
     else if (name === 'remove-ruleset') removeRulesetSub(id);
   });

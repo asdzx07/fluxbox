@@ -27,9 +27,15 @@
 
 <div id="app" class="hidden">
   <aside class="sidebar">
-    <div class="brand">MyBox<small id="brandVersion">版本校验中…</small></div>
+    <div class="brand">
+      <div class="brand-logo">M</div>
+      <div class="brand-text">
+        <span class="brand-name">MyBox</span>
+        <span class="brand-sub">NETWORK CONSOLE</span>
+      </div>
+    </div>
     
-    <div class="sb-sec">导航</div>
+    <div class="sb-sec">工作台</div>
     <nav class="sb-nav">
       <!-- 1. 概览 -->
       <button data-tab="overview" class="active">
@@ -75,11 +81,18 @@
     </nav>
 
     <div class="sb-foot">
+      <div class="sb-user-card">
+        <div class="sb-avatar">网关</div>
+        <div class="sb-user-info">
+          <strong>家庭网关</strong>
+          <span id="brandVersion">管理员</span>
+        </div>
+      </div>
       <button id="btnGlobalDeploy" class="sb-deploy-btn" title="立即部署当前所有配置到内核">
         <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
         <span class="nav-text">部署配置</span>
       </button>
-      <button data-tab="logout" class="ghost">
+      <button data-tab="logout" class="ghost" style="margin-top:4px">
         <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg></span>
         退出登录
       </button>
@@ -105,12 +118,16 @@
         <div class="hero-overview-left">
           <div class="hero-status-row">
             <span class="hero-status-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
             </span>
-            <h3 id="heroStatusTitle">网络核心运行中</h3>
-            <span id="heroStatusBadge" class="hero-badge good">稳定</span>
+            <div class="hero-title-group">
+              <div class="hero-title-line">
+                <h3 id="heroStatusTitle">网络核心运行中</h3>
+                <span id="heroStatusBadge" class="hero-badge good">稳定</span>
+              </div>
+              <p id="heroStatusDesc" class="note">sing-box 已接管流量，DNS 分流正常 · 运行时间 读取中…</p>
+            </div>
           </div>
-          <p id="heroStatusDesc" class="note">sing-box 已接管流量，DNS 分流正常 · 运行时间 读取中…</p>
           <div class="hero-pills">
             <span class="hero-pill good" id="pillTun"><span class="pill-dot"></span>mybox-tun</span>
             <span class="hero-pill good" id="pillDns"><span class="pill-dot"></span>DNS 接管</span>
