@@ -7,6 +7,10 @@
 *.json text eol=lf
 *.md text eol=lf
 *.service text eol=lf
-*.bat text eol=crlf
-*.cmd text eol=crlf
-*.vbs text eol=crlf
+# 批处理脚本不能用 text/eol 属性：GitHub 归档导出时会做换行转换，
+# 转换后的字节与 Git 树里的 blob 不一致，会让在线更新的归档校验误判成「文件被篡改」。
+# 改成 -text（不做任何换行转换、仓库里直接存 CRLF 原文），并用 diff 保留文本差异查看；
+# whitespace=cr-at-eol 表示行尾的 CR 是换行符的一部分，不算空白错误。
+*.bat -text diff whitespace=cr-at-eol
+*.cmd -text diff whitespace=cr-at-eol
+*.vbs -text diff whitespace=cr-at-eol

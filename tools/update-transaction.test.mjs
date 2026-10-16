@@ -124,7 +124,7 @@ function createTreeFixture(files) {
   return { sha, tree: entries };
 }
 
-test('update archive verifier accepts exact Git trees and rejects changed or extra files', () => {
+function loadVerifierSource() {
   const updater = fs.readFileSync(path.join(projectRoot, 'scripts', 'update.sh'), 'utf8');
   const marker = `  "$NODE_BIN" - "$SRCDIR" "$TREE_JSON" "$TREE_SHA" <<'NODE'\n`;
   const start = updater.indexOf(marker);
@@ -132,7 +132,18 @@ test('update archive verifier accepts exact Git trees and rejects changed or ext
   const bodyStart = start + marker.length;
   const end = updater.indexOf('\nNODE\n', bodyStart);
   assert.notEqual(end, -1, 'expected end marker for inline Git tree verifier');
-  const verifier = updater.slice(bodyStart, end);
+  return updater.slice(bodyStart, end);
+}
+
+function runVerifierOn(verifier, fixtureDir, treeFile, treeSha) {
+  return spawnSync(process.execPath, ['-', fixtureDir, treeFile, treeSha], {
+    input: verifier,
+    encoding: 'utf8',
+  });
+}
+
+test('update archive verifier accepts exact Git trees and rejects changed or extra files', () => {
+  const verifier = loadVerifierSource();
   const fixtureDir = path.join(testArea, 'verified-source');
   const fixtureFiles = { 'VERSION': 'v2.0.0 (B200)\n', 'panel/index.html': '<main>safe</main>\n' };
   const tree = createTreeFixture(fixtureFiles);
@@ -158,4 +169,37 @@ test('update archive verifier accepts exact Git trees and rejects changed or ext
   const extra = runVerifier();
   assert.notEqual(extra.status, 0);
   assert.match(extra.stderr, /文件数量|未列入 Git 树/);
+});
+
+test('update archive verifier tolerates Git export newline conversion only', () => {
+  // 复现真实事故：Git 树里存 LF，但 GitHub 归档按 .gitattributes 导出成 CRLF，
+  // 逐字节比较会把归档误判成「文件被篡改」，导致设备永远更新不了。
+  const verifier = loadVerifierSource();
+  const fixtureDir = path.join(testArea, 'crlf-source');
+  const lfContent = '@echo off\nbuild-launcher\n';
+  const tree = createTreeFixture({ 'windows-client/build.cmd': lfContent });
+  const scriptPath = path.join(fixtureDir, 'windows-client', 'build.cmd');
+  fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
+  fs.writeFileSync(scriptPath, lfContent.replace(/\n/g, '\r\n'));
+
+  const treeFile = path.join(testArea, 'crlf-tree.json');
+  fs.writeFileSync(treeFile, JSON.stringify({ sha: tree.sha, truncated: false, tree: tree.tree }));
+
+  const converted = spawnSync(process.execPath, ['-', fixtureDir, treeFile, tree.sha], { input: verifier, encoding: 'utf8' });
+  assert.equal(converted.status, 0, converted.stderr);
+
+  fs.writeFileSync(scriptPath, '@echo off\r\nbuild-launcher --tampered\r\n');
+  const tampered = spawnSync(process.execPath, ['-', fixtureDir, treeFile, tree.sha], { input: verifier, encoding: 'utf8' });
+  assert.notEqual(tampered.status, 0);
+  assert.match(tampered.stderr, /文件校验和不匹配/);
+});
+
+test('git attributes never request CRLF export, which breaks archive verification', () => {
+  // eol=crlf 会让 GitHub 归档的字节与 Git 树 blob 不一致，直接导致在线更新失败。
+  const attributes = fs.readFileSync(path.join(projectRoot, '.gitattributes'), 'utf8');
+  const offenders = attributes
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#') && /(?:^|\s)eol=crlf(?:\s|$)/i.test(line));
+  assert.deepEqual(offenders, [], 'eol=crlf 会破坏归档校验，请改用 -text diff 并在仓库中直接存放 CRLF');
 });

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { loadRulesetMeta, refreshRulesets, formatDateTime } from '../lib/rulesets.mjs';
 
-const UPDATE_SCRIPT_SHA256 = '0b83a625fa34b0c7edd9f996fd51e5f545f19d85df32155f376b6ca996eef0c6';
+const UPDATE_SCRIPT_SHA256 = 'bed9b1d8c6fc2088a6cbcfa303c0157e98d069a53620fc73daa16d86c609cf5a';
 
 export function registerOperationRoutes(app, deps) {
   const { fs, path, spawn, ROOT, DATA_DIR, loadSettings, mutateSettings, getTraffic, resetTrafficTotals, kernel, deploy, log } = deps;

@@ -189,6 +189,15 @@ const crypto = require('node:crypto');
 const [root, treeFile, expectedRootSha] = process.argv.slice(2);
 const fail = (message) => { console.error(`更新归档校验失败：${message}`); process.exit(1); };
 const objectHash = (type, body) => crypto.createHash('sha1').update(`${type} ${body.length}\0`).update(body).digest('hex');
+// GitHub 归档会按 .gitattributes 做换行转换（例如历史遗留的 text eol=crlf），
+// 转换后的字节与 Git 树里的 blob 不同。行尾差异不改变内容语义，因此允许
+// 「原始字节」或「CRLF 归一化后」两种匹配；其它任何差异仍判为篡改。
+const blobMatches = (content, sha) => {
+  if (objectHash('blob', content) === sha) return true;
+  if (!content.includes(13)) return false;
+  const normalized = Buffer.from(content.toString('binary').replace(/\r\n/g, '\n'), 'binary');
+  return objectHash('blob', normalized) === sha;
+};
 const safePath = (value) => {
   if (typeof value !== 'string' || !value || value.includes('\\') || /[\x00-\x1f\x7f]/.test(value)) return false;
   const parts = value.split('/');
@@ -268,7 +277,7 @@ for (const [name, entry] of expectedFiles) {
     if ((entry.mode === '100755') !== executable) fail(`可执行权限不匹配：${name}`);
     content = fs.readFileSync(actual.full);
   }
-  if (objectHash('blob', content) !== entry.sha) fail(`文件校验和不匹配：${name}`);
+  if (!blobMatches(content, entry.sha)) fail(`文件校验和不匹配：${name}`);
 }
 for (const name of actualFiles.keys()) if (!expectedFiles.has(name)) fail(`归档含有未列入 Git 树的文件：${name}`);
 NODE
