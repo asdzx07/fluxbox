@@ -35,10 +35,10 @@ async function withServer(overrides, run) {
 
   const settings = makeSettings();
   const logEntries = [];
-  const calls = { deploy: [], flips: [], fetch: [] };
+  const calls = { deploy: [], flips: [], fetch: [], spawns: [] };
   const baseDeps = {
-    ROOT: '/isolated/mybox',
-    DATA_DIR: '/isolated/mybox/data',
+    ROOT: projectRoot,
+    DATA_DIR: path.join(projectRoot, 'runtime-tests-data'),
     KERNEL: { clashApiHost: '127.0.0.1', clashApiPort: 9095 },
     log: {
       info: (...args) => logEntries.push(['info', ...args]),
@@ -112,7 +112,10 @@ async function withServer(overrides, run) {
     },
     fs,
     path,
-    spawn: () => ({ unref() {} }),
+    spawn: (...args) => {
+      calls.spawns.push(args);
+      return { unref() {} };
+    },
   };
   const app = createApp({ deps: { ...baseDeps, ...overrides }, panelDir });
   const server = app.listen(0, '127.0.0.1');
@@ -142,7 +145,7 @@ test('application preserves static/public-before-auth and protected route contra
 
     const health = await request(baseUrl, '/api/health', {}, false);
     assert.equal(health.status, 200);
-    assert.deepEqual(await health.json(), { ok: true, root: '/isolated/mybox', dbPath: path.join('/isolated/mybox/data', 'settings.json') });
+    assert.deepEqual(await health.json(), { ok: true });
 
     const denied = await request(baseUrl, '/api/overview', {}, false);
     assert.equal(denied.status, 401);
@@ -160,7 +163,7 @@ test('subscription, ruleset, group and policy route response shapes remain stabl
   await withServer({}, async ({ baseUrl, settings, calls }) => {
     const subscriptions = await request(baseUrl, '/api/subscriptions');
     assert.deepEqual(await subscriptions.json(), {
-      subscriptions: [{ ...settings.subscriptions[0], nodeCount: 1, sampleNodes: ['node-a'] }],
+      subscriptions: [{ ...settings.subscriptions[0], nodeCount: 1, nodeTags: ['node-a'], sampleNodes: ['node-a'] }],
       totalNodes: 1,
     });
 
@@ -273,6 +276,56 @@ test('change-password route verifies current password, rotates session secret, a
     assert.equal(savedPassword, 'new-valid-pass');
     assert.equal(secretRotated, true);
     assert.equal(issuedToken, 'token-after-rotation');
+  });
+});
+
+test('login endpoint rate-limits repeated failures and clears the counter after success', async () => {
+  await withServer({
+    isPasswordSet: () => true,
+    verifyPassword: (password) => password === 'correct-password',
+  }, async ({ baseUrl }) => {
+    const login = (password) => request(baseUrl, '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    }, false);
+
+    for (let i = 0; i < 3; i += 1) assert.equal((await login('wrong-password')).status, 401);
+    assert.equal((await login('correct-password')).status, 200);
+    for (let i = 0; i < 5; i += 1) assert.equal((await login('wrong-password')).status, 401);
+
+    const limited = await login('correct-password');
+    assert.equal(limited.status, 429);
+    assert.ok(Number(limited.headers.get('retry-after')) > 0);
+  });
+});
+
+test('update endpoint refuses remote shell fallback and runs only a checksum-pinned local script', async () => {
+  await withServer({ ROOT: path.join(testArea, 'missing-update-root') }, async ({ baseUrl, calls }) => {
+    const missing = await request(baseUrl, '/api/system/update', { method: 'POST' });
+    assert.equal(missing.status, 503);
+    assert.equal(calls.spawns.length, 0);
+  });
+
+  const updateRoot = path.join(testArea, 'update-root');
+  fs.mkdirSync(path.join(updateRoot, 'scripts'), { recursive: true });
+  fs.mkdirSync(path.join(updateRoot, 'data'), { recursive: true });
+  const scriptPath = path.join(updateRoot, 'scripts', 'update.sh');
+  fs.writeFileSync(scriptPath, '#!/bin/sh\\nexit 0\\n');
+  await withServer({ ROOT: updateRoot }, async ({ baseUrl, calls }) => {
+    const tampered = await request(baseUrl, '/api/system/update', { method: 'POST' });
+    assert.equal(tampered.status, 503);
+    assert.equal(calls.spawns.length, 0);
+  });
+
+  fs.copyFileSync(path.join(projectRoot, 'scripts', 'update.sh'), scriptPath);
+  await withServer({ ROOT: updateRoot }, async ({ baseUrl, calls }) => {
+    const response = await request(baseUrl, '/api/system/update', { method: 'POST' });
+    assert.equal(response.status, 200);
+    assert.equal(calls.spawns.length, 1);
+    assert.equal(calls.spawns[0][0], 'sh');
+    assert.deepEqual(calls.spawns[0][1], [path.join(updateRoot, 'scripts', 'update.sh')]);
+    assert.equal(calls.spawns[0][2].detached, true);
   });
 });
 

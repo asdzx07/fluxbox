@@ -166,7 +166,7 @@ for d in server panel system tools scripts; do
   cp -R "$SRCDIR/$d" "$ROOT/"
 done
 cp "$SRCDIR/package.json" "$ROOT/"
-[ -f "$SRCDIR/VERSION" ] && cp "$SRCDIR/VERSION" "$ROOT/VERSION" || echo "1.0.0" > "$ROOT/VERSION"
+[ -f "$SRCDIR/VERSION" ] && cp "$SRCDIR/VERSION" "$ROOT/VERSION" || echo "v2.0.0 (B200)" > "$ROOT/VERSION"
 [ -n "$TMP_SRC" ] && rm -rf "$TMP_SRC"
 
 # ---------------------------------------------------------------- 依赖

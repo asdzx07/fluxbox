@@ -54,6 +54,7 @@ function makeHarness({ visibleId, containerId, source, loadName, stopName, extra
     renderConnections: () => { renderCount += 1; },
     escapeHtml: (value) => String(value),
     toast: () => {},
+    fmtBytes: (value) => String(value),
     confirm: () => true,
     setInterval: () => 1,
     clearInterval: () => {},
@@ -76,10 +77,10 @@ function makeHarness({ visibleId, containerId, source, loadName, stopName, extra
 }
 
 const panelSource = sourceBlock(
-  'panel/app.js',
+  'panel/connections.js',
   'let connAutoPollTimer = null;',
-  '/* --------------------------------------------------------------- 内网分流 */',
-);
+  'export function setConnectionPage',
+).replaceAll('export ', '');
 const windowsLoadSource = sourceBlock(
   'windows-client/ui/app.js',
   'let connLoadPromise = null;',

@@ -1,4 +1,7 @@
+import crypto from 'node:crypto';
 import { loadRulesetMeta, refreshRulesets, formatDateTime } from '../lib/rulesets.mjs';
+
+const UPDATE_SCRIPT_SHA256 = '0b83a625fa34b0c7edd9f996fd51e5f545f19d85df32155f376b6ca996eef0c6';
 
 export function registerOperationRoutes(app, deps) {
   const { fs, path, spawn, ROOT, DATA_DIR, loadSettings, mutateSettings, getTraffic, resetTrafficTotals, kernel, deploy, log } = deps;
@@ -75,8 +78,8 @@ export function registerOperationRoutes(app, deps) {
 
   app.get('/api/system/version', async (req, res) => {
     try {
-      let semver = 'v1.20';
-      let buildNumber = 92;
+      let semver = 'v2.0.0';
+      let buildNumber = 200;
       let commitSha = null;
 
       // 1. 优先尝试从 VERSION 文件读取（官方权威版本文件）
@@ -86,7 +89,7 @@ export function registerOperationRoutes(app, deps) {
           const versionText = fs.readFileSync(versionFile, 'utf8').trim();
           const bMatch = versionText.match(/B(\d+)/i) || versionText.match(/\d+\.\d+\.(\d+)/);
           if (bMatch) buildNumber = Number.parseInt(bMatch[1], 10);
-          const vMatch = versionText.match(/v?(\d+\.\d+)/);
+          const vMatch = versionText.match(/v?(\d+\.\d+\.\d+)/) || versionText.match(/v?(\d+\.\d+)/);
           if (vMatch) semver = `v${vMatch[1]}`;
         }
       } catch {}
@@ -139,14 +142,14 @@ export function registerOperationRoutes(app, deps) {
       for (const vUrl of versionCandidates) {
         try {
           const rawRes = await fetch(vUrl, {
-            headers: { 'User-Agent': 'mybox/1.20' },
+            headers: { 'User-Agent': 'mybox/2.0.0' },
             signal: AbortSignal.timeout(5000),
           });
           if (rawRes.ok) {
             const rawText = (await rawRes.text()).trim();
             const rBMatch = rawText.match(/B(\d+)/i) || rawText.match(/\d+\.\d+\.(\d+)/);
             if (rBMatch) remoteBuild = Number.parseInt(rBMatch[1], 10);
-            const rVMatch = rawText.match(/v?(\d+\.\d+)/);
+            const rVMatch = rawText.match(/v?(\d+\.\d+\.\d+)/) || rawText.match(/v?(\d+\.\d+)/);
             if (rVMatch) remoteSemver = `v${rVMatch[1]}`;
             fetchSucceeded = true;
             break;
@@ -157,7 +160,7 @@ export function registerOperationRoutes(app, deps) {
       for (const sUrl of shaCandidates) {
         try {
           const shaRes = await fetch(sUrl, {
-            headers: { 'User-Agent': 'mybox/1.20' },
+            headers: { 'User-Agent': 'mybox/2.0.0' },
             signal: AbortSignal.timeout(5000),
           });
           if (shaRes.ok) {
@@ -175,7 +178,7 @@ export function registerOperationRoutes(app, deps) {
       if (!remoteCommitSha) {
         try {
           const response = await fetch('https://api.github.com/repos/asdzx07/mybox/commits/main', {
-            headers: { 'User-Agent': 'mybox/1.20' },
+            headers: { 'User-Agent': 'mybox/2.0.0' },
             signal: AbortSignal.timeout(5000),
           });
           if (response.ok) {
@@ -214,19 +217,31 @@ export function registerOperationRoutes(app, deps) {
 
   app.post('/api/system/update', async (req, res) => {
     try {
-      const updateScript = path.join(ROOT, 'scripts', 'update.sh');
-      const logFile = path.join(ROOT, 'data', 'update.log');
-      let command = 'sh';
-      let args = [];
-      if (fs.existsSync(updateScript)) {
-        args = [updateScript, '--mirror'];
-      } else {
-        args = ['-c', 'curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/asdzx07/mybox/main/scripts/update.sh | sh -s -- --mirror'];
+      const rootDir = path.resolve(ROOT);
+      const updateScript = path.resolve(rootDir, 'scripts', 'update.sh');
+      const relativeScript = path.relative(rootDir, updateScript);
+      if (relativeScript.startsWith('..') || path.isAbsolute(relativeScript)) {
+        return res.status(500).json({ ok: false, error: '更新脚本路径无效' });
+      }
+      if (!fs.existsSync(updateScript)) {
+        return res.status(503).json({ ok: false, error: '本地更新脚本不存在，已停止远程脚本执行' });
+      }
+      const scriptStat = fs.lstatSync(updateScript);
+      if (!scriptStat.isFile()) {
+        return res.status(503).json({ ok: false, error: '本地更新脚本类型无效' });
+      }
+      const actualHash = crypto.createHash('sha256').update(fs.readFileSync(updateScript)).digest('hex');
+      const actualHashBytes = Buffer.from(actualHash, 'hex');
+      const expectedHashBytes = Buffer.from(UPDATE_SCRIPT_SHA256, 'hex');
+      if (actualHashBytes.length !== expectedHashBytes.length || !crypto.timingSafeEqual(actualHashBytes, expectedHashBytes)) {
+        log.error('更新脚本 SHA-256 校验失败：%s', updateScript);
+        return res.status(503).json({ ok: false, error: '更新脚本校验失败，已停止执行' });
       }
 
+      const logFile = path.join(rootDir, 'data', 'update.log');
       try {
         const output = fs.openSync(logFile, 'w');
-        const child = spawn(command, args, { detached: true, stdio: ['ignore', output, output] });
+        const child = spawn('sh', [updateScript], { detached: true, stdio: ['ignore', output, output] });
         child.unref();
       } catch (spawnErr) {
         log.error('触发更新脚本失败：%s', spawnErr.message);

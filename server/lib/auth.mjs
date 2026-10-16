@@ -88,15 +88,19 @@ export function isAuthed(req) {
   return tokenValid(parseCookies(req.headers.cookie)[COOKIE]);
 }
 
-export function setSessionCookie(res, token) {
+function secureCookieSuffix(req) {
+  return req?.secure === true || req?.socket?.encrypted === true ? '; Secure' : '';
+}
+
+export function setSessionCookie(res, token, req) {
   res.setHeader(
     'Set-Cookie',
-    `${COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${TTL_MS / 1000}`,
+    `${COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${TTL_MS / 1000}${secureCookieSuffix(req)}`,
   );
 }
 
-export function clearSessionCookie(res) {
-  res.setHeader('Set-Cookie', `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+export function clearSessionCookie(res, req) {
+  res.setHeader('Set-Cookie', `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secureCookieSuffix(req)}`);
 }
 
 /**

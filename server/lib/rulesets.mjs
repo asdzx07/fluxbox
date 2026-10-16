@@ -142,7 +142,7 @@ async function fetchRulesetBuffer(rawUrl, { timeoutMs = 12000 } = {}) {
     try {
       const res = await fetch(targetUrl, {
         signal: AbortSignal.timeout(timeoutMs),
-        headers: { 'User-Agent': 'mybox/1.20' },
+        headers: { 'User-Agent': 'mybox/2.0.0' },
       });
       if (res.ok) {
         const arrBuf = await res.arrayBuffer();

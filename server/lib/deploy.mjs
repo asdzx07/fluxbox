@@ -41,7 +41,7 @@ async function probeRuleSetUrl(rawUrl, timeoutMs = 4000) {
       const res = await fetch(targetUrl, {
         method: 'HEAD',
         signal: AbortSignal.timeout(timeoutMs),
-        headers: { 'User-Agent': 'mybox/1.20' },
+        headers: { 'User-Agent': 'mybox/2.0.0' },
       });
       if (res.ok) {
         return { ok: true, status: res.status };

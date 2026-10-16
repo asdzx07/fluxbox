@@ -27,7 +27,7 @@
 
 <div id="app" class="hidden">
   <aside class="sidebar">
-    <div class="brand">MyBox<small id="brandVersion">v1.20 (B106)</small></div>
+    <div class="brand">MyBox<small id="brandVersion">v2.0.0 (B200)</small></div>
     
     <div class="sb-sec">导航</div>
     <nav class="sb-nav">
@@ -98,12 +98,20 @@
             <span id="statKernel">—</span>
           </div>
           <div class="hero-meta hidden" id="overviewNote"></div>
+          <div class="hero-exit-summary"><span>当前代理出口</span><strong id="overviewCurrentExit">加载中…</strong></div>
         </div>
         <div class="hero-actions">
           <button class="small" id="btnRestart">重启内核</button>
           <button class="small danger" id="btnStop">停止内核</button>
         </div>
         <p class="warn-text hidden" id="overviewHint"></p>
+      </div>
+
+      <div class="overview-snapshot" aria-label="运行概况">
+        <div class="snapshot-item"><span>节点</span><strong id="quickNodes">—</strong></div>
+        <div class="snapshot-item"><span>启用策略</span><strong id="quickPolicies">—</strong></div>
+        <div class="snapshot-item"><span>活动分组</span><strong id="quickGroups">—</strong></div>
+        <div class="snapshot-item"><span>订阅来源</span><strong id="quickSubscriptions">—</strong></div>
       </div>
 
       <div class="card">
@@ -152,7 +160,13 @@
 
     <!-- ---------------------------------------------------------- 2. 节点分组 -->
     <section class="page" id="page-nodes">
-      <h2>节点分组</h2>
+      <div class="page-title-row"><div><h2>节点分组</h2><p class="note">管理代理出口、节点健康状态与分组策略</p></div></div>
+      <div class="node-summary-grid" aria-label="节点健康摘要">
+        <div class="snapshot-item"><span>节点总数</span><strong id="nodeSummaryTotal">—</strong></div>
+        <div class="snapshot-item"><span>已测速可用</span><strong id="nodeSummaryHealthy">—</strong></div>
+        <div class="snapshot-item"><span>最低延迟</span><strong id="nodeSummaryFastest">—</strong></div>
+        <div class="snapshot-item"><span>当前出口组</span><strong id="nodeSummaryGroups">—</strong></div>
+      </div>
 
       <div class="card">
         <div class="card-head">
@@ -189,6 +203,12 @@
           <h3>全部节点</h3>
           <span class="note" id="nodeCount" style="margin-left:8px"></span>
           <div class="spacer"></div>
+          <input type="search" id="nodeSearch" class="node-search" placeholder="搜索节点名称 / 协议 / 地址" aria-label="搜索节点">
+          <select id="nodeSort" class="node-sort" aria-label="节点排序">
+            <option value="default">默认顺序</option>
+            <option value="name">按名称排序</option>
+            <option value="latency">按延迟排序</option>
+          </select>
           <div class="col-switcher" id="nodeColsSwitcher" role="group" aria-label="节点列数">
             <button type="button" class="col-btn" data-cols="1" title="单列排版">1 列</button>
             <button type="button" class="col-btn active" data-cols="2" title="双列排版">2 列</button>
@@ -215,6 +235,15 @@
           <button class="primary" id="btnSaveDeployPolicies">⚡ 保存并部署</button>
           <button class="small" id="btnSavePolicies">仅保存</button>
         </div>
+      </div>
+
+      <div class="card policy-guidance">
+        <div class="policy-guidance-mark" aria-hidden="true">1</div>
+        <div class="grow">
+          <strong>规则按从上到下依次匹配</strong>
+          <p class="note">命中第一条规则后即使用对应出口；未命中时由兜底目标处理。可拖动排序，也可用上移 / 下移按钮键盘操作。</p>
+        </div>
+        <span class="tag muted" id="policyEnabledSummary">已启用 — 条</span>
       </div>
 
       <div id="policyList"></div>
@@ -249,6 +278,13 @@
         </div>
       </div>
 
+      <div class="connection-summary" aria-label="连接流量概况">
+        <div class="snapshot-item"><span>活动连接</span><strong id="connectionSummaryCount">—</strong></div>
+        <div class="snapshot-item"><span>连接协议</span><strong id="connectionSummaryProtocols">—</strong></div>
+        <div class="snapshot-item"><span>累计下载</span><strong id="connectionSummaryDownload">—</strong></div>
+        <div class="snapshot-item"><span>累计上传</span><strong id="connectionSummaryUpload">—</strong></div>
+      </div>
+
       <div class="card">
         <div class="card-head" style="flex-wrap:wrap;gap:10px">
           <div style="display:flex;align-items:center;gap:6px;flex:1 1 260px">
@@ -268,6 +304,12 @@
       <p class="note" style="margin:-6px 0 14px">
         按局域网设备 IP 划分代理策略（如 NAS 下载机强制直连不封号，电视盒子全局走代理，手机电脑走规则分流）。
       </p>
+      <div class="node-summary-grid client-summary-grid" aria-label="内网设备概况">
+        <div class="snapshot-item"><span>已配置设备</span><strong id="clientSummaryTotal">—</strong></div>
+        <div class="snapshot-item"><span>在线设备</span><strong id="clientSummaryOnline">—</strong></div>
+        <div class="snapshot-item"><span>全局代理</span><strong id="clientSummaryProxy">—</strong></div>
+        <div class="snapshot-item"><span>完全直连</span><strong id="clientSummaryDirect">—</strong></div>
+      </div>
 
       <div class="card">
         <div class="card-head">
@@ -276,6 +318,11 @@
           <button class="small" id="btnScanClients">刷新设备列表</button>
           <button class="small" id="btnDeployClients" title="立即部署当前配置">部署配置</button>
           <button class="small primary" id="btnAddClient">＋ 添加设备</button>
+        </div>
+        <div class="card-head client-list-tools">
+          <h4>设备列表</h4>
+          <div class="spacer"></div>
+          <input type="search" id="clientSearch" class="client-search" placeholder="搜索名称、IP 或 MAC 地址" aria-label="搜索内网设备">
         </div>
         <div id="clientList"></div>
         <p class="note" style="margin-top:12px">
@@ -295,7 +342,7 @@
           <label class="field" style="flex:2 1 280px"><span>订阅地址</span><input id="subUrl" placeholder="https://..."></label>
           <div class="fixed"><button class="primary" id="btnAddSub">添加并拉取</button></div>
         </div>
-        <p class="note">支持 sing-box JSON、Clash YAML、base64 分享链接。</p>
+        <p class="note">支持 sing-box JSON、Clash YAML、base64 分享链接。订阅链接可能包含访问凭证，列表中会隐藏查询参数。</p>
       </div>
 
       <div class="card">
@@ -306,6 +353,12 @@
           <button class="small primary" id="btnDeploySubs">⚡ 部署配置</button>
         </div>
         <p class="note" id="subSwitchNote" style="margin:-4px 0 12px"></p>
+        <div class="overview-snapshot subscription-summary" aria-label="订阅概况">
+          <div class="snapshot-item"><span>订阅来源</span><strong id="subSummaryTotal">—</strong></div>
+          <div class="snapshot-item"><span>已启用</span><strong id="subSummaryEnabled">—</strong></div>
+          <div class="snapshot-item"><span>订阅节点</span><strong id="subSummaryNodes">—</strong></div>
+          <div class="snapshot-item"><span>支持格式</span><strong>JSON / YAML / Base64</strong></div>
+        </div>
         <div class="list" id="subList"></div>
       </div>
     </section>
@@ -316,7 +369,7 @@
         <div>
           <div class="page-title-row">
             <h2>核心设置</h2>
-            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B106)</span>
+            <span class="version-tag" id="settingCurrentVerTag">v2.0.0 (B200)</span>
           </div>
           <p class="note" style="margin-top:2px">网络栈协议、DNS 策略、内核系统及版本更新管理</p>
         </div>
@@ -361,10 +414,10 @@
               <span class="bdg" id="panelUpdateBadge">当前已是最新</span>
             </div>
             <div class="vmc-val">
-              <span id="sysVersion">MyBox: v1.20 (B106)</span>
+              <span id="sysVersion">MyBox: v2.0.0 (B200)</span>
             </div>
             <div class="vmc-foot">
-              <span>最新版本：<strong id="latestSysVersion">MyBox: v1.20 (B106)</strong></span>
+              <span>最新版本：<strong id="latestSysVersion">MyBox: v2.0.0 (B200)</strong></span>
               <span id="panelCheckTime">刚刚检查</span>
             </div>
           </div>
@@ -677,6 +730,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<script src="./app.js"></script>
+<script type="module" src="./app.js"></script>
 </body>
 </html>

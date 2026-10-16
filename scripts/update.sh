@@ -104,6 +104,10 @@ cleanup_update() {
 
 [ "$(id -u)" = "0" ] || die "请用 root 运行"
 [ -d "$ROOT" ] || die "$ROOT 不存在，请先安装"
+for c in "$ROOT/node/bin/node" "$(command -v node 2>/dev/null)"; do
+  if [ -n "$c" ] && [ -x "$c" ]; then NODE_BIN="$c"; break; fi
+done
+[ -n "$NODE_BIN" ] || die "找不到 Node，无法验证更新源码"
 TMP=$(mktemp -d)
 trap cleanup_update EXIT
 trap 'exit 1' HUP INT TERM
@@ -114,18 +118,36 @@ if [ -n "$SRC_DIR" ]; then
   say "从本地目录升级：$SRC_DIR"
   SRCDIR="$SRC_DIR"
 else
-  say "下载最新源码"
+  say "验证并下载最新源码"
   TARBALL="$TMP/mybox.tar.gz"
-  ok=0
+  COMMIT_JSON="$TMP/commit.json"
+  TREE_JSON="$TMP/tree.json"
+  API_BASE="https://api.github.com/repos/$REPO"
+
+  api_get() {
+    if [ -n "$TOKEN" ]; then
+      curl -fsSL -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "$1" -o "$2"
+    else
+      curl -fsSL -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "$1" -o "$2"
+    fi
+  }
+
+  api_get "$API_BASE/commits/$BRANCH" "$COMMIT_JSON" || die "无法从 GitHub API 验证更新提交；已停止更新"
+  COMMIT_META=$("$NODE_BIN" -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!/^[a-f0-9]{40}$/i.test(j.sha||"")||!/^[a-f0-9]{40}$/i.test(j.commit?.tree?.sha||""))process.exit(2);process.stdout.write(`${j.sha} ${j.commit.tree.sha}`)' "$COMMIT_JSON") || die "GitHub 提交元数据无效"
+  set -- $COMMIT_META
+  COMMIT_SHA=$1
+  TREE_SHA=$2
+  api_get "$API_BASE/git/trees/$TREE_SHA?recursive=1" "$TREE_JSON" || die "无法获取提交文件树校验数据；已停止更新"
 
   if [ -n "$TOKEN" ]; then
-    say "检测到 GitHub Token，使用认证 API 下载源码"
-    API_URL="https://api.github.com/repos/$REPO/tarball/$BRANCH"
-    if curl -fsSL -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "$API_URL" -o "$TARBALL"; then
-      ok=1
+    say "检测到 GitHub Token，使用认证 API 下载已固定提交"
+    API_URL="$API_BASE/tarball/$COMMIT_SHA"
+    if ! curl -fsSL -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "$API_URL" -o "$TARBALL"; then
+      die "下载已验证提交失败"
     fi
   else
-    URL="https://github.com/$REPO/archive/refs/heads/$BRANCH.tar.gz"
+    URL="https://github.com/$REPO/archive/$COMMIT_SHA.tar.gz"
+    ok=0
     if [ "$USE_MIRROR" = "1" ]; then
       for m in $MIRRORS; do
         if curl -fsSL "$m/$URL" -o "$TARBALL" 2>/dev/null; then ok=1; break; fi
@@ -134,13 +156,123 @@ else
     if [ "$ok" = "0" ]; then
       curl -fsSL "$URL" -o "$TARBALL" 2>/dev/null && ok=1 || true
     fi
+    [ "$ok" = "1" ] || die "下载已验证提交失败"
   fi
 
-  [ "$ok" = "1" ] || die "下载源码失败（若是私有仓库，请传 --token <TOKEN> 或设置 GITHUB_TOKEN 环境变量）"
+  tar -tzf "$TARBALL" > "$TMP/archive.list" || die "源码归档格式无效"
+  tar -tvzf "$TARBALL" > "$TMP/archive.details" || die "源码归档格式无效"
+  "$NODE_BIN" -e 'const fs=require("fs");const lines=fs.readFileSync(process.argv[1],"utf8").split(/\r?\n/).filter(Boolean);if(!lines.length||lines.some(line=>!/[d-]/.test(line[0]||"")))process.exit(2)' "$TMP/archive.details" || die "源码归档含有不支持的链接或特殊文件"
+  ARCHIVE_ROOT=$("$NODE_BIN" -e '
+    const fs=require("fs");
+    const names=fs.readFileSync(process.argv[1],"utf8").split(/\r?\n/).filter(Boolean);
+    let root=null;
+    if(!names.length) process.exit(2);
+    for(const raw of names){
+      const name=raw.endsWith("/")?raw.slice(0,-1):raw;
+      const parts=name.split("/");
+      if(!name||name.startsWith("/")||parts.some(p=>!p||p==="."||p===".."||p.includes("\\")||/[\x00-\x1f\x7f]/.test(p))) process.exit(2);
+      if(!root) root=parts[0];
+      if(parts[0]!==root) process.exit(2);
+    }
+    process.stdout.write(root);
+  ' "$TMP/archive.list") || die "源码归档包含不安全路径"
+  mkdir -p "$TMP/source"
+  tar -xzf "$TARBALL" -C "$TMP/source" || die "源码归档解包失败"
+  SRCDIR="$TMP/source/$ARCHIVE_ROOT"
 
-  tar -xzf "$TARBALL" -C "$TMP"
-  SRCDIR=$(find "$TMP" -maxdepth 1 -type d -name "*mybox*" | head -n 1)
-  [ -n "$SRCDIR" ] || die "解包后找不到源码目录"
+  say "校验归档内容与 Git 提交树"
+  "$NODE_BIN" - "$SRCDIR" "$TREE_JSON" "$TREE_SHA" <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+
+const [root, treeFile, expectedRootSha] = process.argv.slice(2);
+const fail = (message) => { console.error(`更新归档校验失败：${message}`); process.exit(1); };
+const objectHash = (type, body) => crypto.createHash('sha1').update(`${type} ${body.length}\0`).update(body).digest('hex');
+const safePath = (value) => {
+  if (typeof value !== 'string' || !value || value.includes('\\') || /[\x00-\x1f\x7f]/.test(value)) return false;
+  const parts = value.split('/');
+  return parts.every((part) => part && part !== '.' && part !== '..');
+};
+
+let document;
+try { document = JSON.parse(fs.readFileSync(treeFile, 'utf8')); } catch { fail('Git 树 JSON 无效'); }
+if (document.sha !== expectedRootSha || document.truncated || !Array.isArray(document.tree) || document.tree.length > 50000) {
+  fail('Git 树摘要无效、被截断或超出验证上限');
+}
+const entries = new Map();
+for (const entry of document.tree) {
+  if (!safePath(entry.path) || !/^[a-f0-9]{40}$/i.test(entry.sha || '') || entries.has(entry.path)) fail('Git 树路径或对象摘要无效');
+  if (!['blob', 'tree'].includes(entry.type)) fail('更新树包含不支持的子模块或对象');
+  if (entry.type === 'blob' && !['100644', '100755', '120000'].includes(entry.mode)) fail('文件权限类型不受支持');
+  if (entry.type === 'tree' && !['040000', '40000'].includes(entry.mode)) fail('目录权限类型无效');
+  entries.set(entry.path, entry);
+}
+const directories = new Map([['', []]]);
+for (const entry of entries.values()) {
+  if (entry.type === 'tree') directories.set(entry.path, []);
+}
+for (const entry of entries.values()) {
+  const slash = entry.path.lastIndexOf('/');
+  const parent = slash < 0 ? '' : entry.path.slice(0, slash);
+  if (!directories.has(parent)) fail('Git 树存在缺失父目录');
+  directories.get(parent).push({ name: entry.path.slice(slash + 1), ...entry });
+}
+
+function verifyTree(directory) {
+  const children = directories.get(directory);
+  const rows = children.map((entry) => {
+    const suffix = Buffer.from(entry.name + (entry.type === 'tree' ? '/' : '\0'));
+    return { entry, sortKey: suffix };
+  }).sort((a, b) => Buffer.compare(a.sortKey, b.sortKey));
+  const bodyParts = [];
+  for (const { entry } of rows) {
+    const mode = entry.type === 'tree' ? '40000' : entry.mode;
+    bodyParts.push(Buffer.from(`${mode} ${entry.name}\0`), Buffer.from(entry.sha, 'hex'));
+  }
+  const actual = objectHash('tree', Buffer.concat(bodyParts));
+  const expected = directory ? entries.get(directory)?.sha : expectedRootSha;
+  if (actual !== expected) fail(`目录摘要不匹配：${directory || '/'}`);
+  for (const { entry } of rows) if (entry.type === 'tree') verifyTree(entry.path);
+}
+verifyTree('');
+let rootStat;
+try { rootStat = fs.lstatSync(root); } catch { fail('解包根目录不存在'); }
+if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) fail('解包根路径不是普通目录');
+
+const expectedFiles = new Map([...entries].filter(([, entry]) => entry.type === 'blob'));
+const actualFiles = new Map();
+function walk(directory, relative = '') {
+  for (const item of fs.readdirSync(directory, { withFileTypes: true })) {
+    const name = relative ? `${relative}/${item.name}` : item.name;
+    const full = path.join(directory, item.name);
+    const stat = fs.lstatSync(full);
+    if (stat.isSymbolicLink()) actualFiles.set(name, { full, type: 'symlink', stat });
+    else if (stat.isDirectory()) walk(full, name);
+    else if (stat.isFile()) actualFiles.set(name, { full, type: 'file', stat });
+    else fail(`存在不支持的文件类型：${name}`);
+  }
+}
+try { walk(root); } catch (error) { fail(error.message); }
+if (actualFiles.size !== expectedFiles.size) fail('归档文件数量与已验证 Git 树不一致');
+for (const [name, entry] of expectedFiles) {
+  const actual = actualFiles.get(name);
+  if (!actual) fail(`归档缺少文件：${name}`);
+  let content;
+  if (entry.mode === '120000') {
+    if (actual.type !== 'symlink') fail(`符号链接类型不匹配：${name}`);
+    content = fs.readlinkSync(actual.full, { encoding: 'buffer' });
+  } else {
+    if (actual.type !== 'file') fail(`普通文件类型不匹配：${name}`);
+    const executable = Boolean(actual.stat.mode & 0o111);
+    if ((entry.mode === '100755') !== executable) fail(`可执行权限不匹配：${name}`);
+    content = fs.readFileSync(actual.full);
+  }
+  if (objectHash('blob', content) !== entry.sha) fail(`文件校验和不匹配：${name}`);
+}
+for (const name of actualFiles.keys()) if (!expectedFiles.has(name)) fail(`归档含有未列入 Git 树的文件：${name}`);
+NODE
+  [ "$?" = "0" ] || die "源码归档完整性校验失败"
 fi
 
 [ -d "$SRCDIR/server" ] || die "源码里没有 server/"
@@ -164,7 +296,7 @@ cp "$SRCDIR/package.json" "$STAGE/package.json"
 if [ -f "$SRCDIR/VERSION" ]; then
   cp "$SRCDIR/VERSION" "$STAGE/VERSION"
 else
-  echo "1.0.0" > "$STAGE/VERSION"
+  echo "v2.0.0 (B200)" > "$STAGE/VERSION"
 fi
 [ -f "$SRCDIR/commit.sha" ] && cp "$SRCDIR/commit.sha" "$STAGE/commit.sha"
 [ -d "$STAGE/server" ] && [ -d "$STAGE/panel" ] && [ -d "$STAGE/tools" ] || die "暂存源码缺少必需目录"
@@ -216,10 +348,8 @@ else
   backup_external /etc/systemd/system/mybox-kernel.service systemd-kernel
 fi
 
-# 查询版本号失败不阻断更新，只影响展示 commit SHA。
-AUTH_HDR=""
-[ -n "$TOKEN" ] && AUTH_HDR="Authorization: Bearer $TOKEN"
-COMMIT=$(curl -fsSL ${AUTH_HDR:+-H "$AUTH_HDR"} "https://api.github.com/repos/$REPO/commits/$BRANCH" 2>/dev/null | grep -o '"sha": "[a-f0-9]*"' | head -1 | cut -d'"' -f4 | cut -c1-7 || true)
+# 远程归档固定到已验证的提交，记录相同提交的短 SHA。
+COMMIT=$(printf '%s' "${COMMIT_SHA:-}" | cut -c1-7)
 
 say "原子切换代码（data/ 不动）"
 UPDATE_APPLIED=1

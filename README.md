@@ -2,7 +2,7 @@
 
 基于 **官方原版 sing-box** 的现代化透明代理控制面板与网络管理系统。
 
-[![Release](https://img.shields.io/badge/version-v1.0.0-blue.svg)](https://github.com/asdzx07/mybox/releases)
+[![Release](https://img.shields.io/badge/version-v2.0.0-blue.svg)](https://github.com/asdzx07/mybox/releases)
 [![sing-box](https://img.shields.io/badge/sing--box-official%20binary-orange.svg)](https://github.com/SagerNet/sing-box)
 [![Platform](https://img.shields.io/badge/platform-OpenWrt%20%7C%20iStoreOS%20%7C%20Linux-green.svg)](https://github.com/asdzx07/mybox)
 [![License](https://img.shields.io/badge/license-MIT-purple.svg)](./LICENSE)
