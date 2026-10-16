@@ -23,20 +23,27 @@ export function renderSubList(subs) {
     box.innerHTML = '<p class="note">还没有订阅，请在上方添加。</p>';
     return;
   }
-  box.innerHTML = list.map((s) => `
-    <div class="item">
-      <label class="switch">
-        <input type="checkbox" data-sub-toggle="${escapeHtml(s.id)}"${s.enabled ? ' checked' : ''}>
-        <span></span>
-      </label>
-      <div class="grow">
-        <div class="title">${escapeHtml(s.name || s.id)}</div>
-        <div class="sub" title="订阅凭证已隐藏">${escapeHtml(redactSensitiveUrl(s.url || ''))} · 节点: ${Number(s.nodeCount) || s.nodes?.length || 0} 个</div>
+  box.innerHTML = `<div class="subscription-table">
+    <div class="subscription-table-head" aria-hidden="true"><span></span><span>订阅来源</span><span>节点 / 状态</span><span>操作</span></div>
+    ${list.map((s) => `
+      <div class="item subscription-row ${s.enabled ? 'is-enabled' : 'is-disabled'}">
+        <label class="switch subscription-toggle" title="${s.enabled ? '停用订阅' : '启用订阅'}">
+          <input type="checkbox" data-sub-toggle="${escapeHtml(s.id)}" aria-label="${escapeHtml(s.name || s.id)}：${s.enabled ? '已启用' : '已停用'}"${s.enabled ? ' checked' : ''}>
+          <span></span>
+        </label>
+        <div class="subscription-source">
+          <strong class="title">${escapeHtml(s.name || s.id)}</strong>
+          <span class="sub" title="订阅凭证已隐藏">${escapeHtml(redactSensitiveUrl(s.url || ''))}</span>
+        </div>
+        <div class="subscription-state">
+          <strong>${Number(s.nodeCount) || s.nodes?.length || 0} 个节点</strong>
+          <span class="subscription-status ${s.enabled ? 'is-enabled' : 'is-disabled'}"><i aria-hidden="true"></i>${s.enabled ? '已启用' : '已停用'}</span>
+        </div>
+        <div class="inline subscription-actions">
+          <button class="small" data-refresh="${escapeHtml(s.id)}">刷新</button>
+          <button class="small danger" data-remove="${escapeHtml(s.id)}">删除</button>
+        </div>
       </div>
-      <div class="inline">
-        <button class="small" data-refresh="${escapeHtml(s.id)}">刷新</button>
-        <button class="small danger" data-remove="${escapeHtml(s.id)}">删除</button>
-      </div>
-    </div>
-  `).join('');
+    `).join('')}
+  </div>`;
 }

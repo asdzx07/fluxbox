@@ -27,7 +27,7 @@
 
 <div id="app" class="hidden">
   <aside class="sidebar">
-    <div class="brand">MyBox<small id="brandVersion">v2.0.0 (B200)</small></div>
+    <div class="brand">MyBox<small id="brandVersion">版本校验中…</small></div>
     
     <div class="sb-sec">导航</div>
     <nav class="sb-nav">
@@ -89,7 +89,10 @@
   <main>
     <!-- ---------------------------------------------------------- 1. 概览 -->
     <section class="page active" id="page-overview">
-      <h2>概览</h2>
+      <div class="page-head-with-actions">
+        <div><h2>概览</h2><p class="note">网络状态、实时流量与当前出口</p></div>
+        <span class="bdg overview-live-badge"><i aria-hidden="true"></i>数据自动更新</span>
+      </div>
 
       <div class="card hero">
         <div class="hero-main">
@@ -300,10 +303,14 @@
 
     <!-- ---------------------------------------------------------- 5. 内网分流 (NEW) -->
     <section class="page" id="page-clients">
-      <h2>内网分流</h2>
-      <p class="note" style="margin:-6px 0 14px">
-        按局域网设备 IP 划分代理策略（如 NAS 下载机强制直连不封号，电视盒子全局走代理，手机电脑走规则分流）。
-      </p>
+      <div class="page-head-with-actions">
+        <div><h2>内网分流</h2><p class="note">按设备 IP 指定流量策略；未单独设置的设备使用默认规则分流</p></div>
+        <div class="head-actions">
+          <button class="small" id="btnScanClients">刷新设备列表</button>
+          <button class="small" id="btnDeployClients" title="立即部署当前配置">部署配置</button>
+          <button class="small primary" id="btnAddClient">＋ 添加设备</button>
+        </div>
+      </div>
       <div class="node-summary-grid client-summary-grid" aria-label="内网设备概况">
         <div class="snapshot-item"><span>已配置设备</span><strong id="clientSummaryTotal">—</strong></div>
         <div class="snapshot-item"><span>在线设备</span><strong id="clientSummaryOnline">—</strong></div>
@@ -312,15 +319,8 @@
       </div>
 
       <div class="card">
-        <div class="card-head">
-          <h3>局域网设备控制</h3>
-          <div class="spacer"></div>
-          <button class="small" id="btnScanClients">刷新设备列表</button>
-          <button class="small" id="btnDeployClients" title="立即部署当前配置">部署配置</button>
-          <button class="small primary" id="btnAddClient">＋ 添加设备</button>
-        </div>
         <div class="card-head client-list-tools">
-          <h4>设备列表</h4>
+          <div><h3>设备列表</h3><p class="note">离线设备仍保留规则；调整策略后按需部署到内核</p></div>
           <div class="spacer"></div>
           <input type="search" id="clientSearch" class="client-search" placeholder="搜索名称、IP 或 MAC 地址" aria-label="搜索内网设备">
         </div>
@@ -333,7 +333,13 @@
 
     <!-- ---------------------------------------------------------- 6. 订阅管理 -->
     <section class="page" id="page-subscriptions">
-      <h2>订阅管理</h2>
+      <div class="page-head-with-actions">
+        <div><h2>订阅管理</h2><p class="note">维护订阅源、检查节点更新并部署当前配置</p></div>
+        <div class="head-actions">
+          <button class="small" id="btnRefreshSubs">全部刷新</button>
+          <button class="primary" id="btnDeploySubs">⚡ 部署配置</button>
+        </div>
+      </div>
 
       <div class="card">
         <h3>添加订阅</h3>
@@ -349,8 +355,6 @@
         <div class="card-head">
           <h3>已有订阅</h3>
           <div class="spacer"></div>
-          <button class="small" id="btnRefreshSubs">全部刷新</button>
-          <button class="small primary" id="btnDeploySubs">⚡ 部署配置</button>
         </div>
         <p class="note" id="subSwitchNote" style="margin:-4px 0 12px"></p>
         <div class="overview-snapshot subscription-summary" aria-label="订阅概况">
@@ -369,7 +373,7 @@
         <div>
           <div class="page-title-row">
             <h2>核心设置</h2>
-            <span class="version-tag" id="settingCurrentVerTag">v2.0.0 (B200)</span>
+            <span class="version-tag" id="settingCurrentVerTag">版本校验中…</span>
           </div>
           <p class="note" style="margin-top:2px">网络栈协议、DNS 策略、内核系统及版本更新管理</p>
         </div>
@@ -414,11 +418,12 @@
               <span class="bdg" id="panelUpdateBadge">当前已是最新</span>
             </div>
             <div class="vmc-val">
-              <span id="sysVersion">MyBox: v2.0.0 (B200)</span>
+              <span id="sysVersion">正在读取版本…</span>
             </div>
             <div class="vmc-foot">
-              <span>最新版本：<strong id="latestSysVersion">MyBox: v2.0.0 (B200)</strong></span>
-              <span id="panelCheckTime">刚刚检查</span>
+              <span>最新版本：<strong id="latestSysVersion">—</strong></span>
+              <span id="panelCheckTime">等待检查</span>
+              <span id="panelCommitSha">构建标识读取中</span>
             </div>
           </div>
 

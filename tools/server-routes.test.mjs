@@ -142,6 +142,7 @@ test('application preserves static/public-before-auth and protected route contra
     const staticResponse = await fetch(new URL('/', baseUrl));
     assert.equal(staticResponse.status, 200);
     assert.equal(await staticResponse.text(), 'panel-static');
+    assert.match(staticResponse.headers.get('cache-control') || '', /no-cache, must-revalidate/);
 
     const health = await request(baseUrl, '/api/health', {}, false);
     assert.equal(health.status, 200);
@@ -156,6 +157,21 @@ test('application preserves static/public-before-auth and protected route contra
     const data = await overview.json();
     assert.equal(data.counts.subscriptions, 1);
     assert.equal(data.platform.id, 'test');
+  });
+});
+
+test('version endpoint does not invent a semantic release when VERSION is absent', async () => {
+  const unversionedRoot = path.join(testArea, 'unversioned-root');
+  fs.mkdirSync(unversionedRoot, { recursive: true });
+  await withServer({ ROOT: unversionedRoot }, async ({ baseUrl }) => {
+    const response = await request(baseUrl, '/api/system/version');
+    assert.equal(response.status, 200);
+    const version = await response.json();
+    assert.equal(version.current, 'MyBox: 版本未知');
+    assert.equal(version.shortVersion, '版本未知');
+    assert.equal(version.semver, null);
+    assert.ok(Number.isFinite(version.buildNumber));
+    assert.equal(version.hasUpdate, false);
   });
 });
 

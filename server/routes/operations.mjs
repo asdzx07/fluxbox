@@ -5,6 +5,7 @@ const UPDATE_SCRIPT_SHA256 = '0b83a625fa34b0c7edd9f996fd51e5f545f19d85df32155f37
 
 export function registerOperationRoutes(app, deps) {
   const { fs, path, spawn, ROOT, DATA_DIR, loadSettings, mutateSettings, getTraffic, resetTrafficTotals, kernel, deploy, log } = deps;
+  const fetchImpl = deps.fetchImpl || globalThis.fetch;
 
   app.get('/api/traffic', (req, res) => {
     res.json({ ok: true, ...getTraffic() });
@@ -78,8 +79,8 @@ export function registerOperationRoutes(app, deps) {
 
   app.get('/api/system/version', async (req, res) => {
     try {
-      let semver = 'v2.0.0';
-      let buildNumber = 200;
+      let semver = null;
+      let buildNumber = null;
       let commitSha = null;
 
       // 1. 优先尝试从 VERSION 文件读取（官方权威版本文件）
@@ -93,6 +94,13 @@ export function registerOperationRoutes(app, deps) {
           if (vMatch) semver = `v${vMatch[1]}`;
         }
       } catch {}
+
+      if (!semver) {
+        try {
+          const packageInfo = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+          if (/^\d+\.\d+\.\d+$/.test(packageInfo.version || '')) semver = `v${packageInfo.version}`;
+        } catch {}
+      }
 
       // 2. 本地 git 计数兜底（仅在无 VERSION 文件时）
       if (!fs.existsSync(path.join(ROOT, 'VERSION'))) {
@@ -116,8 +124,9 @@ export function registerOperationRoutes(app, deps) {
           } catch {}
         }
       }
-      const effectiveSha = commitSha || 'f4e9f8d';
-      const shortVersion = `${semver} (B${buildNumber})`;
+      const shortVersion = semver
+        ? `${semver}${Number.isFinite(buildNumber) ? ` (B${buildNumber})` : ''}`
+        : '版本未知';
       const current = `MyBox: ${shortVersion}`;
 
       // 4. 从远程 GitHub 检测是否有最新版本与构建
@@ -141,7 +150,7 @@ export function registerOperationRoutes(app, deps) {
       let fetchSucceeded = false;
       for (const vUrl of versionCandidates) {
         try {
-          const rawRes = await fetch(vUrl, {
+          const rawRes = await fetchImpl(vUrl, {
             headers: { 'User-Agent': 'mybox/2.0.0' },
             signal: AbortSignal.timeout(5000),
           });
@@ -159,7 +168,7 @@ export function registerOperationRoutes(app, deps) {
 
       for (const sUrl of shaCandidates) {
         try {
-          const shaRes = await fetch(sUrl, {
+          const shaRes = await fetchImpl(sUrl, {
             headers: { 'User-Agent': 'mybox/2.0.0' },
             signal: AbortSignal.timeout(5000),
           });
@@ -177,7 +186,7 @@ export function registerOperationRoutes(app, deps) {
       // 通过 API 检查最新 commit sha（兜底）
       if (!remoteCommitSha) {
         try {
-          const response = await fetch('https://api.github.com/repos/asdzx07/mybox/commits/main', {
+          const response = await fetchImpl('https://api.github.com/repos/asdzx07/mybox/commits/main', {
             headers: { 'User-Agent': 'mybox/2.0.0' },
             signal: AbortSignal.timeout(5000),
           });
@@ -190,7 +199,7 @@ export function registerOperationRoutes(app, deps) {
       }
 
       // 严格以远程构建号是否大于本地构建号为准判定更新，杜绝假版本死循环
-      if (remoteBuild > buildNumber) {
+      if (Number.isFinite(buildNumber) && Number.isFinite(remoteBuild) && remoteBuild > buildNumber) {
         hasUpdate = true;
       } else {
         hasUpdate = false;
@@ -204,7 +213,7 @@ export function registerOperationRoutes(app, deps) {
         shortVersion,
         semver,
         buildNumber,
-        commitSha: effectiveSha,
+        commitSha,
         latest,
         hasUpdate,
         checkFailed: !fetchSucceeded,

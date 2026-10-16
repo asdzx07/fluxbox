@@ -31,13 +31,14 @@ export async function loadSettings() {
 
   try {
     const v = await api('/system/version');
-    const cur = v.current || 'MyBox: v2.0.0 (B200)';
+    const cur = v.current || 'MyBox: 版本未知';
     const shortVer = v.shortVersion || cur.replace(/^MyBox:\s*/, '');
     if ($('sysVersion')) $('sysVersion').textContent = cur;
     if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = shortVer;
     if ($('brandVersion')) $('brandVersion').textContent = shortVer;
     if ($('latestSysVersion')) $('latestSysVersion').textContent = v.latest || cur;
-    if ($('panelCheckTime')) $('panelCheckTime').textContent = '刚刚检查';
+    if ($('panelCheckTime')) $('panelCheckTime').textContent = '已读取本机版本';
+    if ($('panelCommitSha')) $('panelCommitSha').textContent = v.commitSha ? `运行构建：${v.commitSha}` : '运行构建：未知';
 
     const pBadge = $('panelUpdateBadge');
     const applyBtn = $('btnSysUpdate');
@@ -64,10 +65,16 @@ export async function loadSettings() {
       if (applyBtn) applyBtn.classList.add('hidden');
     }
   } catch {
-    if ($('sysVersion')) $('sysVersion').textContent = 'MyBox: v2.0.0 (B200)';
-    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v2.0.0 (B200)';
-    if ($('brandVersion')) $('brandVersion').textContent = 'v2.0.0 (B200)';
-    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'MyBox: v2.0.0 (B200)';
+    if ($('sysVersion')) $('sysVersion').textContent = 'MyBox: 版本不可用';
+    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = '版本不可用';
+    if ($('brandVersion')) $('brandVersion').textContent = '版本不可用';
+    if ($('latestSysVersion')) $('latestSysVersion').textContent = '—';
+    if ($('panelCheckTime')) $('panelCheckTime').textContent = '无法读取本机版本';
+    if ($('panelCommitSha')) $('panelCommitSha').textContent = '运行构建：未知';
+    if ($('panelUpdateBadge')) {
+      $('panelUpdateBadge').textContent = '无法确认版本';
+      $('panelUpdateBadge').classList.add('version-unavailable');
+    }
   }
 
   try {
@@ -174,13 +181,15 @@ export function bindSettingsEvents({ withBusy, loadOverview }) {
     if (txt) txt.innerHTML = '<span class="animate-spin">↻</span> 检查中...';
     try {
       const v = await api('/system/version');
-      const cur = v.current || 'MyBox: v2.0.0 (B200)';
+      const cur = v.current || 'MyBox: 版本未知';
       const shortVer = v.shortVersion || cur.replace(/^MyBox:\s*/, '');
       if ($('sysVersion')) $('sysVersion').textContent = cur;
       if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = shortVer;
       if ($('brandVersion')) $('brandVersion').textContent = shortVer;
       if ($('latestSysVersion')) $('latestSysVersion').textContent = v.latest || cur;
-      if ($('panelCheckTime')) $('panelCheckTime').textContent = '刚刚检查';
+      if ($('panelCheckTime')) $('panelCheckTime').textContent = '已读取本机版本';
+      if ($('panelCommitSha')) $('panelCommitSha').textContent = v.commitSha ? `运行构建：${v.commitSha}` : '运行构建：未知';
+      $('panelUpdateBadge')?.classList.remove('version-unavailable');
 
       const pBadge = $('panelUpdateBadge');
       const applyBtn = $('btnSysUpdate');

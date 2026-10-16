@@ -18,7 +18,15 @@ export function createApp({ deps = createServerDeps(), panelDir = path.join(here
   app.use(express.json({ limit: '4mb' }));
 
   // Keep static resources and public authentication routes before authMiddleware.
-  app.use(express.static(panelDir, { index: 'index.html' }));
+  // Revalidate front-end assets so a panel update cannot leave the old CSS/module cached.
+  app.use(express.static(panelDir, {
+    index: 'index.html',
+    setHeaders(res, filePath) {
+      if (/\.(?:html|css|js|mjs)$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+      }
+    },
+  }));
   registerPublicAuthRoutes(app, deps);
   app.use(deps.authMiddleware);
   registerProtectedAuthRoutes(app, deps);
