@@ -1,7 +1,10 @@
 import crypto from 'node:crypto';
 import { loadRulesetMeta, refreshRulesets, formatDateTime } from '../lib/rulesets.mjs';
 
-const UPDATE_SCRIPT_SHA256 = 'bed9b1d8c6fc2088a6cbcfa303c0157e98d069a53620fc73daa16d86c609cf5a';
+export const UPDATE_SCRIPT_SHA256 = 'bed9b1d8c6fc2088a6cbcfa303c0157e98d069a53620fc73daa16d86c609cf5a';
+export const TRUSTED_UPDATE_SCRIPT_SHA256 = [
+  UPDATE_SCRIPT_SHA256,
+];
 
 export function registerOperationRoutes(app, deps) {
   const { fs, path, spawn, ROOT, DATA_DIR, loadSettings, mutateSettings, getTraffic, resetTrafficTotals, kernel, deploy, log } = deps;
@@ -241,8 +244,11 @@ export function registerOperationRoutes(app, deps) {
       }
       const actualHash = crypto.createHash('sha256').update(fs.readFileSync(updateScript)).digest('hex');
       const actualHashBytes = Buffer.from(actualHash, 'hex');
-      const expectedHashBytes = Buffer.from(UPDATE_SCRIPT_SHA256, 'hex');
-      if (actualHashBytes.length !== expectedHashBytes.length || !crypto.timingSafeEqual(actualHashBytes, expectedHashBytes)) {
+      const isTrusted = TRUSTED_UPDATE_SCRIPT_SHA256.some((expected) => {
+        const expectedBytes = Buffer.from(expected, 'hex');
+        return actualHashBytes.length === expectedBytes.length && crypto.timingSafeEqual(actualHashBytes, expectedBytes);
+      });
+      if (!isTrusted) {
         log.error('更新脚本 SHA-256 校验失败：%s', updateScript);
         return res.status(503).json({ ok: false, error: '更新脚本校验失败，已停止执行' });
       }

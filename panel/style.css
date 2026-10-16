@@ -2420,3 +2420,390 @@ h2 { font-size: 24px; letter-spacing: -0.03em; }
 }
 .overview-live-badge { display: inline-flex; align-items: center; gap: 7px; }
 .overview-live-badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px var(--ok-weak); }
+
+/* ==========================================================================
+   全新 7 页概念架构现代化组件规范 (Linear/Vercel 级极简微质感)
+   ========================================================================== */
+
+/* 1. Hero 概览核心状态大卡片 */
+.hero-overview-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.hero-overview-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent) 0%, rgba(59, 130, 246, 0.2) 100%);
+}
+.hero-overview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.hero-status-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hero-status-title-row h2 {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: var(--text);
+}
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+.hero-badge.good {
+  color: var(--ok);
+  background: var(--ok-weak);
+}
+.hero-badge.warn {
+  color: var(--warn);
+  background: var(--warn-weak);
+}
+.hero-badge.bad {
+  color: var(--err);
+  background: var(--err-weak);
+}
+.hero-subtext {
+  font-size: 13px;
+  color: var(--text-2);
+  margin: 0;
+}
+.hero-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.hero-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.hero-pill .pill-dot {
+  width: 6.5px;
+  height: 6.5px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.hero-pill.good .pill-dot {
+  background: var(--ok);
+  box-shadow: 0 0 0 2px var(--ok-weak);
+}
+.hero-pill.warn .pill-dot {
+  background: var(--warn);
+}
+.hero-pill.muted .pill-dot {
+  background: var(--text-muted);
+}
+.hero-exit-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  gap: 12px;
+}
+.hero-exit-label {
+  font-size: 12px;
+  color: var(--text-3);
+  font-weight: 500;
+}
+.hero-exit-val {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hero-exit-name {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text);
+}
+.hero-exit-meta {
+  font-size: 12px;
+  color: var(--text-2);
+  padding: 2px 7px;
+  background: var(--surface-solid);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-subtle);
+}
+
+/* 2. KPI 指标网格体系 */
+.kpi-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.kpi-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.kpi-card {
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 15px 17px;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 86px;
+  transition: transform var(--duration) var(--ease), border-color var(--duration) var(--ease);
+}
+.kpi-card:hover {
+  border-color: var(--accent-border);
+}
+.kpi-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: 0.01em;
+}
+.kpi-num {
+  font-size: 24px;
+  font-weight: 750;
+  line-height: 1.15;
+  color: var(--text);
+  margin: 6px 0 2px 0;
+  font-feature-settings: "tnum";
+}
+.kpi-num .unit {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+.kpi-sub {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+/* 3. 概览双栏网格 */
+.overview-two-col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+/* 4. 服务健康状态列表 */
+.service-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.service-status-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  transition: background var(--duration) var(--ease);
+}
+.service-status-item:hover {
+  background: var(--surface-hover);
+}
+.service-status-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.service-status-info strong {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+}
+.service-status-info span {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.status-pill.good {
+  color: var(--ok);
+  background: var(--ok-weak);
+}
+.status-pill.warn {
+  color: var(--warn);
+  background: var(--warn-weak);
+}
+.status-pill.bad {
+  color: var(--err);
+  background: var(--err-weak);
+}
+.status-pill.muted {
+  color: var(--text-3);
+  background: var(--surface-2);
+}
+
+/* 5. 概览出口列表与设备行 */
+.overview-exit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.overview-exit-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+.overview-exit-item:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent-border);
+}
+.overview-exit-item.active {
+  background: var(--accent-weak);
+  border-color: var(--accent);
+}
+.overview-exit-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.overview-exit-meta {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.overview-client-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.overview-client-row:last-child {
+  border-bottom: none;
+}
+.overview-client-info strong {
+  display: block;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.overview-client-info span {
+  display: block;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* 6. 提示横幅 */
+.card-info-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--accent-weak);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text-2);
+  margin-bottom: 14px;
+}
+
+/* 7. 策略列表卡片专属美化 */
+.policy-card {
+  position: relative;
+  transition: transform var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
+}
+.policy-card.is-fallback {
+  border-left: 3px solid var(--accent);
+  background: var(--surface-2) !important;
+}
+.policy-idx-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 22px;
+  border-radius: var(--radius-xs);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-feature-settings: "tnum";
+  color: var(--accent);
+  background: var(--accent-weak);
+}
+.fallback-badge {
+  color: var(--text-2);
+  background: var(--border);
+}
+.policy-move {
+  min-width: 28px;
+  height: 26px;
+  padding: 0 4px;
+  font-size: 12px;
+}
+
+/* 8. 响应式规则适配 */
+@media (max-width: 900px) {
+  .kpi-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .kpi-grid-3 {
+    grid-template-columns: 1fr;
+  }
+  .overview-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .kpi-grid-4 {
+    grid-template-columns: 1fr;
+  }
+  .hero-overview-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

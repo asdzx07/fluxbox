@@ -1,6 +1,11 @@
-import { $, api, escapeHtml, toast } from './core.js';
+import { $, api, escapeHtml, toast, state } from './core.js';
 
-const overviewState = { overviewSubs: [], overviewSelectedSubId: 'all', overviewGroupsData: null };
+const overviewState = {
+  overviewSubs: [],
+  overviewSelectedSubId: 'all',
+  overviewGroupsData: [],
+  onlineClients: [],
+};
 let groupLabel = {};
 let extractFlagFn = () => '🌐';
 
@@ -12,13 +17,36 @@ export function configureOverview({ groupLabel: labels, extractFlag: flagExtract
 /* --------------------------------------------------------------- 概览与实时流量 */
 
 export function fmtBytes(b) {
-  if (b < 1024) return b + ' B';
+  if (!b || isNaN(b) || b <= 0) return '0 B';
+  if (b < 1024) return Math.round(b) + ' B';
   if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
   if (b < 1024 * 1024 * 1024) return (b / 1024 / 1024).toFixed(1) + ' MB';
   return (b / 1024 / 1024 / 1024).toFixed(2) + ' GB';
 }
+
 function fmtSpeed(bps) {
   return fmtBytes(bps) + '/s';
+}
+
+function formatUptime(seconds) {
+  if (!seconds || isNaN(seconds) || seconds <= 0) return '刚启动';
+  const s = Math.floor(seconds);
+  const days = Math.floor(s / 86400);
+  const hours = Math.floor((s % 86400) / 3600);
+  const mins = Math.floor((s % 3600) / 60);
+  if (days > 0) return `${days} 天 ${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  if (hours > 0) return `${hours} 小时 ${String(mins).padStart(2, '0')} 分`;
+  return `${mins} 分钟`;
+}
+
+function formatTimeOnly(ts) {
+  if (!ts) return '—';
+  try {
+    const d = new Date(ts);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  } catch {
+    return '—';
+  }
 }
 
 let trafficTimer = null;
@@ -33,11 +61,13 @@ export async function loadTraffic() {
     const down = Number(t.down) || 0;
     const totalUp = Number(t.totalUp) || 0;
     const totalDown = Number(t.totalDown) || 0;
+    const connsCount = Number(t.connectionsCount) || 0;
 
-    $('statUp').textContent = fmtSpeed(up);
-    $('statDown').textContent = fmtSpeed(down);
-    $('statTotalUp').textContent = fmtBytes(totalUp);
-    $('statTotalDown').textContent = fmtBytes(totalDown);
+    if ($('statUp')) $('statUp').textContent = fmtSpeed(up);
+    if ($('statDown')) $('statDown').textContent = fmtSpeed(down);
+    if ($('statTotalUp')) $('statTotalUp').textContent = fmtBytes(totalUp);
+    if ($('statTotalDown')) $('statTotalDown').textContent = fmtBytes(totalDown);
+    if ($('ovKpiConns')) $('ovKpiConns').textContent = `${connsCount} 条`;
 
     // 写入历史
     trafficHist.up.push(up);
@@ -52,13 +82,13 @@ function drawTrafficChart() {
   const cv = $('trafficChart');
   if (!cv) return;
   const dpr = window.devicePixelRatio || 1;
-  const w = cv.clientWidth, h = 120;
+  const w = cv.clientWidth, h = 130;
   cv.width = w * dpr; cv.height = h * dpr;
   const ctx = cv.getContext('2d');
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, w, h);
 
-  // 动态根据历史最大值缩放，最低 10KB/s 防止零流量浮动，有数据时自适应跳动
+  // 动态根据历史最大值缩放，最低 10KB/s 防止零流量浮动
   const max = Math.max(1024 * 10, ...trafficHist.up, ...trafficHist.down);
 
   // 绘制水平辅助虚线
@@ -118,204 +148,222 @@ export function startTrafficPoll() {
   }, 1500);
 }
 
-
-
-
 export async function loadOverview() {
+  let overviewData = null;
   try {
-    const data = await api('/overview');
-    const running = Boolean(data.kernel?.running);
-    $('heroDot').className = 'dot ' + (running ? 'on' : 'off');
+    overviewData = await api('/overview');
+    const running = Boolean(overviewData.kernel?.running);
 
-    if (!running) {
-      $('statKernel').textContent = '未运行';
-    } else {
-      const timeStr = data.kernel?.uptime ? ` 运行 ${data.kernel.uptime}` : '';
-      $('statKernel').textContent = `运行中 (内核${timeStr})`;
+    // 1. 顶部 Header 运行状态指示徽章
+    const topBadge = $('overviewTopBadge');
+    if (topBadge) {
+      topBadge.innerHTML = `<span class="badge-dot ${running ? 'on' : 'off'}"></span><span>${running ? '核心运行正常' : '核心未运行'}</span>`;
     }
 
-    let note = '';
-    if (data.kernel?.reloadedAt) {
-      note = `上次热重载：${new Date(data.kernel.reloadedAt).toLocaleTimeString()}`;
-    }
-    const noteEl = $('overviewNote');
-    if (noteEl) {
-      noteEl.textContent = note;
-      if (note) {
-        noteEl.classList.remove('hidden');
-      } else {
-        noteEl.classList.add('hidden');
-      }
+    // 2. Hero 卡片主状态
+    if ($('heroDot')) $('heroDot').className = 'dot ' + (running ? 'on' : 'off');
+    if ($('heroStatusTitle')) $('heroStatusTitle').textContent = running ? '网络核心运行中' : '网络核心未运行';
+    if ($('heroStatusBadge')) {
+      $('heroStatusBadge').textContent = running ? '稳定' : '已停止';
+      $('heroStatusBadge').className = `hero-badge ${running ? 'good' : 'warn'}`;
     }
 
-    if ($('statVersion')) $('statVersion').textContent = data.kernel?.version || '—';
-    const counts = data.counts || {};
-    if ($('statNodes')) $('statNodes').textContent = `${counts.nodes || 0} 个`;
-    if ($('statPolicies')) $('statPolicies').textContent = `${counts.policiesEnabled || 0} / ${counts.policies || 0}`;
+    // 运行时间与接管说明
+    const uptimeStr = overviewData.kernel?.uptime ? formatUptime(overviewData.kernel.uptime) : '刚启动';
+    if ($('heroStatusDesc')) {
+      $('heroStatusDesc').textContent = running
+        ? `sing-box 已接管流量，DNS 分流正常 · 运行时间 ${uptimeStr}`
+        : 'sing-box 尚未启动，局域网流量未处于代理接管状态';
+    }
+
+    // 状态标签药丸：mybox-tun, DNS 接管, nftables
+    const dnsTaken = Boolean(overviewData.dnsmasq?.takenOver);
+    if ($('pillTun')) {
+      $('pillTun').className = `hero-pill ${running ? 'good' : 'muted'}`;
+      $('pillTun').innerHTML = `<span class="pill-dot"></span>mybox-tun`;
+    }
+    if ($('pillDns')) {
+      $('pillDns').className = `hero-pill ${dnsTaken ? 'good' : 'warn'}`;
+      $('pillDns').innerHTML = `<span class="pill-dot"></span>DNS 接管`;
+    }
+    if ($('pillNft')) {
+      $('pillNft').className = `hero-pill ${running ? 'good' : 'muted'}`;
+      $('pillNft').innerHTML = `<span class="pill-dot"></span>nftables`;
+    }
+
+    // 3. 服务状态卡片详情
+    renderServiceStatus(overviewData);
+
+    // 4. 节点与策略健康指标
+    const counts = overviewData.counts || {};
     if ($('quickNodes')) $('quickNodes').textContent = String(counts.nodes || 0);
     if ($('quickPolicies')) $('quickPolicies').textContent = `${counts.policiesEnabled || 0} / ${counts.policies || 0}`;
     if ($('quickGroups')) $('quickGroups').textContent = String(counts.groups || 0);
     if ($('quickSubscriptions')) $('quickSubscriptions').textContent = String(counts.subscriptions || 0);
 
-    const hint = $('overviewHint');
-    if (hint) {
-      if (data.kernel?.error) {
-        hint.textContent = data.kernel.error;
-        hint.classList.remove('hidden');
-      } else {
-        hint.classList.add('hidden');
-      }
-    }
   } catch (err) {
-    if ($('statKernel')) $('statKernel').textContent = '读取失败';
-    const hint = $('overviewHint');
-    if (hint) {
-      hint.textContent = err.message;
-      hint.classList.remove('hidden');
-    }
+    if ($('heroStatusTitle')) $('heroStatusTitle').textContent = '状态读取失败';
+    if ($('heroStatusDesc')) $('heroStatusDesc').textContent = err.message;
   }
 
-  await Promise.all([loadOverviewSubs(), loadOverviewGroups()]);
+  // 并行加载出口节点和局域网设备概览
+  await Promise.all([
+    loadOverviewGroups(),
+    loadOverviewClients(),
+  ]);
 }
 
-export async function loadOverviewSubs() {
-  const box = $('overviewSubsList');
-  if (!box) return;
-  try {
-    const data = await api('/subscriptions');
-    overviewState.overviewSubs = data.subscriptions || [];
-    if (overviewState.overviewSelectedSubId !== 'all' && !overviewState.overviewSubs.some((s) => s.id === overviewState.overviewSelectedSubId)) {
-      overviewState.overviewSelectedSubId = 'all';
-    }
-    renderOverviewSubs();
-  } catch (err) {
-    box.innerHTML = `<div class="mini-empty err-text">${escapeHtml(err.message)}</div>`;
-  }
-}
+function renderServiceStatus(data) {
+  if (!data) return;
+  const running = Boolean(data.kernel?.running);
+  const k = data.kernel || {};
+  const ver = k.version || 'v1.15.0';
+  const pid = k.pid ? `PID ${k.pid}` : '未分配';
+  const dnsState = data.dnsmasq?.takenOver ? '正常' : '未接管';
+  const deployTime = data.meta?.lastDeployAt ? formatTimeOnly(data.meta.lastDeployAt) : '最近已部署';
 
-function renderOverviewSubs() {
-  const box = $('overviewSubsList');
-  if (!box) return;
-  const subs = overviewState.overviewSubs || [];
-  const totalNodes = subs.reduce((acc, s) => acc + (s.nodeCount || 0), 0);
-  const allActive = overviewState.overviewSelectedSubId === 'all';
-  const allEnabled = subs.length > 0 && subs.every((s) => s.enabled);
-
-  let html = `
-    <div class="ov-sub-item${allActive ? ' active' : ''}" data-ov-sub-id="all">
-      <div class="ov-sub-radio"><span class="ov-sub-radio-dot"></span></div>
-      <div class="ov-sub-info">
-        <div class="ov-sub-title">全部订阅 · 所有节点</div>
-        <div class="ov-sub-meta">全部 ${subs.length} 个订阅 · 共 ${totalNodes} 个节点</div>
-      </div>
-      <div class="ov-sub-actions" data-stop-propagation>
-        <label class="switch" title="${allEnabled ? '一键停用全部订阅' : '一键启用全部订阅'}">
-          <input type="checkbox" data-ov-sub-toggle="all"${allEnabled ? ' checked' : ''}${subs.length === 0 ? ' disabled' : ''}>
-          <span></span>
-        </label>
-      </div>
-    </div>
-  `;
-
-  if (!subs.length) {
-    html += '<p class="note" style="padding:10px 0;text-align:center">暂无订阅，点击上方「订阅管理」前往添加</p>';
-  } else {
-    html += subs.map((s) => {
-      const active = overviewState.overviewSelectedSubId === s.id;
-      return `
-        <div class="ov-sub-item${active ? ' active' : ''}" data-ov-sub-id="${escapeHtml(s.id)}">
-          <div class="ov-sub-radio"><span class="ov-sub-radio-dot"></span></div>
-          <div class="ov-sub-info">
-            <div class="ov-sub-title">${escapeHtml(s.name || s.id)}</div>
-            <div class="ov-sub-meta">${s.nodeCount || 0} 个节点</div>
-          </div>
-          <div class="ov-sub-actions" data-stop-propagation>
-            <label class="switch" title="${s.enabled ? '停用此订阅' : '启用此订阅'}">
-              <input type="checkbox" data-ov-sub-toggle="${escapeHtml(s.id)}"${s.enabled ? ' checked' : ''}>
-              <span></span>
-            </label>
-          </div>
-        </div>
-      `;
-    }).join('');
+  if ($('srvKernelMeta')) $('srvKernelMeta').textContent = `${ver} · ${pid}`;
+  if ($('srvKernelBadge')) {
+    $('srvKernelBadge').textContent = running ? '运行中' : '已停止';
+    $('srvKernelBadge').className = `status-pill ${running ? 'good' : 'bad'}`;
   }
 
-  box.innerHTML = html;
+  if ($('srvTunMeta')) $('srvTunMeta').textContent = running ? 'mybox-tun · auto-route' : 'tun 接口未就绪';
+  if ($('srvTunBadge')) {
+    $('srvTunBadge').textContent = running ? '正常' : '异常';
+    $('srvTunBadge').className = `status-pill ${running ? 'good' : 'bad'}`;
+  }
+
+  if ($('srvDnsMeta')) $('srvDnsMeta').textContent = data.dnsmasq?.takenOver ? 'dnsmasq 接管 · 分流开启' : '未检测到接管规则';
+  if ($('srvDnsBadge')) {
+    $('srvDnsBadge').textContent = data.dnsmasq?.takenOver ? '正常' : '未接管';
+    $('srvDnsBadge').className = `status-pill ${data.dnsmasq?.takenOver ? 'good' : 'warn'}`;
+  }
+
+  if ($('srvNftMeta')) $('srvNftMeta').textContent = `nftables · 最近部署 ${deployTime}`;
+  if ($('srvNftBadge')) {
+    $('srvNftBadge').textContent = running ? '正常' : '未就绪';
+    $('srvNftBadge').className = `status-pill ${running ? 'good' : 'muted'}`;
+  }
 }
 
 export async function loadOverviewGroups() {
-  const box = $('overviewGroups');
-  if (!box) return;
+  const box = $('overviewExitList');
   try {
     const data = await api('/nodes/status');
     overviewState.overviewGroupsData = data.groups || [];
-    const currentExit = overviewState.overviewGroupsData.find((group) => group.now);
-    const exitEl = $('overviewCurrentExit');
-    if (exitEl) exitEl.textContent = currentExit ? `${currentExit.now} · ${groupLabel[currentExit.type] || currentExit.type}` : '暂无可用出口';
-    renderOverviewGroups();
+    const nodes = data.nodes || [];
+
+    // 计算测通的健康在线节点数
+    const measuredCount = nodes.filter((n) => {
+      const lat = state.latency[n.name]?.delay;
+      return Number.isFinite(lat) && lat > 0;
+    }).length;
+
+    if ($('ovKpiNodes')) {
+      $('ovKpiNodes').innerHTML = nodes.length > 0
+        ? `${measuredCount > 0 ? measuredCount : '—'} <span class="unit">/ ${nodes.length}</span>`
+        : '0 <span class="unit">/ 0</span>';
+    }
+
+    const currentExitGroup = overviewState.overviewGroupsData.find((group) => group.now) || overviewState.overviewGroupsData[0];
+    const currentExitNodeName = currentExitGroup?.now || '';
+
+    // 更新 Hero 卡片右侧当前出口
+    if ($('overviewHeroExitName')) {
+      $('overviewHeroExitName').textContent = currentExitNodeName ? `${extractFlagFn(currentExitNodeName)} ${currentExitNodeName}` : '暂无可用出口';
+    }
+    if ($('overviewHeroExitMeta')) {
+      const lat = state.latency[currentExitNodeName]?.delay;
+      const latStr = Number.isFinite(lat) ? `延迟 ${lat} ms` : '未测速';
+      const typeStr = currentExitGroup ? (groupLabel[currentExitGroup.type] || currentExitGroup.type) : '直连';
+      $('overviewHeroExitMeta').textContent = `${typeStr} · ${latStr}`;
+    }
+
+    renderOverviewExitNodes();
   } catch (err) {
-    box.innerHTML = `<div class="mini-empty">${escapeHtml(err.message)}</div>`;
+    if (box) box.innerHTML = `<div class="mini-empty err-text">${escapeHtml(err.message)}</div>`;
   }
 }
 
-function renderOverviewGroups() {
-  const box = $('overviewGroups');
+function renderOverviewExitNodes() {
+  const box = $('overviewExitList');
   if (!box) return;
   const groups = overviewState.overviewGroupsData || [];
   if (!groups.length) {
-    box.innerHTML = '<div class="mini-empty">内核未运行或无节点组</div>';
+    box.innerHTML = '<div class="mini-empty">内核未运行或无可用出口节点</div>';
     return;
   }
 
-  const selectedSubId = overviewState.overviewSelectedSubId;
-  const currSub = selectedSubId !== 'all' ? (overviewState.overviewSubs || []).find((s) => s.id === selectedSubId) : null;
-  const subPill = $('subFilterPill');
+  // 优先选取首个 Selector 手动选择组或当前生效组
+  const group = groups.find((g) => g.type === 'Selector' || g.type === 'selector') || groups[0];
+  const members = group.members || [];
+  const currentNow = group.now || '';
 
-  if (currSub) {
-    if (subPill) {
-      subPill.textContent = `筛选：${currSub.name || currSub.id}`;
-      subPill.classList.remove('hidden');
-    }
-  } else {
-    if (subPill) {
-      subPill.textContent = '全部节点';
-      subPill.classList.add('hidden');
-    }
+  if (!members.length) {
+    box.innerHTML = '<div class="mini-empty">当前节点组没有可用节点，请在订阅页添加节点</div>';
+    return;
   }
 
-  const subNodeSet = currSub?.nodeTags ? new Set(currSub.nodeTags) : null;
+  // 展示前 5 个节点供快速切换
+  const displayNodes = members.slice(0, 6);
 
-  box.innerHTML = `<div class="mini">${groups.map((g) => {
-    let members = g.members || [];
-    if (subNodeSet) {
-      members = members.filter((m) => subNodeSet.has(m) || m === g.now);
-    }
-    const hasFilteredOut = subNodeSet && members.length === 0;
+  box.innerHTML = displayNodes.map((m) => {
+    const isCurrent = (m === currentNow);
+    const flag = extractFlagFn(m);
+    const lat = state.latency[m]?.delay;
+    const latBadge = Number.isFinite(lat) ? `<span class="exit-lat good">${lat} ms</span>` : '<span class="exit-lat na">—</span>';
 
     return `
-      <div class="mini-row">
-        <div class="grow">
-          <div class="name" style="font-weight:600">${escapeHtml(g.name)}</div>
-          <div class="sub">${groupLabel[g.type] || g.type} · ${members.length} 个可选${currSub ? ` (源于「${escapeHtml(currSub.name)}」)` : ''}</div>
+      <div class="overview-exit-item ${isCurrent ? 'is-active' : ''}" data-action="switch-exit" data-group="${escapeHtml(group.name)}" data-name="${escapeHtml(m)}">
+        <div class="exit-radio-circle"><span class="exit-radio-inner"></span></div>
+        <div class="exit-node-info">
+          <div class="exit-node-name">${flag} ${escapeHtml(m)}</div>
+          <div class="exit-node-type">${groupLabel[group.type] || group.type}</div>
         </div>
-        <select data-ov-group="${escapeHtml(g.name)}"${hasFilteredOut ? ' disabled' : ''}>
-          ${hasFilteredOut
-            ? `<option value="">当前订阅无此组节点</option>`
-            : members.map((m) => {
-                const isCurrent = m === g.now;
-                const notInSub = subNodeSet && !subNodeSet.has(m) && isCurrent;
-                return `<option value="${escapeHtml(m)}"${isCurrent ? ' selected' : ''}>${extractFlagFn(m)} ${escapeHtml(m)}${notInSub ? ' (当前非该订阅)' : ''}</option>`;
-              }).join('')
-          }
-        </select>
+        <div class="exit-node-actions">
+          ${latBadge}
+          ${isCurrent ? '<span class="exit-current-tag">当前出口</span>' : '<button class="small ghost exit-switch-btn">选择</button>'}
+        </div>
       </div>
     `;
-  }).join('')}</div>`;
+  }).join('');
 }
 
+export async function loadOverviewClients() {
+  const box = $('overviewClientsList');
+  if (!box) return;
+  try {
+    const res = await api('/clients');
+    const clients = res.clients || [];
+    overviewState.onlineClients = clients.filter((c) => c.online);
 
-export function selectOverviewSubscription(id) {
-  overviewState.overviewSelectedSubId = id;
-  renderOverviewSubs();
-  renderOverviewGroups();
+    if ($('ovClientsCount')) {
+      $('ovClientsCount').textContent = `${overviewState.onlineClients.length} 台在线 · 按设备设置分流`;
+    }
+
+    if (!overviewState.onlineClients.length) {
+      box.innerHTML = '<div class="mini-empty">当前暂无在线局域网设备</div>';
+      return;
+    }
+
+    // 展示前 3~4 台在线设备
+    const preview = overviewState.onlineClients.slice(0, 4);
+    box.innerHTML = preview.map((c) => {
+      const modeText = c.mode === 'proxy' ? '全局代理' : c.mode === 'direct' ? '完全直连' : '规则分流';
+      const modeTagCls = c.mode === 'proxy' ? 'tag-proxy' : c.mode === 'direct' ? 'tag-direct' : 'tag-rule';
+      return `
+        <div class="overview-client-row">
+          <div class="client-avatar"><span class="client-avatar-dot"></span></div>
+          <div class="client-detail">
+            <div class="client-name">${escapeHtml(c.name || '局域网设备')}</div>
+            <div class="client-ip">${escapeHtml(c.ip || '—')}</div>
+          </div>
+          <span class="client-mode-badge ${modeTagCls}">${modeText}</span>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    box.innerHTML = `<div class="mini-empty">${escapeHtml(err.message)}</div>`;
+  }
 }

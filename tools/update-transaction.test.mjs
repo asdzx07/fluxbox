@@ -203,3 +203,20 @@ test('git attributes never request CRLF export, which breaks archive verificatio
     .filter((line) => line && !line.startsWith('#') && /(?:^|\s)eol=crlf(?:\s|$)/i.test(line));
   assert.deepEqual(offenders, [], 'eol=crlf 会破坏归档校验，请改用 -text diff 并在仓库中直接存放 CRLF');
 });
+
+test('bootstrap updater strictly checks SHA-256 and rejects tampered scripts', () => {
+  const bootstrapPath = path.join(projectRoot, 'scripts', 'bootstrap-update.sh');
+  assert.equal(fs.existsSync(bootstrapPath), true, 'scripts/bootstrap-update.sh 必须存在');
+
+  const content = fs.readFileSync(bootstrapPath, 'utf8');
+  assert.match(content, /EXPECTED_SHA256="[a-f0-9]{64}"/, '自举脚本必须固定预期 SHA-256');
+
+  // 提取自举脚本中锁定的 EXPECTED_SHA256
+  const match = content.match(/EXPECTED_SHA256="([a-f0-9]{64})"/);
+  assert.ok(match, '未能解析 EXPECTED_SHA256');
+  const pinnedSha = match[1];
+
+  // 核验与当前 update.sh 的实际 SHA-256 精确一致
+  const actualUpdateSha = crypto.createHash('sha256').update(fs.readFileSync(path.join(projectRoot, 'scripts', 'update.sh'))).digest('hex');
+  assert.equal(pinnedSha, actualUpdateSha, '自举脚本锁定的 EXPECTED_SHA256 必须与 scripts/update.sh 的实际哈希一致');
+});

@@ -1,26 +1,39 @@
+/* MyBox 当前连接监控模块：实时活动连接、搜索过滤、流量监控与单条/批量断开 */
 import { $, api, escapeHtml, toast } from './core.js';
 import { fmtBytes } from './overview.js';
-
-/* --------------------------------------------------------------- 当前连接 */
 
 let connCache = { connections: [], uploadTotal: 0, downloadTotal: 0 };
 let connPage = 1;
 let ignoredConnIds = new Set();
 let isConnViewCleared = false;
+let connProtocolFilter = 'all';
+let connSortMode = 'traffic';
 
-window.clearConnectionRecords = function() {
+export function clearConnectionRecords() {
   const conns = connCache.connections || [];
-  conns.forEach(c => { if (c.id) ignoredConnIds.add(c.id); });
+  conns.forEach((c) => { if (c.id) ignoredConnIds.add(c.id); });
   isConnViewCleared = true;
   renderConnections();
-  toast('已清空当前连接记录，正在监听新连接…');
-};
+  toast('已清空当前连接显示记录，正在监听新连接…');
+}
 
-window.resetConnectionRecords = function() {
+export function resetConnectionRecords() {
   ignoredConnIds.clear();
   isConnViewCleared = false;
   loadConnectionsPage();
-};
+}
+
+export function setConnectionProtocolFilter(proto) {
+  connProtocolFilter = proto || 'all';
+  connPage = 1;
+  renderConnections();
+}
+
+export function setConnectionSortMode(mode) {
+  connSortMode = mode || 'traffic';
+  connPage = 1;
+  renderConnections();
+}
 
 export function renderConnections() {
   const countEl = $('connPageCount');
@@ -28,15 +41,27 @@ export function renderConnections() {
   if (!listEl) return;
 
   const allConns = connCache.connections || [];
-  const protocols = new Set(allConns.map((connection) => connection.metadata?.network).filter(Boolean));
-  if ($('connectionSummaryCount')) $('connectionSummaryCount').textContent = String(allConns.length);
-  if ($('connectionSummaryProtocols')) $('connectionSummaryProtocols').textContent = protocols.size ? `${protocols.size} 种` : '—';
-  if ($('connectionSummaryDownload')) $('connectionSummaryDownload').textContent = fmtBytes(connCache.downloadTotal || 0);
-  if ($('connectionSummaryUpload')) $('connectionSummaryUpload').textContent = fmtBytes(connCache.uploadTotal || 0);
-  const conns = isConnViewCleared ? allConns.filter(c => !ignoredConnIds.has(c.id)) : allConns;
-  const query = ($('connSearch')?.value || '').trim().toLowerCase();
+  const protocols = new Set(allConns.map((c) => c.metadata?.network).filter(Boolean));
 
-  const filtered = query
+  // 4 个 KPI 卡片更新
+  if ($('connSummaryCount')) $('connSummaryCount').textContent = `${allConns.length} 条`;
+  if ($('connSummaryDownload')) $('connSummaryDownload').textContent = fmtBytes(connCache.downloadTotal || 0);
+  if ($('connSummaryUpload')) $('connSummaryUpload').textContent = fmtBytes(connCache.uploadTotal || 0);
+  if ($('connSummaryTotalTraffic')) {
+    $('connSummaryTotalTraffic').textContent = `↓ ${fmtBytes(connCache.downloadTotal || 0)} / ↑ ${fmtBytes(connCache.uploadTotal || 0)}`;
+  }
+
+  // 过滤已清空的连接
+  let conns = isConnViewCleared ? allConns.filter((c) => !ignoredConnIds.has(c.id)) : allConns;
+
+  // 协议筛选
+  if (connProtocolFilter !== 'all') {
+    conns = conns.filter((c) => (c.metadata?.network || '').toLowerCase() === connProtocolFilter.toLowerCase());
+  }
+
+  // 搜索关键字
+  const query = ($('connSearch')?.value || '').trim().toLowerCase();
+  let filtered = query
     ? conns.filter((c) => {
         const host = (c.metadata?.host || c.metadata?.destinationIP || '').toLowerCase();
         const port = String(c.metadata?.destinationPort || '');
@@ -49,11 +74,18 @@ export function renderConnections() {
       })
     : conns;
 
+  // 排序
+  if (connSortMode === 'traffic') {
+    filtered = [...filtered].sort((a, b) => ((b.download || 0) + (b.upload || 0)) - ((a.download || 0) + (a.upload || 0)));
+  } else if (connSortMode === 'time') {
+    filtered = [...filtered].sort((a, b) => new Date(b.start || 0) - new Date(a.start || 0));
+  }
+
   if (countEl) {
-    if (query) {
-      countEl.textContent = `匹配 ${filtered.length} / 当前 ${conns.length} 条连接`;
+    if (query || connProtocolFilter !== 'all') {
+      countEl.textContent = `匹配 ${filtered.length} / 共 ${allConns.length} 条连接`;
     } else {
-      countEl.textContent = `${conns.length} 条连接 · 累计 ↓ ${fmtBytes(connCache.downloadTotal || 0)} / ↑ ${fmtBytes(connCache.uploadTotal || 0)}${isConnViewCleared ? ' (已过滤历史记录)' : ''}`;
+      countEl.textContent = `${allConns.length} 条连接 · 累计 ↓ ${fmtBytes(connCache.downloadTotal || 0)} / ↑ ${fmtBytes(connCache.uploadTotal || 0)}${isConnViewCleared ? ' (已隐藏历史)' : ''}`;
     }
   }
 
@@ -72,45 +104,68 @@ export function renderConnections() {
       `;
     } else {
       listEl.innerHTML = query
-        ? '<p class="note" style="padding:16px 0;text-align:center">未找到匹配的连接</p>'
-        : '<p class="note" style="padding:16px 0;text-align:center">当前没有活动连接</p>';
+        ? '<p class="note" style="padding:24px 0;text-align:center">未找到匹配的连接</p>'
+        : '<p class="note" style="padding:24px 0;text-align:center">当前没有活动连接</p>';
     }
     return;
   }
 
-  listEl.innerHTML = `<div class="list">${pageItems.map((c) => {
-    const host = escapeHtml(c.metadata?.host || c.metadata?.destinationIP || '—');
-    const port = c.metadata?.destinationPort ? `:${c.metadata.destinationPort}` : '';
-    const src = escapeHtml(c.metadata?.sourceIP || '');
-    const proto = escapeHtml((c.metadata?.network || '').toUpperCase());
-    const chain = (c.chains || []).map(escapeHtml).join(' → ');
-    const rule = escapeHtml(c.rule || '');
-    const id = encodeURIComponent(c.id || '');
-    return `
-      <div class="conn-item">
-        <div class="conn-main">
-          <div class="conn-header">
-            <span class="conn-target" title="${host}${port}">${host}${port}</span>
-            <span class="tag muted conn-proto">${proto}</span>
-            ${rule ? `<span class="tag conn-rule" title="${rule}">${rule}</span>` : ''}
-          </div>
-          <div class="conn-meta-sub">
-            <span>源: ${src}</span>
-            <span class="conn-sep">·</span>
-            <span>链路: ${chain || '直连'}</span>
-          </div>
-        </div>
-        <div class="conn-stats-col">
-          <div class="conn-traffic">
-            <span class="tf-down">↓ ${fmtBytes(c.download || 0)}</span>
-            <span class="tf-sep">/</span>
-            <span class="tf-up">↑ ${fmtBytes(c.upload || 0)}</span>
-          </div>
-          ${c.id ? `<button class="small conn-btn-close" data-action="close-connection" data-id="${encodeURIComponent(c.id)}">断开</button>` : ''}
-        </div>
+  listEl.innerHTML = `
+    <div class="connections-table">
+      <div class="conn-table-head" aria-hidden="true">
+        <span style="flex:2">目标地址</span>
+        <span style="flex:1.2">来源 / 协议</span>
+        <span style="flex:1.5">规则 / 出口链路</span>
+        <span style="flex:1.2">↓ 下载 / ↑ 上传</span>
+        <span style="width:72px;text-align:right">操作</span>
       </div>
-    `;
-  }).join('')}</div>${pageCount > 1 ? `<div class="connection-pagination" role="navigation" aria-label="连接分页"><button class="small" data-action="connection-page" data-page="${Math.max(1, connPage - 1)}"${connPage <= 1 ? ' disabled' : ''}>上一页</button><span class="note">第 ${connPage} / ${pageCount} 页，共 ${filtered.length} 条</span><button class="small" data-action="connection-page" data-page="${Math.min(pageCount, connPage + 1)}"${connPage >= pageCount ? ' disabled' : ''}>下一页</button></div>` : ''}`;
+      ${pageItems.map((c) => {
+        const host = escapeHtml(c.metadata?.host || c.metadata?.destinationIP || '—');
+        const port = c.metadata?.destinationPort ? `:${c.metadata.destinationPort}` : '';
+        const src = escapeHtml(c.metadata?.sourceIP || '');
+        const network = (c.metadata?.network || '').toUpperCase();
+        const chain = (c.chains || []).map(escapeHtml).join(' → ') || '直连';
+        const rule = escapeHtml(c.rule || '默认路由');
+        const downBytes = fmtBytes(c.download || 0);
+        const upBytes = fmtBytes(c.upload || 0);
+
+        // 协议标签
+        let protoBadge = network || 'TCP';
+        if (c.metadata?.destinationPort === 443 || c.metadata?.host?.includes('tls')) protoBadge = 'TLS';
+        else if (c.metadata?.destinationPort === 80) protoBadge = 'HTTP';
+
+        return `
+          <div class="conn-row-item">
+            <div class="conn-col-target" style="flex:2">
+              <span class="conn-host-text" title="${host}${port}">${host}${port}</span>
+              <span class="conn-proto-tag">${protoBadge}</span>
+            </div>
+            <div class="conn-col-source" style="flex:1.2">
+              <span class="conn-src-ip">${src}</span>
+              <span class="conn-sub-text">${network} · 局域网设备</span>
+            </div>
+            <div class="conn-col-route" style="flex:1.5">
+              <span class="conn-rule-name">${rule}</span>
+              <span class="conn-chain-name" title="${chain}">${chain}</span>
+            </div>
+            <div class="conn-col-traffic" style="flex:1.2">
+              <span class="tf-down">↓ ${downBytes}</span>
+              <span class="tf-up">↑ ${upBytes}</span>
+            </div>
+            <div class="conn-col-action" style="width:72px;text-align:right">
+              ${c.id ? `<button class="small ghost danger" data-action="close-connection" data-id="${encodeURIComponent(c.id)}">断开</button>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    ${pageCount > 1 ? `
+      <div class="connection-pagination" role="navigation" aria-label="连接分页">
+        <button class="small" data-action="connection-page" data-page="${Math.max(1, connPage - 1)}"${connPage <= 1 ? ' disabled' : ''}>上一页</button>
+        <span class="note">第 ${connPage} / ${pageCount} 页 · 共 ${filtered.length} 条</span>
+        <button class="small" data-action="connection-page" data-page="${Math.min(pageCount, connPage + 1)}"${connPage >= pageCount ? ' disabled' : ''}>下一页</button>
+      </div>` : ''}
+  `;
 }
 
 let connAutoPollTimer = null;
@@ -164,7 +219,7 @@ export function stopConnAutoPoll() {
   }
 }
 
-window.closeSingleConn = async function(id) {
+export async function closeSingleConn(id) {
   try {
     await api(`/connections/${id}`, { method: 'DELETE' });
     toast('已断开该连接');
@@ -172,19 +227,18 @@ window.closeSingleConn = async function(id) {
   } catch (err) {
     toast(`断开失败：${err.message}`);
   }
-};
+}
 
-window.closeAllConnections = async function() {
+export async function closeAllConnections() {
   if (!confirm('确定清空并断开所有当前活动连接吗？（客户端会自动重连）')) return;
   try {
     await api('/connections', { method: 'DELETE' });
-    toast('已清空所有连接');
+    toast('已清空并断开所有连接');
     await loadConnectionsPage();
   } catch (err) {
     toast(`清空失败：${err.message}`);
   }
-};
-
+}
 
 export function setConnectionPage(page) {
   connPage = Math.max(1, Number(page) || 1);

@@ -12,26 +12,38 @@ export function createRefreshSubscription({
     const sub = settings.subscriptions.find((item) => item.id === id);
     if (!sub) throw new Error('订阅不存在');
 
-    const text = await fetchTextLimited(sub.url, {
-      timeoutMs,
-      maxBytes,
-      headers: { 'User-Agent': 'mybox/0.1' },
-      redirect: 'follow',
-    });
+    try {
+      const text = await fetchTextLimited(sub.url, {
+        timeoutMs,
+        maxBytes,
+        headers: { 'User-Agent': 'mybox/0.1' },
+        redirect: 'follow',
+      });
 
-    const { format, nodes } = parseSubscription(text);
-    const tagged = dedupeTags(nodes.map((node) => ({ ...node, __subscriptionId: id })));
+      const { format, nodes } = parseSubscription(text);
+      const tagged = dedupeTags(nodes.map((node) => ({ ...node, __subscriptionId: id })));
 
-    mutateSettings((current) => {
-      current.nodes = [...current.nodes.filter((node) => node.__subscriptionId !== id), ...tagged];
-      const target = current.subscriptions.find((item) => item.id === id);
-      if (target) {
-        target.format = format;
-        target.nodeCount = tagged.length;
-        target.updatedAt = Date.now();
-      }
-    });
+      mutateSettings((current) => {
+        current.nodes = [...current.nodes.filter((node) => node.__subscriptionId !== id), ...tagged];
+        const target = current.subscriptions.find((item) => item.id === id);
+        if (target) {
+          target.format = format;
+          target.nodeCount = tagged.length;
+          target.updatedAt = Date.now();
+          target.lastError = null;
+        }
+      });
 
-    return { format, nodeCount: tagged.length, sample: tagged.slice(0, 8).map((node) => node.tag) };
+      return { format, nodeCount: tagged.length, sample: tagged.slice(0, 8).map((node) => node.tag) };
+    } catch (err) {
+      mutateSettings((current) => {
+        const target = current.subscriptions.find((item) => item.id === id);
+        if (target) {
+          target.lastError = err.message;
+          target.lastErrorAt = Date.now();
+        }
+      });
+      throw err;
+    }
   };
 }
