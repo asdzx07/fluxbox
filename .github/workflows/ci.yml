@@ -23,4 +23,9 @@ jobs:
       - name: Check JavaScript syntax
         run: npm run check
       - name: Run regression tests
-        run: npm test
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee "$RUNNER_TEMP/test-output.txt"
+      - name: Report failing tests
+        if: failure()
+        run: node tools/ci-report-failures.mjs "$RUNNER_TEMP/test-output.txt"

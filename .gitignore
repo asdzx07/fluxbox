@@ -1,5 +1,6 @@
 node_modules/
 runtime/
+runtime-tests-*/
 windows-client/build/
 windows-client/config.json
 *.log
