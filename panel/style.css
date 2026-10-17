@@ -1391,6 +1391,11 @@ label.field > span,
 /* 概览页：流量趋势（宽）+ 系统资源（窄）左右布局 */
 .grid-trend { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
 @media (max-width: 900px) { .grid-trend { grid-template-columns: 1fr; } }
+/* 概览页高度铺满：最后一行卡片撑满剩余空间 */
+#page-overview { display: flex; flex-direction: column; min-height: calc(100vh - 48px); }
+#page-overview .grid-trend.grow { flex: 1; }
+#page-overview .grid-trend.grow .card { display: flex; flex-direction: column; }
+#page-overview .grid-trend.grow .card > div:last-child { flex: 1; overflow-y: auto; min-height: 120px; }
 /* 系统资源卡片：CPU / 内存进度条 */
 .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); }
 .stat-row:last-child { border-bottom: none; }
