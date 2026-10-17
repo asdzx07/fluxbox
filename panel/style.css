@@ -338,13 +338,13 @@ nav.sb-nav {
 nav.sb-nav button {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   position: relative;
   gap: 10px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-2);
-  padding: 10px 12px;
+  padding: 10px 12px 10px 30%;
   border-radius: var(--radius-sm);
   cursor: pointer;
   font: inherit;
@@ -393,7 +393,7 @@ nav.sb-nav button.active .ic {
 
 nav.sb-nav button .nav-text {
   flex: none;
-  text-align: center;
+  text-align: left;
   white-space: nowrap;
 }
 
@@ -632,6 +632,7 @@ h3 {
   background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
   position: relative;
   overflow: hidden;
+  min-height: 120px;
 }
 
 .card.hero::before {
