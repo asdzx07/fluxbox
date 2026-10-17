@@ -1392,7 +1392,7 @@ label.field > span,
 .grid-trend { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
 @media (max-width: 900px) { .grid-trend { grid-template-columns: 1fr; } }
 /* 概览页高度铺满：最后一行卡片撑满剩余空间 */
-#page-overview { display: flex; flex-direction: column; min-height: calc(100vh - 120px); }
+#page-overview.active { display: flex; flex-direction: column; min-height: calc(100vh - 120px); }
 #page-overview .grid-trend.grow { flex: 1 0 auto; min-height: 320px; }
 #page-overview .grid-trend.grow .card { display: flex; flex-direction: column; }
 #page-overview .grid-trend.grow .card > div:last-child { flex: 1; overflow-y: auto; min-height: 200px; }
