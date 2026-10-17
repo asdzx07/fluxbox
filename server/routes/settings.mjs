@@ -6,8 +6,7 @@ function sanitize(settings) {
   return { ...rest, panel: { passwordSet: Boolean(panel.passwordHash) } };
 }
 
-// /proc/stat 双采样算 CPU 使用率（首次调用返回 null，前端下次轮询即有值）
-let lastCpuSample = null;
+// /proc/stat 双采样算 CPU 使用率
 function cpuSample() {
   try {
     const line = fs.readFileSync('/proc/stat', 'utf8').split('\n')[0];
@@ -41,15 +40,17 @@ export function registerSettingsRoutes(app, deps) {
     });
   });
 
-  app.get('/api/system/stats', (req, res) => {
+  app.get('/api/system/stats', async (req, res) => {
+    // 双采样算 CPU 使用率（间隔 150ms，首次调用即有值）
+    const first = cpuSample();
+    await new Promise((r) => setTimeout(r, 150));
+    const second = cpuSample();
     let cpuPct = null;
-    const cur = cpuSample();
-    if (cur && lastCpuSample) {
-      const dIdle = cur.idle - lastCpuSample.idle;
-      const dTotal = cur.total - lastCpuSample.total;
+    if (first && second) {
+      const dIdle = second.idle - first.idle;
+      const dTotal = second.total - first.total;
       if (dTotal > 0) cpuPct = Math.max(0, Math.min(100, Math.round((1 - dIdle / dTotal) * 100)));
     }
-    if (cur) lastCpuSample = cur;
     const totalMem = os.totalmem();
     const usedMem = totalMem - os.freemem();
     res.json({

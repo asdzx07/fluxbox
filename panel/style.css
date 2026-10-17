@@ -1400,15 +1400,16 @@ label.field > span,
 #page-overview.active .grid-trend.grow { flex: 1 0 auto; min-height: 38vh; }
 #page-overview.active .grid-trend.grow .card { display: flex; flex-direction: column; }
 #page-overview.active .grid-trend.grow .card > div:last-child { flex: 1; overflow-y: auto; min-height: 200px; }
-/* 系统资源卡片：CPU / 内存进度条 */
-.stat-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); }
-.stat-row:last-child { border-bottom: none; }
-.stat-row > span:first-child { color: var(--text-2); font-size: 13px; }
-.stat-row strong { font-size: 14px; }
-.res-bar { display: flex; align-items: center; gap: 10px; flex: 1; justify-content: flex-end; }
-.res-bar strong { min-width: 42px; text-align: right; font-size: 14px; }
-.meter { flex: 1; max-width: 160px; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+/* 系统资源卡片 */
+.sysres { display: flex; flex-direction: column; gap: 16px; padding: 6px 2px; }
+.sysres-row { display: flex; align-items: center; gap: 12px; }
+.sysres-label { width: 56px; flex-shrink: 0; color: var(--text-2); font-size: 13px; }
+.sysres-val { margin-left: auto; font-size: 14px; font-weight: 650; white-space: nowrap; }
+.sysres-sub { text-align: right; color: var(--text-3); font-size: 12px; margin: -12px 0 0; }
+.meter { flex: 1; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; min-width: 60px; }
 .meter-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #4f7df3, #315fe8); transition: width .5s; }
+.meter-fill.warm { background: linear-gradient(90deg, #f5a623, #e8890c); }
+.meter-fill.hot { background: linear-gradient(90deg, #f0564a, #d63a2f); }
 
 /* ==========================================================================
    12. 实时当前连接体系 (Connections)

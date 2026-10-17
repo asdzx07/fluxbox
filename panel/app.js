@@ -491,6 +491,7 @@ async function loadOverview() {
 }
 
 /** 概览页：系统资源（CPU / 内存 / 运行时间）。 */
+let sysTimer = null;
 async function loadSysResources() {
   const box = $('sysResources');
   if (!box) return;
@@ -501,17 +502,27 @@ async function loadSysResources() {
       const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60);
       return d > 0 ? `${d} 天 ${h} 小时` : h > 0 ? `${h} 小时 ${m} 分` : `${m} 分钟`;
     };
-    const bar = (pct) => pct == null
-      ? '<span class="note">—</span>'
-      : `<div class="meter"><div class="meter-fill" style="width:${pct}%"></div></div><strong>${pct}%</strong>`;
-    box.innerHTML = `
-      <div class="stat-row"><span>CPU</span><span class="res-bar">${bar(s.cpuPct)}</span></div>
-      <div class="stat-row"><span>内存</span><span class="res-bar">${bar(s.mem.pct)}</span></div>
-      <div class="stat-row"><span></span><span class="note">${fmtMem(s.mem.used)} / ${fmtMem(s.mem.total)}</span></div>
-      <div class="stat-row"><span>运行时间</span><strong>${fmtUp(s.uptime)}</strong></div>`;
+    const pctColor = (p) => p == null ? '' : p >= 90 ? 'hot' : p >= 70 ? 'warm' : '';
+    const row = (label, pct, extra = '') => `
+      <div class="sysres-row">
+        <span class="sysres-label">${label}</span>
+        <div class="meter"><div class="meter-fill ${pctColor(pct)}" style="width:${pct ?? 0}%"></div></div>
+        <strong class="sysres-val">${pct ?? '—'}${pct != null ? '%' : ''}</strong>
+      </div>${extra}`;
+    box.innerHTML = `<div class="sysres">`
+      + row('CPU', s.cpuPct)
+      + row('内存', s.mem.pct, `<div class="sysres-sub">${fmtMem(s.mem.used)} / ${fmtMem(s.mem.total)}</div>`)
+      + `<div class="sysres-row"><span class="sysres-label">运行时间</span><strong class="sysres-val">${fmtUp(s.uptime)}</strong></div>`
+      + `</div>`;
   } catch (err) {
     box.innerHTML = `<p class="mini-empty">${escapeHtml(err.message)}</p>`;
   }
+}
+function startSysPoll() {
+  if (sysTimer) return;
+  sysTimer = setInterval(() => {
+    if ($('page-overview')?.classList.contains('active')) loadSysResources();
+  }, 5000);
 }
 
 async function loadOverviewSubs() {
@@ -1705,6 +1716,7 @@ function bindEvents() {
     loadTraffic();
   });
   startTrafficPoll();
+  startSysPoll();
 
   // 概览页订阅管理与节点联动
   $('btnOverviewRefreshSubs')?.addEventListener('click', (e) => withBusy(e.currentTarget, loadOverviewSubs));
