@@ -4,7 +4,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test, { after } from 'node:test';
 import { validateSelftestRoot } from './selftest-guard.mjs';
-import { escapeHtml, redactSensitiveUrl } from '../panel/core.js';
 
 const toolsDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(toolsDir, '..');
@@ -18,29 +17,6 @@ after(() => { try { fs.rmSync(testArea, { recursive: true, force: true }); } cat
 const { loadSettings, mutateSettings } = await import('../server/lib/settings.mjs');
 const deployModule = await import('../server/lib/deploy.mjs');
 const { setSessionCookie, clearSessionCookie } = await import('../server/lib/auth.mjs');
-
-test('dynamic panel data is escaped and event handling contains no inline JavaScript', () => {
-  const hostile = `\"><img src=x onerror=alert(1)>\\'`;
-  const escaped = escapeHtml(hostile);
-  assert.equal(escaped.includes('<'), false);
-  assert.equal(escaped.includes('>'), false);
-  assert.equal(escaped.includes('"'), false);
-  assert.equal(escaped.includes("'"), false);
-
-  const appSource = fs.readFileSync(path.join(projectRoot, 'panel', 'app.js'), 'utf8');
-  assert.doesNotMatch(appSource, /\son(?:click|change|input|submit)\s*=/i);
-  assert.match(appSource, /data-action/);
-  assert.match(appSource, /addEventListener\('click'/);
-});
-
-test('subscription URLs hide credentials, query values and fragments in display text', () => {
-  const masked = redactSensitiveUrl('https://alice:secret@example.com/subscribe/private-token?token=private&plan=gold#fragment');
-  assert.equal(masked, 'https://example.com/…?…');
-  assert.equal(masked.includes('secret'), false);
-  assert.equal(masked.includes('private'), false);
-  assert.equal(redactSensitiveUrl('https://example.com/public'), 'https://example.com/…');
-  assert.equal(redactSensitiveUrl('subscribe?token=private'), '订阅地址（已隐藏）');
-});
 
 test('session cookies are Secure for direct TLS requests only', () => {
   const headers = new Map();

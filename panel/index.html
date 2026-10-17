@@ -27,15 +27,9 @@
 
 <div id="app" class="hidden">
   <aside class="sidebar">
-    <div class="brand">
-      <div class="brand-logo">M</div>
-      <div class="brand-text">
-        <span class="brand-name">MyBox</span>
-        <span class="brand-sub">NETWORK CONSOLE</span>
-      </div>
-    </div>
+    <div class="brand">MyBox<small id="brandVersion">v1.20 (B106)</small></div>
     
-    <div class="sb-sec">工作台</div>
+    <div class="sb-sec">导航</div>
     <nav class="sb-nav">
       <!-- 1. 概览 -->
       <button data-tab="overview" class="active">
@@ -81,18 +75,11 @@
     </nav>
 
     <div class="sb-foot">
-      <div class="sb-user-card">
-        <div class="sb-avatar">网关</div>
-        <div class="sb-user-info">
-          <strong>家庭网关</strong>
-          <span id="brandVersion">管理员</span>
-        </div>
-      </div>
       <button id="btnGlobalDeploy" class="sb-deploy-btn" title="立即部署当前所有配置到内核">
         <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
         <span class="nav-text">部署配置</span>
       </button>
-      <button data-tab="logout" class="ghost" style="margin-top:4px">
+      <button data-tab="logout" class="ghost">
         <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg></span>
         退出登录
       </button>
@@ -102,193 +89,70 @@
   <main>
     <!-- ---------------------------------------------------------- 1. 概览 -->
     <section class="page active" id="page-overview">
-      <div class="page-head-with-actions">
-        <div>
-          <h2>概览</h2>
-          <p class="note">网络状态、流量趋势与出口策略</p>
+      <h2>概览</h2>
+
+      <div class="card hero">
+        <div class="hero-main">
+          <div class="hero-status">
+            <span class="dot" id="heroDot"></span>
+            <span id="statKernel">—</span>
+          </div>
+          <div class="hero-meta hidden" id="overviewNote"></div>
         </div>
-        <div class="head-actions">
-          <span class="bdg overview-top-badge" id="overviewTopBadge"><span class="badge-dot on"></span><span>核心运行正常</span></span>
-          <button class="primary" id="btnDeployOverview">⚡ 保存并部署</button>
+        <div class="hero-actions">
+          <button class="small" id="btnRestart">重启内核</button>
+          <button class="small danger" id="btnStop">停止内核</button>
+        </div>
+        <p class="warn-text hidden" id="overviewHint"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>实时流量监控</h3>
+          <div class="spacer"></div>
+          <span class="note" id="trafficLegend"><span class="lg up"></span>上传 <span class="lg down"></span>下载</span>
+          <button class="small" id="btnTrafficReset">清零</button>
+        </div>
+        <canvas id="trafficChart" height="120"></canvas>
+        <div class="grid" style="margin-top:14px">
+          <div class="stat"><div class="k">↑ 实时上传</div><div class="v" id="statUp" style="color:var(--accent)">—</div></div>
+          <div class="stat"><div class="k">↓ 实时下载</div><div class="v" id="statDown" style="color:var(--ok)">—</div></div>
+          <div class="stat"><div class="k">累计上传</div><div class="v" id="statTotalUp">—</div></div>
+          <div class="stat"><div class="k">累计下载</div><div class="v" id="statTotalDown">—</div></div>
         </div>
       </div>
 
-      <!-- Hero 出口与运行状态卡片 -->
-      <div class="card hero-overview-card">
-        <div class="hero-overview-left">
-          <div class="hero-status-row">
-            <span class="hero-status-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-            </span>
-            <div class="hero-title-group">
-              <div class="hero-title-line">
-                <h3 id="heroStatusTitle">网络核心运行中</h3>
-                <span id="heroStatusBadge" class="hero-badge good">稳定</span>
-              </div>
-              <p id="heroStatusDesc" class="note">sing-box 已接管流量，DNS 分流正常 · 运行时间 读取中…</p>
-            </div>
+      <div class="grid-2">
+        <div class="card" id="cardOverviewSubs">
+          <div class="card-head">
+            <h3 class="card-title-link" data-nav-tab="subscriptions" title="点击前往「订阅管理」页面">
+              <span>订阅管理</span>
+              <svg class="title-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </h3>
+            <div class="spacer"></div>
+            <button class="small" id="btnOverviewRefreshSubs">刷新</button>
           </div>
-          <div class="hero-pills">
-            <span class="hero-pill good" id="pillTun"><span class="pill-dot"></span>mybox-tun</span>
-            <span class="hero-pill good" id="pillDns"><span class="pill-dot"></span>DNS 接管</span>
-            <span class="hero-pill good" id="pillNft"><span class="pill-dot"></span>nftables</span>
-          </div>
-        </div>
-        <div class="hero-overview-divider"></div>
-        <div class="hero-overview-right">
-          <div class="hero-exit-label">当前代理出口</div>
-          <div class="hero-exit-name" id="overviewHeroExitName">加载中…</div>
-          <div class="hero-exit-meta" id="overviewHeroExitMeta">—</div>
-          <div class="hero-exit-actions">
-            <button class="small" id="btnRestart">重启</button>
-            <button class="small danger ghost" id="btnStop">停止</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 4 个 KPI 指标 -->
-      <div class="kpi-grid-4">
-        <div class="card kpi-card">
-          <div class="kpi-label">实时上传</div>
-          <div class="kpi-value" id="statUp" style="color:var(--accent)">—</div>
-          <div class="kpi-sub">累计 <span id="statTotalUp">—</span></div>
-        </div>
-        <div class="card kpi-card">
-          <div class="kpi-label">实时下载</div>
-          <div class="kpi-value" id="statDown" style="color:var(--ok)">—</div>
-          <div class="kpi-sub">累计 <span id="statTotalDown">—</span></div>
-        </div>
-        <div class="card kpi-card">
-          <div class="kpi-label">活动连接</div>
-          <div class="kpi-value" id="ovKpiConns">—</div>
-          <div class="kpi-sub">透明代理接管</div>
-        </div>
-        <div class="card kpi-card">
-          <div class="kpi-label">在线节点</div>
-          <div class="kpi-value" id="ovKpiNodes">—</div>
-          <div class="kpi-sub">已测速可用 / 总数</div>
-        </div>
-      </div>
-
-      <!-- 两栏主体布局 -->
-      <div class="overview-two-col">
-        <!-- 左侧主区 -->
-        <div class="overview-main-col">
-          <!-- 流量趋势 -->
-          <div class="card">
-            <div class="card-head">
-              <div>
-                <h3>流量趋势</h3>
-                <p class="note">上下行实时速率 · 最近 1 分钟</p>
-              </div>
-              <div class="spacer"></div>
-              <div class="traffic-legend">
-                <span class="lg-dot up"></span>上传
-                <span class="lg-dot down" style="margin-left:8px"></span>下载
-              </div>
-              <button class="small ghost" id="btnTrafficReset" style="margin-left:12px">清零</button>
-            </div>
-            <canvas id="trafficChart" height="130"></canvas>
-            <div class="traffic-time-axis">
-              <span id="chartTimeStart">1 分钟前</span>
-              <span id="chartTimeMid">30 秒前</span>
-              <span id="chartTimeNow">现在</span>
-            </div>
-          </div>
-
-          <!-- 出口节点 -->
-          <div class="card" style="margin-top:14px">
-            <div class="card-head">
-              <div>
-                <h3>出口节点</h3>
-                <p class="note">手动选择 · 切换无需重启内核</p>
-              </div>
-              <div class="spacer"></div>
-              <a href="javascript:void(0)" class="card-jump-link" data-nav-tab="nodes">管理节点 →</a>
-            </div>
-            <div id="overviewExitList" class="overview-exit-list"></div>
-          </div>
+          <div id="overviewSubsList" class="overview-subs-list"></div>
         </div>
 
-        <!-- 右侧副区 -->
-        <div class="overview-side-col">
-          <!-- 服务状态 -->
-          <div class="card">
-            <div class="card-head">
-              <h3>服务状态</h3>
-              <div class="spacer"></div>
-              <span class="badge-status-all good">全部正常</span>
-            </div>
-            <div class="service-status-list">
-              <div class="service-status-item">
-                <div class="srv-info">
-                  <strong>sing-box 内核</strong>
-                  <span class="sub" id="srvKernelMeta">v1.15.0 · PID —</span>
-                </div>
-                <span class="status-pill good" id="srvKernelBadge">运行中</span>
-              </div>
-              <div class="service-status-item">
-                <div class="srv-info">
-                  <strong>TUN 透明接管</strong>
-                  <span class="sub" id="srvTunMeta">mybox-tun · auto-route</span>
-                </div>
-                <span class="status-pill good" id="srvTunBadge">正常</span>
-              </div>
-              <div class="service-status-item">
-                <div class="srv-info">
-                  <strong>DNS / Fake-IP</strong>
-                  <span class="sub" id="srvDnsMeta">dnsmasq 接管 · 分流开启</span>
-                </div>
-                <span class="status-pill good" id="srvDnsBadge">正常</span>
-              </div>
-              <div class="service-status-item">
-                <div class="srv-info">
-                  <strong>系统防火墙</strong>
-                  <span class="sub" id="srvNftMeta">nftables · 最近部署 —</span>
-                </div>
-                <span class="status-pill good" id="srvNftBadge">正常</span>
-              </div>
-            </div>
-            <div class="card-foot-link">
-              <a href="javascript:void(0)" class="card-jump-link" data-nav-tab="settings">查看系统日志 →</a>
-            </div>
+        <div class="card" id="cardOverviewGroups">
+          <div class="card-head">
+            <h3 class="card-title-link" data-nav-tab="nodes" title="点击前往「节点分组」页面">
+              <span>出口节点组</span>
+              <svg class="title-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </h3>
+            <div class="spacer"></div>
+            <span class="sub-filter-pill hidden" id="subFilterPill" title="当前节点过滤订阅">全部节点</span>
+            <button class="small" id="btnOverviewNodes">刷新</button>
           </div>
-
-          <!-- 局域网设备概况 -->
-          <div class="card" style="margin-top:14px">
-            <div class="card-head">
-              <div>
-                <h3>局域网设备</h3>
-                <p class="note" id="ovClientsCount">在线设备概要</p>
-              </div>
-              <div class="spacer"></div>
-              <a href="javascript:void(0)" class="card-jump-link" data-nav-tab="clients">全部设备 →</a>
-            </div>
-            <div id="overviewClientsList" class="overview-clients-list"></div>
-          </div>
+          <div id="overviewGroups"></div>
         </div>
       </div>
     </section>
 
     <!-- ---------------------------------------------------------- 2. 节点分组 -->
     <section class="page" id="page-nodes">
-      <div class="page-head-with-actions">
-        <div>
-          <h2>节点分组</h2>
-          <p class="note">管理代理出口、分组策略与节点健康状态</p>
-        </div>
-        <div class="head-actions">
-          <button class="small" id="btnCollapseAll">全部折叠</button>
-          <button class="primary" id="btnTestAll">⚡ 全部测速</button>
-        </div>
-      </div>
-
-      <div class="kpi-grid-4" aria-label="节点健康摘要" style="margin-bottom:14px">
-        <div class="card kpi-card"><div class="kpi-label">节点总数</div><div class="kpi-value" id="nodeSummaryTotal">—</div><div class="kpi-sub">全部可用节点</div></div>
-        <div class="card kpi-card"><div class="kpi-label">健康节点</div><div class="kpi-value" id="nodeSummaryHealthy" style="color:var(--ok)">—</div><div class="kpi-sub">已测速连通</div></div>
-        <div class="card kpi-card"><div class="kpi-label">当前最低延迟</div><div class="kpi-value" id="nodeSummaryFastest" style="font-size:18px">—</div><div class="kpi-sub">最快可用出口</div></div>
-        <div class="card kpi-card"><div class="kpi-label">订阅来源</div><div class="kpi-value" id="nodeSummarySubs">—</div><div class="kpi-sub">启用订阅数</div></div>
-      </div>
+      <h2>节点分组</h2>
 
       <div class="card">
         <div class="card-head">
@@ -325,12 +189,6 @@
           <h3>全部节点</h3>
           <span class="note" id="nodeCount" style="margin-left:8px"></span>
           <div class="spacer"></div>
-          <input type="search" id="nodeSearch" class="node-search" placeholder="搜索节点名称 / 协议 / 地址" aria-label="搜索节点">
-          <select id="nodeSort" class="node-sort" aria-label="节点排序">
-            <option value="default">默认顺序</option>
-            <option value="name">按名称排序</option>
-            <option value="latency">按延迟排序</option>
-          </select>
           <div class="col-switcher" id="nodeColsSwitcher" role="group" aria-label="节点列数">
             <button type="button" class="col-btn" data-cols="1" title="单列排版">1 列</button>
             <button type="button" class="col-btn active" data-cols="2" title="双列排版">2 列</button>
@@ -359,15 +217,6 @@
         </div>
       </div>
 
-      <div class="card policy-guidance">
-        <div class="policy-guidance-mark" aria-hidden="true">1</div>
-        <div class="grow">
-          <strong>规则按从上到下依次匹配</strong>
-          <p class="note">命中第一条规则后即使用对应出口；未命中时由兜底目标处理。可拖动排序，也可用上移 / 下移按钮键盘操作。</p>
-        </div>
-        <span class="tag muted" id="policyEnabledSummary">已启用 — 条</span>
-      </div>
-
       <div id="policyList"></div>
 
       <div class="card" style="margin-top:16px">
@@ -386,153 +235,78 @@
       <div class="page-head-with-actions">
         <div>
           <h2>当前连接</h2>
-          <p class="note" style="margin-top:2px">透明代理正在处理的实时活动连接</p>
+          <p class="note" style="margin-top:2px">展示由 sing-box 透明代理接管的实时活动连接与流量传输</p>
         </div>
         <div class="head-actions">
+          <button class="small danger" id="btnCloseAllConns" title="彻底断开并清空所有当前活动连接">
+            <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            断开所有连接
+          </button>
           <button class="small" id="btnConnsRefresh" title="恢复显示并刷新所有连接">
             <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            刷新连接
+            刷新
           </button>
         </div>
       </div>
 
-      <div class="kpi-grid-4" aria-label="连接流量概况" style="margin-bottom:14px">
-        <div class="card kpi-card"><div class="kpi-label">活动连接</div><div class="kpi-value" id="connSummaryCount">—</div><div class="kpi-sub">实时并发处理</div></div>
-        <div class="card kpi-card"><div class="kpi-label">实时下载</div><div class="kpi-value" id="connSummaryDownload" style="color:var(--ok)">—</div><div class="kpi-sub">累计下载总量</div></div>
-        <div class="card kpi-card"><div class="kpi-label">实时上传</div><div class="kpi-value" id="connSummaryUpload" style="color:var(--accent)">—</div><div class="kpi-sub">累计上传总量</div></div>
-        <div class="card kpi-card"><div class="kpi-label">本次累计流量</div><div class="kpi-value" id="connSummaryTotalTraffic" style="font-size:18px">—</div><div class="kpi-sub">双向传输累计</div></div>
-      </div>
-
       <div class="card">
         <div class="card-head" style="flex-wrap:wrap;gap:10px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <h3>连接列表</h3>
-            <span class="bdg overview-live-badge"><i aria-hidden="true"></i>每 1.5 秒更新</span>
+          <div style="display:flex;align-items:center;gap:6px;flex:1 1 260px">
+            <input type="search" id="connSearch" placeholder="搜索连接 (域名/IP/规则/链路)..." style="font-size:12px;padding:5px 10px;height:32px;flex:1;max-width:320px">
+            <button class="small" id="btnClearConnRecords" style="height:32px;padding:0 12px" title="清空当前页面显示的连接记录，方便观察后续新产生的连接">清空记录</button>
           </div>
           <div class="spacer"></div>
           <span class="note" id="connPageCount"></span>
         </div>
-        <div class="conn-toolbar" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">
-          <input type="search" id="connSearch" placeholder="搜索域名、IP、规则或出口链路…" style="font-size:12px;padding:6px 12px;height:34px;flex:1 1 240px;max-width:360px">
-          <select id="connProtocolFilter" style="height:34px;font-size:12px;width:110px">
-            <option value="all">全部协议</option>
-            <option value="tcp">TCP</option>
-            <option value="udp">UDP</option>
-          </select>
-          <select id="connSortMode" style="height:34px;font-size:12px;width:120px">
-            <option value="traffic">按流量排序</option>
-            <option value="time">按时间排序</option>
-          </select>
-          <div class="spacer"></div>
-          <button class="small ghost" id="btnClearConnRecords" style="height:34px;padding:0 12px">清空显示记录</button>
-          <button class="small danger ghost" id="btnCloseAllConns" style="height:34px;padding:0 12px">断开全部…</button>
-        </div>
         <div id="connsList"></div>
-        <p class="note" style="margin-top:14px;font-size:11px">
-          断开单条连接不会停止内核；断开全部会导致客户端自动重连，执行前请确认。
-        </p>
       </div>
     </section>
 
-    <!-- ---------------------------------------------------------- 5. 内网设备 -->
+    <!-- ---------------------------------------------------------- 5. 内网分流 (NEW) -->
     <section class="page" id="page-clients">
-      <div class="page-head-with-actions">
-        <div>
-          <h2>内网设备</h2>
-          <p class="note">为每台局域网设备指定流量策略；未单独设置的设备使用默认规则分流</p>
-        </div>
-        <div class="head-actions">
-          <button class="small" id="btnScanClients">刷新设备列表</button>
-          <button class="small" id="btnDeployClients" title="立即部署当前配置">部署配置</button>
-          <button class="primary" id="btnAddClient">＋ 添加设备</button>
-        </div>
-      </div>
-
-      <div class="kpi-grid-3" aria-label="内网设备概况" style="margin-bottom:14px">
-        <div class="card kpi-card"><div class="kpi-label">已发现设备</div><div class="kpi-value" id="clientSummaryTotal">—</div><div class="kpi-sub">局域网可见设备</div></div>
-        <div class="card kpi-card"><div class="kpi-label">当前在线</div><div class="kpi-value" id="clientSummaryOnline" style="color:var(--ok)">—</div><div class="kpi-sub">租约活跃设备</div></div>
-        <div class="card kpi-card"><div class="kpi-label">策略分布</div><div class="kpi-value" id="clientSummaryModes" style="font-size:18px">—</div><div class="kpi-sub">分流绑定分布</div></div>
-      </div>
-
-      <div class="card policy-guidance" style="margin-bottom:14px">
-        <div class="policy-guidance-mark" aria-hidden="true">i</div>
-        <div class="grow">
-          <strong>按设备 IP 精细分流</strong>
-          <p class="note">可为电视指定全局代理，为 NAS 强制直连；修改策略会立即保存，部署后应用到内核。</p>
-        </div>
-        <a href="javascript:void(0)" class="card-jump-link" data-nav-tab="policies">查看默认策略 →</a>
-      </div>
+      <h2>内网分流</h2>
+      <p class="note" style="margin:-6px 0 14px">
+        按局域网设备 IP 划分代理策略（如 NAS 下载机强制直连不封号，电视盒子全局走代理，手机电脑走规则分流）。
+      </p>
 
       <div class="card">
-        <div class="card-head client-list-tools">
-          <div>
-            <h3>设备列表</h3>
-            <p class="note">在线状态来自路由器租约与邻居表；不在线设备仍保留已保存的策略</p>
-          </div>
+        <div class="card-head">
+          <h3>局域网设备控制</h3>
           <div class="spacer"></div>
-          <input type="search" id="clientSearch" class="client-search" placeholder="搜索名称、IP 或 MAC 地址…" aria-label="搜索内网设备">
+          <button class="small" id="btnScanClients">刷新设备列表</button>
+          <button class="small" id="btnDeployClients" title="立即部署当前配置">部署配置</button>
+          <button class="small primary" id="btnAddClient">＋ 添加设备</button>
         </div>
         <div id="clientList"></div>
-        <div class="card-info-box" style="margin-top:14px">
-          <span class="info-icon">i</span>
-          <div class="info-content">
-            <strong>扫描到新设备？</strong>
-            <p class="note">扫描仅读取局域网当前可见设备；手动添加的规则不会因设备离线而删除。策略修改会保存到设备规则，部署后生效。</p>
-          </div>
-        </div>
+        <p class="note" style="margin-top:12px">
+          通过系统 iptables/nftables 标记或路由旁路分流，未单独设置的局域网设备默认走「规则分流」。
+        </p>
       </div>
     </section>
 
     <!-- ---------------------------------------------------------- 6. 订阅管理 -->
     <section class="page" id="page-subscriptions">
-      <div class="page-head-with-actions">
-        <div><h2>订阅管理</h2><p class="note">维护订阅源、检查节点更新并部署当前配置</p></div>
-        <div class="head-actions">
-          <button class="small" id="btnRefreshSubs">全部刷新</button>
-          <button class="primary" id="btnDeploySubs">⚡ 部署配置</button>
-        </div>
-      </div>
+      <h2>订阅管理</h2>
 
-      <div class="kpi-grid-3" aria-label="订阅概况" style="margin-bottom:14px">
-        <div class="card kpi-card"><div class="kpi-label">已启用订阅</div><div class="kpi-value" id="subSummaryEnabled">—</div><div class="kpi-sub">总计 <span id="subSummaryTotal">—</span> 条</div></div>
-        <div class="card kpi-card"><div class="kpi-label">可用节点</div><div class="kpi-value" id="subSummaryNodes">—</div><div class="kpi-sub">已同步节点数</div></div>
-        <div class="card kpi-card"><div class="kpi-label">最近刷新</div><div class="kpi-value" id="subSummaryLatest" style="font-size:18px">—</div><div class="kpi-sub">持久化记录</div></div>
+      <div class="card">
+        <h3>添加订阅</h3>
+        <div class="row">
+          <label class="field" style="flex:1 1 180px"><span>名称</span><input id="subName" placeholder="例如：极速机场主线"></label>
+          <label class="field" style="flex:2 1 280px"><span>订阅地址</span><input id="subUrl" placeholder="https://..."></label>
+          <div class="fixed"><button class="primary" id="btnAddSub">添加并拉取</button></div>
+        </div>
+        <p class="note">支持 sing-box JSON、Clash YAML、base64 分享链接。</p>
       </div>
 
       <div class="card">
         <div class="card-head">
-          <div>
-            <h3>添加订阅</h3>
-            <p class="note">支持 sing-box JSON、Clash YAML 与 Base64 分享链接</p>
-          </div>
-          <div class="spacer"></div>
-          <span class="bdg">已支持 3 种格式自动识别</span>
-        </div>
-        <div class="row">
-          <label class="field" style="flex:1 1 180px"><span>订阅名称</span><input id="subName" placeholder="例如：家庭高速线路"></label>
-          <label class="field" style="flex:2 1 280px"><span>订阅地址</span><input id="subUrl" placeholder="https://provider.example/subscribe?token=••••••"></label>
-          <div class="fixed"><button class="primary" id="btnAddSub">添加并拉取</button></div>
-        </div>
-        <p class="note" style="margin-top:8px">订阅地址会保存在本机配置中，请勿截图分享含密钥的完整 URL。</p>
-      </div>
-
-      <div class="card" style="margin-top:14px">
-        <div class="card-head">
-          <div>
-            <h3>已添加的订阅</h3>
-            <p class="note">节点更新后可在节点分组页查看；停用订阅不会删除它</p>
-          </div>
+          <h3>已有订阅</h3>
           <div class="spacer"></div>
           <button class="small" id="btnRefreshSubs">全部刷新</button>
+          <button class="small primary" id="btnDeploySubs">⚡ 部署配置</button>
         </div>
-        <div id="subList"></div>
-        <div class="card-info-box" style="margin-top:14px">
-          <span class="info-icon">i</span>
-          <div class="info-content">
-            <strong>订阅更新提示</strong>
-            <p class="note">全部刷新会依次更新各订阅；失败项会保留旧节点列表，可单独重试。订阅地址包含访问凭证；页面已做脱敏处理。</p>
-          </div>
-        </div>
+        <p class="note" id="subSwitchNote" style="margin:-4px 0 12px"></p>
+        <div class="list" id="subList"></div>
       </div>
     </section>
 
@@ -542,7 +316,7 @@
         <div>
           <div class="page-title-row">
             <h2>核心设置</h2>
-            <span class="version-tag" id="settingCurrentVerTag">版本校验中…</span>
+            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B106)</span>
           </div>
           <p class="note" style="margin-top:2px">网络栈协议、DNS 策略、内核系统及版本更新管理</p>
         </div>
@@ -587,12 +361,11 @@
               <span class="bdg" id="panelUpdateBadge">当前已是最新</span>
             </div>
             <div class="vmc-val">
-              <span id="sysVersion">正在读取版本…</span>
+              <span id="sysVersion">MyBox: v1.20 (B106)</span>
             </div>
             <div class="vmc-foot">
-              <span>最新版本：<strong id="latestSysVersion">—</strong></span>
-              <span id="panelCheckTime">等待检查</span>
-              <span id="panelCommitSha">构建标识读取中</span>
+              <span>最新版本：<strong id="latestSysVersion">MyBox: v1.20 (B106)</strong></span>
+              <span id="panelCheckTime">刚刚检查</span>
             </div>
           </div>
 
@@ -904,6 +677,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<script type="module" src="./app.js"></script>
+<script src="./app.js"></script>
 </body>
 </html>
