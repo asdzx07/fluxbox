@@ -123,18 +123,6 @@
       </div>
 
       <div class="grid-2">
-        <div class="card" id="cardOverviewSubs">
-          <div class="card-head">
-            <h3 class="card-title-link" data-nav-tab="subscriptions" title="点击前往「订阅管理」页面">
-              <span>订阅管理</span>
-              <svg class="title-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </h3>
-            <div class="spacer"></div>
-            <button class="small" id="btnOverviewRefreshSubs">刷新</button>
-          </div>
-          <div id="overviewSubsList" class="overview-subs-list"></div>
-        </div>
-
         <div class="card" id="cardOverviewGroups">
           <div class="card-head">
             <h3 class="card-title-link" data-nav-tab="nodes" title="点击前往「节点分组」页面">
@@ -147,6 +135,25 @@
           </div>
           <div id="overviewGroups"></div>
         </div>
+
+        <div class="card" id="cardSysResources">
+          <div class="card-head">
+            <h3>系统资源</h3>
+          </div>
+          <div id="sysResources"><p class="mini-empty">加载中…</p></div>
+        </div>
+      </div>
+
+      <div class="card" id="cardOverviewSubs">
+        <div class="card-head">
+          <h3 class="card-title-link" data-nav-tab="subscriptions" title="点击前往「订阅管理」页面">
+            <span>订阅管理</span>
+            <svg class="title-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </h3>
+          <div class="spacer"></div>
+          <button class="small" id="btnOverviewRefreshSubs">刷新</button>
+        </div>
+        <div id="overviewSubsList" class="overview-subs-list"></div>
       </div>
     </section>
 

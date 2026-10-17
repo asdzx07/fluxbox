@@ -1,6 +1,21 @@
+import fs from 'node:fs';
+import os from 'node:os';
+
 function sanitize(settings) {
   const { panel, ...rest } = settings;
   return { ...rest, panel: { passwordSet: Boolean(panel.passwordHash) } };
+}
+
+// /proc/stat 双采样算 CPU 使用率（首次调用返回 null，前端下次轮询即有值）
+let lastCpuSample = null;
+function cpuSample() {
+  try {
+    const line = fs.readFileSync('/proc/stat', 'utf8').split('\n')[0];
+    const p = line.split(/\s+/).slice(1).map(Number);
+    const idle = (p[3] || 0) + (p[4] || 0);
+    const total = p.reduce((a, b) => a + (b || 0), 0);
+    return { idle, total };
+  } catch { return null; }
 }
 
 export function registerSettingsRoutes(app, deps) {
@@ -23,6 +38,29 @@ export function registerSettingsRoutes(app, deps) {
       },
       meta: settings.meta,
       node: process.version,
+    });
+  });
+
+  app.get('/api/system/stats', (req, res) => {
+    let cpuPct = null;
+    const cur = cpuSample();
+    if (cur && lastCpuSample) {
+      const dIdle = cur.idle - lastCpuSample.idle;
+      const dTotal = cur.total - lastCpuSample.total;
+      if (dTotal > 0) cpuPct = Math.max(0, Math.min(100, Math.round((1 - dIdle / dTotal) * 100)));
+    }
+    if (cur) lastCpuSample = cur;
+    const totalMem = os.totalmem();
+    const usedMem = totalMem - os.freemem();
+    res.json({
+      cpuPct,
+      loadAvg: os.loadavg()[0],
+      mem: {
+        total: totalMem,
+        used: usedMem,
+        pct: totalMem ? Math.round((usedMem / totalMem) * 100) : null,
+      },
+      uptime: Math.floor(os.uptime()),
     });
   });
 
