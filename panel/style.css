@@ -1395,11 +1395,15 @@ label.field > span,
 /* 概览页：流量趋势（宽）+ 系统资源（窄）左右布局 */
 .grid-trend { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
 @media (max-width: 900px) { .grid-trend { grid-template-columns: 1fr; } }
-/* 概览页高度铺满：最后一行卡片撑满剩余空间 */
-#page-overview.active { display: flex; flex-direction: column; min-height: calc(100vh - 130px); }
-#page-overview.active .grid-trend.grow { flex: 1 0 auto; min-height: calc(38vh + 100px); }
-#page-overview.active .grid-trend.grow .card { display: flex; flex-direction: column; }
-#page-overview.active .grid-trend.grow .card > div:last-child { flex: 1; overflow-y: auto; min-height: 200px; }
+/* 概览页高度铺满：固定视口高度，底部卡片内部滚动，页面本身不滚动 */
+#page-overview.active { display: flex; flex-direction: column; height: calc(100vh - 130px); min-height: 620px; }
+#page-overview.active .grid-trend.grow { flex: 1; min-height: 0; }
+#page-overview.active .grid-trend.grow .card { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+#page-overview.active .grid-trend.grow .card > div:last-child { flex: 1; overflow-y: auto; min-height: 0; }
+@media (max-width: 900px) {
+  #page-overview.active { height: auto; min-height: 0; }
+  #page-overview.active .grid-trend.grow .card > div:last-child { overflow-y: visible; }
+}
 /* 系统资源卡片 */
 .sysres { display: flex; flex-direction: column; gap: 16px; padding: 6px 2px; }
 .sysres-row { display: flex; align-items: center; gap: 12px; }
