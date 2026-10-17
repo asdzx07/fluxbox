@@ -1388,6 +1388,9 @@ label.field > span,
   border-radius: var(--radius-sm);
 }
 
+/* 概览页：流量趋势（宽）+ 系统资源（窄）左右布局 */
+.grid-trend { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .grid-trend { grid-template-columns: 1fr; } }
 /* 系统资源卡片：CPU / 内存进度条 */
 .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); }
 .stat-row:last-child { border-bottom: none; }

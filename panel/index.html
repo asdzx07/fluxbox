@@ -106,19 +106,28 @@
         <p class="warn-text hidden" id="overviewHint"></p>
       </div>
 
-      <div class="card">
-        <div class="card-head">
-          <h3>实时流量监控</h3>
-          <div class="spacer"></div>
-          <span class="note" id="trafficLegend"><span class="lg up"></span>上传 <span class="lg down"></span>下载</span>
-          <button class="small" id="btnTrafficReset">清零</button>
+      <div class="grid-trend">
+        <div class="card">
+          <div class="card-head">
+            <h3>实时流量监控</h3>
+            <div class="spacer"></div>
+            <span class="note" id="trafficLegend"><span class="lg up"></span>上传 <span class="lg down"></span>下载</span>
+            <button class="small" id="btnTrafficReset">清零</button>
+          </div>
+          <canvas id="trafficChart" height="120"></canvas>
+          <div class="grid" style="margin-top:14px">
+            <div class="stat"><div class="k">↑ 实时上传</div><div class="v" id="statUp" style="color:var(--accent)">—</div></div>
+            <div class="stat"><div class="k">↓ 实时下载</div><div class="v" id="statDown" style="color:var(--ok)">—</div></div>
+            <div class="stat"><div class="k">累计上传</div><div class="v" id="statTotalUp">—</div></div>
+            <div class="stat"><div class="k">累计下载</div><div class="v" id="statTotalDown">—</div></div>
+          </div>
         </div>
-        <canvas id="trafficChart" height="120"></canvas>
-        <div class="grid" style="margin-top:14px">
-          <div class="stat"><div class="k">↑ 实时上传</div><div class="v" id="statUp" style="color:var(--accent)">—</div></div>
-          <div class="stat"><div class="k">↓ 实时下载</div><div class="v" id="statDown" style="color:var(--ok)">—</div></div>
-          <div class="stat"><div class="k">累计上传</div><div class="v" id="statTotalUp">—</div></div>
-          <div class="stat"><div class="k">累计下载</div><div class="v" id="statTotalDown">—</div></div>
+
+        <div class="card" id="cardSysResources">
+          <div class="card-head">
+            <h3>系统资源</h3>
+          </div>
+          <div id="sysResources"><p class="mini-empty">加载中…</p></div>
         </div>
       </div>
 
@@ -136,24 +145,17 @@
           <div id="overviewGroups"></div>
         </div>
 
-        <div class="card" id="cardSysResources">
+        <div class="card" id="cardOverviewSubs">
           <div class="card-head">
-            <h3>系统资源</h3>
+            <h3 class="card-title-link" data-nav-tab="subscriptions" title="点击前往「订阅管理」页面">
+              <span>订阅管理</span>
+              <svg class="title-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </h3>
+            <div class="spacer"></div>
+            <button class="small" id="btnOverviewRefreshSubs">刷新</button>
           </div>
-          <div id="sysResources"><p class="mini-empty">加载中…</p></div>
+          <div id="overviewSubsList" class="overview-subs-list"></div>
         </div>
-      </div>
-
-      <div class="card" id="cardOverviewSubs">
-        <div class="card-head">
-          <h3 class="card-title-link" data-nav-tab="subscriptions" title="点击前往「订阅管理」页面">
-            <span>订阅管理</span>
-            <svg class="title-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          </h3>
-          <div class="spacer"></div>
-          <button class="small" id="btnOverviewRefreshSubs">刷新</button>
-        </div>
-        <div id="overviewSubsList" class="overview-subs-list"></div>
       </div>
     </section>
 
