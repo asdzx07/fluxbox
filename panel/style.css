@@ -344,7 +344,7 @@ nav.sb-nav button {
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-2);
-  padding: 10px 12px 10px 30%;
+  padding: 10px 12px 10px calc(30% - 10px);
   border-radius: var(--radius-sm);
   cursor: pointer;
   font: inherit;
@@ -1397,7 +1397,7 @@ label.field > span,
 @media (max-width: 900px) { .grid-trend { grid-template-columns: 1fr; } }
 /* 概览页高度铺满：最后一行卡片撑满剩余空间 */
 #page-overview.active { display: flex; flex-direction: column; min-height: calc(100vh - 130px); }
-#page-overview.active .grid-trend.grow { flex: 1 0 auto; min-height: 38vh; }
+#page-overview.active .grid-trend.grow { flex: 1 0 auto; min-height: calc(38vh + 100px); }
 #page-overview.active .grid-trend.grow .card { display: flex; flex-direction: column; }
 #page-overview.active .grid-trend.grow .card > div:last-child { flex: 1; overflow-y: auto; min-height: 200px; }
 /* 系统资源卡片 */
