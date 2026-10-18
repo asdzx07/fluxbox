@@ -32,7 +32,7 @@
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
       </div>
       <span>MyBox</span>
-      <small id="brandVersion">v1.20 (B106)</small>
+      <small id="brandVersion">v1.20 (B111)</small>
     </div>
     
     <div class="sb-sec">核心控制台</div>
@@ -396,7 +396,7 @@
         <div>
           <div class="page-title-row">
             <h2>核心设置</h2>
-            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B106)</span>
+            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B111)</span>
           </div>
           <p class="note" style="margin-top:2px">底层透明代理网络栈、DNS 防污染分流、广告拦截、版本升级与实时内核终端</p>
         </div>
@@ -484,11 +484,44 @@
 
               <div class="setting-item">
                 <div class="grow">
+                  <div class="title">严格路由保护 (strict_route)</div>
+                  <div class="sub">防止跨网络接口路由回环与隐性流量泄漏</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setStrictRoute">
+                  <span></span>
+                </label>
+              </div>
+
+              <div class="setting-item">
+                <div class="grow">
+                  <div class="title">流量协议嗅探 (SNI / Host)</div>
+                  <div class="sub">精准提取 TLS/HTTP 首包域名以准确匹配分流规则</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setSniff">
+                  <span></span>
+                </label>
+              </div>
+
+              <div class="setting-item">
+                <div class="grow">
                   <div class="title">启用 IPv6 流量接管</div>
                   <div class="sub">接管并分流局域网 IPv6 流量（若宽带无原生 IPv6 建议关闭以防连接拖慢）</div>
                 </div>
                 <label class="switch">
                   <input type="checkbox" id="setIpv6">
+                  <span></span>
+                </label>
+              </div>
+
+              <div class="setting-item">
+                <div class="grow">
+                  <div class="title">内核开机自启与进程守护</div>
+                  <div class="sub">系统引导时自动启动 sing-box，异常崩溃时由守护进程即刻拉起</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setAutoStart">
                   <span></span>
                 </label>
               </div>
@@ -587,3 +620,196 @@
             <label class="switch" title="开启/关闭广告过滤">
               <input type="checkbox" id="setAdblock">
               <span></span>
+            </label>
+          </div>
+          <p class="note" style="margin:-4px 0 16px">
+            基于 sing-box 原生 Geosite 规则集与本地自定义名单，在 DNS 解析层拦截常见广告与隐私追踪，轻量且不损耗转发吞吐。
+          </p>
+
+          <div class="dns-rules-grid">
+            <label class="field">
+              <span class="field-title">手动广告黑名单（强制拦截）</span>
+              <textarea id="setAdblockCustom" placeholder="每行一个域名，例如：&#10;ads.example.com&#10;adservice.google.com"></textarea>
+            </label>
+            <label class="field">
+              <span class="field-title">广告白名单（放行防误杀）</span>
+              <textarea id="setAdblockAllow" placeholder="每行一个域名，例如：&#10;example.com&#10;analytics.trusted.org"></textarea>
+            </label>
+          </div>
+
+          <div class="dns-rules-foot">
+            <span class="note">远程 Geosite 规则集每日自动同步 <span id="adblockRulesetDate" style="margin-left:6px;color:var(--text-muted)">(上次更新: <span id="adblockRulesetDateText">未更新</span>)</span></span>
+            <button class="small" id="btnAdblockRefresh">
+              <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span id="btnAdblockRefreshText">更新广告规则集</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 子标签页 3: 版本与面板安全 -->
+      <div class="stab-pane" id="stab-security">
+        <!-- 版本状态展板 -->
+        <div class="card">
+          <div class="card-head">
+            <h3>版本信息与在线状态</h3>
+            <div class="spacer"></div>
+            <span class="bdg" id="versionStatusBadge">已连接官方源</span>
+          </div>
+          <p class="note" style="margin:-4px 0 14px">采用标准语义化版本号 (SemVer) 与 GitHub 官方源自动对齐</p>
+          <div class="version-cards-grid">
+            <!-- 面板版本卡 -->
+            <div class="version-mini-card">
+              <div class="vmc-top">
+                <span>MyBox 控制面板</span>
+                <span class="bdg" id="panelUpdateBadge">当前已是最新</span>
+              </div>
+              <div class="vmc-val">
+                <span id="sysVersion">MyBox: v1.20 (B111)</span>
+              </div>
+              <div class="vmc-foot">
+                <span>最新版本：<strong id="latestSysVersion">MyBox: v1.20 (B111)</strong></span>
+                <span id="panelCheckTime">刚刚检查</span>
+              </div>
+            </div>
+
+            <!-- 内核版本卡 -->
+            <div class="version-mini-card">
+              <div class="vmc-top">
+                <span>sing-box 官方内核</span>
+                <span class="bdg" id="kernelStatusBadge">SagerNet 原版</span>
+              </div>
+              <div class="vmc-val">
+                <span id="setKernelVersion">v1.15.0-alpha.12</span>
+                <small style="color:var(--ok)">● 运行中</small>
+              </div>
+              <div class="vmc-foot">
+                <span>最新版本：<strong id="latestKernelVer">v1.15.0-alpha.12</strong></span>
+                <span class="note" id="kernelUpdateNote"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 面板安全设置 -->
+        <div class="card">
+          <div class="card-head">
+            <h3>面板安全设置</h3>
+            <div class="spacer"></div>
+            <span class="bdg" id="pwdStatusBadge">密码保护已启用</span>
+          </div>
+          <p class="note" style="margin:-4px 0 16px">
+            修改旁路由 MyBox 面板的管理访问密码。保存后所有已发放的历史登录凭据将立即失效。
+          </p>
+
+          <div class="pwd-row-form">
+            <label class="field">
+              <span class="field-title">当前管理密码</span>
+              <input type="password" id="setCurrPassword" autocomplete="current-password" placeholder="请输入当前密码">
+              <span class="field-hint">验证当前管理员身份</span>
+            </label>
+
+            <label class="field">
+              <span class="field-title">新管理密码</span>
+              <input type="password" id="setNewPassword" autocomplete="new-password" placeholder="至少 6 位新密码">
+              <span class="field-hint">长度至少 6 位</span>
+            </label>
+
+            <label class="field">
+              <span class="field-title">确认新密码</span>
+              <input type="password" id="setConfirmPassword" autocomplete="new-password" placeholder="再次输入新密码">
+              <span class="field-hint">确保两次输入一致</span>
+            </label>
+
+            <div class="pwd-btn-box">
+              <button class="primary" id="btnUpdatePassword">
+                <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                修改密码
+              </button>
+              <span class="field-hint" id="pwdChangeHint">自动轮换安全密钥</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 子标签页 4: 内核运行实时日志 -->
+      <div class="stab-pane" id="stab-logs">
+        <div class="card terminal-card">
+          <div class="card-head terminal-head">
+            <div class="term-dots">
+              <span class="tdot red"></span>
+              <span class="tdot yellow"></span>
+              <span class="tdot green"></span>
+            </div>
+            <h3 style="color:#f8fafc">内核运行实时日志</h3>
+            <div class="spacer"></div>
+            <input id="logSearch" placeholder="搜索日志…" style="width:180px;background:#1e293b;border-color:rgba(255,255,255,0.15);color:#f8fafc">
+            <label class="inline note" style="color:#94a3b8"><input type="checkbox" id="logAuto" style="width:auto"> 自动刷新</label>
+            <button class="small" id="btnLog" style="background:#1e293b;border-color:rgba(255,255,255,0.2);color:#f8fafc">刷新</button>
+          </div>
+          <pre class="log" id="kernelLog">—</pre>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 内网设备编辑/添加弹窗 -->
+<div id="clientModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h3 id="modalTitle">编辑内网设备</h3>
+    <input type="hidden" id="modalClientIndex" value="-1">
+    <label class="field">
+      <span>设备名称 / 备注</span>
+      <input id="modalClientName" placeholder="例如：客厅 Apple TV、群晖 NAS">
+    </label>
+    <label class="field">
+      <span>设备 IP 地址</span>
+      <input id="modalClientIp" placeholder="例如：192.168.1.188">
+    </label>
+    <label class="field">
+      <span>分流策略</span>
+      <select id="modalClientMode">
+        <option value="rule">规则分流 (推荐)</option>
+        <option value="proxy">全局代理</option>
+        <option value="direct">完全直连 (绕过代理)</option>
+      </select>
+    </label>
+    <div class="modal-actions">
+      <button class="small" id="btnCancelClientModal">取消</button>
+      <button class="small primary" id="btnSaveClientModal">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 自定义规则集订阅添加弹窗 -->
+<div id="rulesetModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h3>添加自定义规则集订阅</h3>
+    <p class="note" style="margin-bottom:12px">支持引入第三方 geosite / geoip 远程规则集（如特殊分流、去广告等）</p>
+    <label class="field">
+      <span>规则集标识 (Tag)</span>
+      <input id="modalRsTag" placeholder="例如：geosite-apple 或 custom-ads">
+    </label>
+    <label class="field">
+      <span>规则集订阅 URL</span>
+      <input id="modalRsUrl" placeholder="https://raw.githubusercontent.com/.../geosite.srs">
+    </label>
+    <label class="field">
+      <span>格式类型</span>
+      <select id="modalRsFormat">
+        <option value="binary">Binary 二进制 (.srs，性能最佳)</option>
+        <option value="source">Source 源码 (.json)</option>
+      </select>
+    </label>
+    <div class="modal-actions">
+      <button class="small" id="btnCancelRulesetModal">取消</button>
+      <button class="small primary" id="btnSaveRulesetModal">添加并保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="./app.js"></script>
+</body>
+</html>
