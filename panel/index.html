@@ -506,15 +506,6 @@
               </label>
             </div>
           </div>
-
-          <!-- 底部透明代理网络栈状态条 (自然填补留白) -->
-          <div class="netstack-status-box" style="margin-top:auto">
-            <div class="dot"></div>
-            <div class="netstack-info">
-              <div class="netstack-title">TUN 模式: mybox-tun (Mixed 栈)</div>
-              <div class="netstack-sub">nftables 表: mybox ｜ ip rule 优先级: 9000</div>
-            </div>
-          </div>
         </div>
 
         <!-- 核心卡片 2: DNS 分流与规则配置 (参数与名单集中区) -->
@@ -574,20 +565,20 @@
             </label>
           </div>
 
-          <!-- 广告过滤黑白名单 (双列文本域并排) -->
-          <div class="dns-rules-grid" style="margin-top:auto;padding-top:12px;border-top:1px solid var(--border)">
+          <!-- 广告过滤黑白名单 (双列文本域并排，高度铺满卡片) -->
+          <div class="dns-rules-grid">
             <label class="field">
               <span class="field-title">手动广告黑名单（强制拦截）</span>
-              <textarea id="setAdblockCustom" rows="5" placeholder="每行一个域名，例如：&#10;ads.example.com&#10;adservice.google.com"></textarea>
+              <textarea id="setAdblockCustom" placeholder="每行一个域名，例如：&#10;ads.example.com&#10;adservice.google.com"></textarea>
             </label>
             <label class="field">
               <span class="field-title">广告白名单（放行防误杀）</span>
-              <textarea id="setAdblockAllow" rows="5" placeholder="每行一个域名，例如：&#10;example.com&#10;analytics.trusted.org"></textarea>
+              <textarea id="setAdblockAllow" placeholder="每行一个域名，例如：&#10;example.com&#10;analytics.trusted.org"></textarea>
             </label>
           </div>
 
           <!-- 底部规则更新操作栏 -->
-          <div class="dns-rules-foot" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+          <div class="dns-rules-foot">
             <span class="note">远程 Geosite 规则集每日自动同步 <span id="adblockRulesetDate" style="margin-left:6px;color:var(--text-muted)">(上次更新: <span id="adblockRulesetDateText">未更新</span>)</span></span>
             <button class="small" id="btnAdblockRefresh">
               <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>

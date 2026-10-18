@@ -1792,46 +1792,12 @@ label.field > span,
 }
 
 /* 底部透明代理网络栈状态条 */
-.netstack-status-box {
-  margin-top: auto;
-  padding: 10px 14px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-}
-.netstack-status-box .dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--ok);
-  box-shadow: 0 0 6px var(--ok-glow);
-  flex-shrink: 0;
-}
-.netstack-info {
-  flex: 1;
-  min-width: 0;
-}
-.netstack-title {
-  font-weight: 600;
-  color: var(--text);
-  font-size: 12px;
-}
-.netstack-sub {
-  font-size: 11px;
-  color: var(--text-2);
-  margin-top: 2px;
-}
-
 /* DNS 分流极简双列网格 */
 .dns-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px 14px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 .dns-grid .field {
   display: flex;
@@ -1844,26 +1810,34 @@ label.field > span,
   margin-bottom: 2px;
 }
 
-/* 广告过滤规则网格与底部操作栏 */
+/* 广告过滤规则网格与底部操作栏：加大文本框尺寸并铺满卡片 */
 .dns-rules-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 14px;
-  margin-top: 4px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+  flex: 1;
 }
 .dns-rules-grid .field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   margin: 0;
+  flex: 1;
+  height: 100%;
 }
 .dns-rules-grid textarea {
   resize: vertical;
-  min-height: 72px;
+  min-height: 160px;
+  height: 100%;
+  flex: 1;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
   line-height: 1.5;
-  padding: 8px 11px;
+  padding: 10px 12px;
+  box-sizing: border-box;
 }
 
 .dns-rules-foot {
