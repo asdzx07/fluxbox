@@ -117,8 +117,9 @@ export function registerOperationRoutes(app, deps) {
       }
 
       // 3. 读取本地 commit.sha（展示用）
+      // 3. 读取本地 commit.sha（展示用，优先从 data/ 读取真实安装写入的哈希）
       if (!commitSha) {
-        for (const sf of [path.join(ROOT, 'commit.sha'), path.join(ROOT, 'data', 'commit.sha')]) {
+        for (const sf of [path.join(ROOT, 'data', 'commit.sha'), path.join(ROOT, 'commit.sha')]) {
           try {
             if (fs.existsSync(sf)) {
               commitSha = fs.readFileSync(sf, 'utf8').trim().slice(0, 7);
@@ -138,17 +139,12 @@ export function registerOperationRoutes(app, deps) {
       let remoteBuild = buildNumber;
       let hasUpdate = false;
 
-      // 优先从 raw 读取最新 VERSION 文件与 commit.sha（带防缓存时间戳与国内镜像重试）
+      // 优先从 raw 读取最新 VERSION 文件（带防缓存时间戳与国内镜像重试）
       const cacheBust = `?t=${Date.now()}`;
       const versionCandidates = [
         `https://ghfast.top/https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION${cacheBust}`,
         `https://gh-proxy.com/https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION${cacheBust}`,
         `https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION${cacheBust}`,
-      ];
-      const shaCandidates = [
-        `https://ghfast.top/https://raw.githubusercontent.com/asdzx07/mybox/main/commit.sha${cacheBust}`,
-        `https://gh-proxy.com/https://raw.githubusercontent.com/asdzx07/mybox/main/commit.sha${cacheBust}`,
-        `https://raw.githubusercontent.com/asdzx07/mybox/main/commit.sha${cacheBust}`,
       ];
 
       let fetchSucceeded = false;
@@ -170,25 +166,8 @@ export function registerOperationRoutes(app, deps) {
         } catch {}
       }
 
-      for (const sUrl of shaCandidates) {
-        try {
-          const shaRes = await fetchImpl(sUrl, {
-            headers: { 'User-Agent': 'mybox/2.0.0', 'Cache-Control': 'no-cache' },
-            signal: AbortSignal.timeout(5000),
-          });
-          if (shaRes.ok) {
-            const shaText = (await shaRes.text()).trim();
-            if (shaText && /^[a-f0-9]{7,40}$/i.test(shaText)) {
-              remoteCommitSha = shaText.slice(0, 7);
-              fetchSucceeded = true;
-              break;
-            }
-          }
-        } catch {}
-      }
-
-      // 通过 API 检查最新 commit sha（兜底）
-      if (!remoteCommitSha) {
+      // 仅在本地或远程缺少数字构建号时（例如开发环境源码调试），才退化到检查最新 Git Commit SHA
+      if (!Number.isFinite(buildNumber) || !Number.isFinite(remoteBuild)) {
         try {
           const response = await fetchImpl('https://api.github.com/repos/asdzx07/mybox/commits/main', {
             headers: { 'User-Agent': 'mybox/2.0.0' },
@@ -202,24 +181,25 @@ export function registerOperationRoutes(app, deps) {
         } catch {}
       }
 
-      // 判定更新逻辑：
-      // 1. 若远程构建号严格大于本地构建号，判定为有新构建/版本
-      // 2. 若构建号相同或无法对比，但远程 commit sha 与本地 commit sha 不一致，也判定为有新代码提交更新
-      if (Number.isFinite(buildNumber) && Number.isFinite(remoteBuild) && remoteBuild > buildNumber) {
-        hasUpdate = true;
+      // 判定更新逻辑（确立唯一权威准绳）：
+      // 1. 若本地与远程均存在数字构建号，有且仅有 remoteBuild > buildNumber 时判定为有新构建；
+      //    当 remoteBuild <= buildNumber 时，判定为当前已是最新，严禁因 commit SHA 错配引发死循环假更新；
+      // 2. 若缺乏构建号时（开发环境源码调试），退化对比 commit SHA
+      if (Number.isFinite(buildNumber) && Number.isFinite(remoteBuild)) {
+        hasUpdate = remoteBuild > buildNumber;
       } else if (
         remoteCommitSha &&
         commitSha &&
-        remoteCommitSha.toLowerCase() !== commitSha.toLowerCase() &&
-        (!Number.isFinite(buildNumber) || !Number.isFinite(remoteBuild) || remoteBuild >= buildNumber)
+        remoteCommitSha.toLowerCase() !== commitSha.toLowerCase()
       ) {
         hasUpdate = true;
       } else {
         hasUpdate = false;
       }
 
+      // 最新版本文案格式统一规范化：有构建号时严格以构建号展示，绝不展示易引起混淆的 commit sha
       const latest = hasUpdate
-        ? (Number.isFinite(remoteBuild) && Number.isFinite(buildNumber) && remoteBuild > buildNumber
+        ? (Number.isFinite(remoteBuild)
             ? `MyBox: ${remoteSemver || semver || 'v1.20'} (B${remoteBuild})`
             : `MyBox: ${remoteSemver || semver || 'v1.20'} (${remoteCommitSha || '新提交'})`)
         : current;

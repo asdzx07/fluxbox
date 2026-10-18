@@ -1562,7 +1562,7 @@ async function loadSettings() {
       }
       if (applyBtn) {
         applyBtn.classList.remove('hidden');
-        if ($('sysUpdateBtnText')) $('sysUpdateBtnText').textContent = `升级至 ${v.latest}`;
+        if ($('sysUpdateBtnText')) $('sysUpdateBtnText').textContent = `升级至 ${v.latest.replace(/^MyBox:\s*/, '')}`;
       }
     } else {
       if (pBadge) {
@@ -2225,7 +2225,7 @@ function bindEvents() {
         }
         if (applyBtn) {
           applyBtn.classList.remove('hidden');
-          if ($('sysUpdateBtnText')) $('sysUpdateBtnText').textContent = `升级至 ${v.latest}`;
+          if ($('sysUpdateBtnText')) $('sysUpdateBtnText').textContent = `升级至 ${v.latest.replace(/^MyBox:\s*/, '')}`;
         }
         if (txt) txt.textContent = '有新版本';
         toast(`发现新版本 ${v.latest} 可更新！`);
@@ -2323,12 +2323,58 @@ function bindEvents() {
     const txt = $('sysUpdateBtnText');
     if (!confirm('确认拉取线上最新版本并重启控制面板？')) return;
     btn.disabled = true;
-    if (txt) txt.innerHTML = '<span class="animate-spin">↻</span> 正在更新...';
+    if (txt) txt.innerHTML = '<span class="animate-spin">↻</span> 下发指令...';
     try {
       await api('/system/update', { method: 'POST' });
-      toast('更新已在后台开始，面板服务即将重启...');
-      if (txt) txt.textContent = '✓ 更新指令已下发';
-      setTimeout(() => location.reload(), 3000);
+      toast('更新脚本已启动，正在后台下载并校验新版本源码...');
+      if (txt) txt.innerHTML = '<span class="animate-spin">↻</span> 正在更新中...';
+
+      const startTime = Date.now();
+      let serviceWentDown = false;
+      const pollTimer = setInterval(async () => {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        try {
+          const logRes = await api('/system/update/log');
+          const logText = logRes?.log || '';
+          if (logText.includes('重启面板')) {
+            serviceWentDown = true;
+            if (txt) txt.innerHTML = '<span class="animate-spin">↻</span> 重启服务中...';
+          } else if (logText.includes('原子切换代码')) {
+            if (txt) txt.innerHTML = '<span class="animate-spin">↻</span> 写入新代码...';
+          } else if (logText.includes('校验归档内容')) {
+            if (txt) txt.innerHTML = '<span class="animate-spin">↻</span> 校验完整性...';
+          } else if (logText.includes('验证并下载')) {
+            if (txt) txt.innerHTML = '<span class="animate-spin">↻</span> 下载源码包...';
+          }
+        } catch {
+          // 请求失败说明 Node 进程正在重启退出
+          serviceWentDown = true;
+          if (txt) txt.innerHTML = '<span class="animate-spin">↻</span> 服务重启中...';
+        }
+
+        // 一旦检测到服务重启中，或已过去 5 秒，探测新服务是否重新就绪
+        if (serviceWentDown || elapsed >= 5) {
+          try {
+            const probe = await fetch('/api/health', { signal: AbortSignal.timeout(1800) });
+            if (probe.ok) {
+              clearInterval(pollTimer);
+              btn.classList.add('btn-success');
+              if (txt) txt.textContent = '✓ 升级完成';
+              toast('✓ 面板升级成功，新版本服务已就绪！即将刷新页面');
+              setTimeout(() => location.reload(), 1200);
+              return;
+            }
+          } catch {}
+        }
+
+        // 超时兜底（45 秒）：提示用户手动刷新
+        if (elapsed > 45) {
+          clearInterval(pollTimer);
+          if (txt) txt.textContent = '请刷新页面';
+          toast('更新流程已完成，页面即将刷新');
+          setTimeout(() => location.reload(), 1500);
+        }
+      }, 1500);
     } catch (err) {
       btn.disabled = false;
       if (txt) txt.textContent = '立即更新';
