@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{B983F625-1CC2-47B1-A7BA-04A7B42FB8C3}</ProjectGuid>
     <OutputType>WinExe</OutputType>
-    <RootNamespace>MyBox.Client</RootNamespace>
-    <AssemblyName>MyBox</AssemblyName>
+    <RootNamespace>FluxBox.Client</RootNamespace>
+    <AssemblyName>FluxBox</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ApplicationIcon>app.ico</ApplicationIcon>

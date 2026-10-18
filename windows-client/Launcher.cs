@@ -10,7 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace MyBox.Client
+namespace FluxBox.Client
 {
     public static class Program
     {
@@ -34,14 +34,14 @@ namespace MyBox.Client
                 if (arg == "--reset" || arg == "--disconnect" || arg == "-r")
                 {
                     ResetNetworkDirectly();
-                    MessageBox.Show("已成功恢复 Windows 默认网络（DHCP 自动获取 IP 与 DNS）！", "MyBox 网络恢复", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("已成功恢复 Windows 默认网络（DHCP 自动获取 IP 与 DNS）！", "FluxBox 网络恢复", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
             }
 
             // 2. 单实例检查：若已有托盘常驻实例运行，唤醒已有唯一界面后本进程直接退出
             bool createdNew;
-            AppMutex = new Mutex(true, "Global\\MyBox_Windows_Client_Singleton_Mutex", out createdNew);
+            AppMutex = new Mutex(true, "Global\\FluxBox_Windows_Client_Singleton_Mutex", out createdNew);
             if (!createdNew)
             {
                 IntPtr hWnd = EnsureSingleWindow();
@@ -107,11 +107,11 @@ namespace MyBox.Client
                 // 7. 进入常驻系统托盘消息循环
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new MyBoxTrayContext());
+                Application.Run(new FluxBoxTrayContext());
             }
             catch (Exception ex)
             {
-                MessageBox.Show("程序发生异常: " + ex.Message, "MyBox 客户端错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("程序发生异常: " + ex.Message, "FluxBox 客户端错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -306,7 +306,7 @@ namespace MyBox.Client
         public const uint WM_CLOSE = 0x0010;
 
         /// <summary>
-        /// 确保桌面上仅保留唯一一个 MyBox 窗口：若已有窗口则激活至最前台，并关闭意外残留的多余窗口
+        /// 确保桌面上仅保留唯一一个 FluxBox 窗口：若已有窗口则激活至最前台，并关闭意外残留的多余窗口
         /// </summary>
         public static IntPtr EnsureSingleWindow()
         {
@@ -320,7 +320,9 @@ namespace MyBox.Client
                 string title = titleSb.ToString().Trim();
                 if (string.IsNullOrEmpty(title)) return true;
 
-                if (title == "MyBox" || title.StartsWith("MyBox ") || title.StartsWith("MyBox -") || title.Contains("127.0.0.1:3038"))
+                if (title == "FluxBox" || title.StartsWith("FluxBox ") || title.StartsWith("FluxBox -") ||
+                    title == "MyBox" || title.StartsWith("MyBox ") || title.StartsWith("MyBox -") ||
+                    title.Contains("127.0.0.1:3038"))
                 {
                     StringBuilder clsSb = new StringBuilder(256);
                     GetClassName(hWnd, clsSb, 256);
@@ -383,9 +385,9 @@ namespace MyBox.Client
         }
 
         /// <summary>
-        /// 关闭桌面上所有属于 MyBox 的网页应用窗口
+        /// 关闭桌面上所有属于 FluxBox 的网页应用窗口
         /// </summary>
-        public static void CloseAllMyBoxWindows()
+        public static void CloseAllFluxBoxWindows()
         {
             EnumWindows((hWnd, lParam) =>
             {
@@ -396,7 +398,9 @@ namespace MyBox.Client
                 string title = titleSb.ToString().Trim();
                 if (string.IsNullOrEmpty(title)) return true;
 
-                if (title == "MyBox" || title.StartsWith("MyBox ") || title.StartsWith("MyBox -") || title.Contains("127.0.0.1:3038"))
+                if (title == "FluxBox" || title.StartsWith("FluxBox ") || title.StartsWith("FluxBox -") ||
+                    title == "MyBox" || title.StartsWith("MyBox ") || title.StartsWith("MyBox -") ||
+                    title.Contains("127.0.0.1:3038"))
                 {
                     StringBuilder clsSb = new StringBuilder(256);
                     GetClassName(hWnd, clsSb, 256);
@@ -409,6 +413,11 @@ namespace MyBox.Client
                 }
                 return true;
             }, IntPtr.Zero);
+        }
+
+        public static void CloseAllMyBoxWindows()
+        {
+            CloseAllFluxBoxWindows();
         }
 
         #endregion
@@ -424,7 +433,7 @@ namespace MyBox.Client
 
             LastLaunchTime = DateTime.Now;
 
-            string profileDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MyBoxClient", "cache");
+            string profileDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FluxBoxClient", "cache");
             string appUrl = "http://127.0.0.1:3038";
             string args = string.Format(
                 "--app=\"{0}\" --window-size=1120,760 --user-data-dir=\"{1}\" " +
@@ -515,7 +524,7 @@ namespace MyBox.Client
     /// <summary>
     /// 系统托盘常驻上下文管理器 (NotifyIcon)
     /// </summary>
-    public class MyBoxTrayContext : ApplicationContext
+    public class FluxBoxTrayContext : ApplicationContext
     {
         private NotifyIcon trayIcon;
         private ContextMenu contextMenu;
@@ -528,7 +537,7 @@ namespace MyBox.Client
         private string currentGatewayIp = "192.168.3.2";
         private bool isExiting = false;
 
-        public MyBoxTrayContext()
+        public FluxBoxTrayContext()
         {
             InitializeTray();
             StartPolling();
@@ -560,7 +569,7 @@ namespace MyBox.Client
             trayIcon.Icon = loadIcon;
 
             // 2. 初始提示文本 (最多 63 字符)
-            trayIcon.Text = "MyBox";
+            trayIcon.Text = "FluxBox";
 
             // 3. 构建原生右键菜单
             contextMenu = new ContextMenu();
@@ -575,7 +584,7 @@ namespace MyBox.Client
 
             MenuItem sep2 = new MenuItem("-");
 
-            menuExit = new MenuItem("退出 MyBox (&X)", OnExitClick);
+            menuExit = new MenuItem("退出 FluxBox (&X)", OnExitClick);
 
             contextMenu.MenuItems.Add(menuOpen);
             contextMenu.MenuItems.Add(sep1);
@@ -626,7 +635,7 @@ namespace MyBox.Client
 
         private void ShowMainWindow()
         {
-            // 1. 若已有 MyBox 窗口存在，直接激活并拉到最前台，绝不重复创建
+            // 1. 若已有 FluxBox 窗口存在，直接激活并拉到最前台，绝不重复创建
             IntPtr hWnd = Program.EnsureSingleWindow();
             if (hWnd != IntPtr.Zero)
             {
@@ -677,8 +686,8 @@ namespace MyBox.Client
 
                         // 格式化悬停提示与菜单文本
                         string tipText = conn
-                            ? ("MyBox (已连接: " + gwIp + ")")
-                            : "MyBox (未连接)";
+                            ? ("FluxBox (已连接: " + gwIp + ")")
+                            : "FluxBox (未连接)";
                         if (tipText.Length > 63) tipText = tipText.Substring(0, 63);
 
                         string menuText = conn
@@ -720,17 +729,17 @@ namespace MyBox.Client
                     {
                         if (action == "connect")
                         {
-                            trayIcon.ShowBalloonTip(2000, "MyBox 旁路由", "已成功接入旁路由 (" + currentGatewayIp + ")，网络流量已由 MyBox 智能接管分流！", ToolTipIcon.Info);
+                            trayIcon.ShowBalloonTip(2000, "FluxBox 旁路由", "已成功接入旁路由 (" + currentGatewayIp + ")，网络流量已由 FluxBox 智能接管分流！", ToolTipIcon.Info);
                         }
                         else
                         {
-                            trayIcon.ShowBalloonTip(2000, "MyBox 旁路由", "已断开旁路由，已安全恢复 Windows 默认网络直连！", ToolTipIcon.Info);
+                            trayIcon.ShowBalloonTip(2000, "FluxBox 旁路由", "已断开旁路由，已安全恢复 Windows 默认网络直连！", ToolTipIcon.Info);
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("网络切换操作失败: " + ex.Message, "MyBox", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("网络切换操作失败: " + ex.Message, "FluxBox", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             });
         }
@@ -739,7 +748,7 @@ namespace MyBox.Client
         {
             DialogResult dr = MessageBox.Show(
                 "确定立即将 Windows 物理网卡还原为自动获取 (DHCP) 吗？\n\n此操作会清除所有临时路由并重置 DNS 设置。",
-                "MyBox 网络还原确认",
+                "FluxBox 网络还原确认",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question);
 
@@ -766,12 +775,12 @@ namespace MyBox.Client
 
                     if (trayIcon != null && !isExiting)
                     {
-                        trayIcon.ShowBalloonTip(2000, "MyBox", "已成功还原 Windows 物理网卡默认网络 (DHCP)！", ToolTipIcon.Info);
+                        trayIcon.ShowBalloonTip(2000, "FluxBox", "已成功还原 Windows 物理网卡默认网络 (DHCP)！", ToolTipIcon.Info);
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("网络还原失败: " + ex.Message, "MyBox", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("网络还原失败: " + ex.Message, "FluxBox", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             });
         }
@@ -798,7 +807,7 @@ namespace MyBox.Client
                 trayIcon = null;
             }
 
-            Program.CloseAllMyBoxWindows();
+            Program.CloseAllFluxBoxWindows();
             Program.CleanupAndRestoreNetwork();
             ExitThread();
         }

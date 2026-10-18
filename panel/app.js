@@ -1,4 +1,4 @@
-/* MyBox 面板 —— 基于官方 sing-box 的透明代理控制面板，无构建步骤，直接跑。 */
+/* FluxBox 面板 —— 基于官方 sing-box 的透明代理控制面板，无构建步骤，直接跑。 */
 
 const $ = (id) => document.getElementById(id);
 
@@ -1546,8 +1546,8 @@ async function loadSettings() {
   // 面板语义化版本展示与官方源对比
   try {
     const v = await api('/system/version');
-    const cur = v.current || 'MyBox: v1.20 (B92)';
-    const shortVer = v.shortVersion || cur.replace(/^MyBox:\s*/, '');
+    const cur = v.current || 'FluxBox: v1.20 (B112)';
+    const shortVer = v.shortVersion || cur.replace(/^(?:MyBox|FluxBox):\s*/i, '');
     if ($('sysVersion')) $('sysVersion').textContent = cur;
     if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = shortVer;
     if ($('brandVersion')) $('brandVersion').textContent = shortVer;
@@ -1569,7 +1569,7 @@ async function loadSettings() {
       }
       if (applyBtn) {
         applyBtn.classList.remove('hidden');
-        if ($('sysUpdateBtnText')) $('sysUpdateBtnText').textContent = `升级至 ${v.latest.replace(/^MyBox:\s*/, '')}`;
+        if ($('sysUpdateBtnText')) $('sysUpdateBtnText').textContent = `升级至 ${v.latest.replace(/^(?:MyBox|FluxBox):\s*/i, '')}`;
       }
     } else {
       if (pBadge) {
@@ -1579,10 +1579,10 @@ async function loadSettings() {
       if (applyBtn) applyBtn.classList.add('hidden');
     }
   } catch {
-    if ($('sysVersion')) $('sysVersion').textContent = 'MyBox: v1.20 (B92)';
-    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v1.20 (B92)';
-    if ($('brandVersion')) $('brandVersion').textContent = 'v1.20 (B92)';
-    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'MyBox: v1.20 (B92)';
+    if ($('sysVersion')) $('sysVersion').textContent = 'FluxBox: v1.20 (B112)';
+    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v1.20 (B112)';
+    if ($('brandVersion')) $('brandVersion').textContent = 'v1.20 (B112)';
+    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'FluxBox: v1.20 (B112)';
   }
 
   // 获取并展示内核最新版本
@@ -2205,8 +2205,8 @@ function bindEvents() {
     if (txt) txt.innerHTML = '<span class="animate-spin">↻</span> 检查中...';
     try {
       const v = await api('/system/version');
-      const cur = v.current || 'MyBox: v1.20 (B92)';
-      const shortVer = v.shortVersion || cur.replace(/^MyBox:\s*/, '');
+      const cur = v.current || 'FluxBox: v1.20 (B112)';
+      const shortVer = v.shortVersion || cur.replace(/^(?:MyBox|FluxBox):\s*/i, '');
       if ($('sysVersion')) $('sysVersion').textContent = cur;
       if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = shortVer;
       if ($('brandVersion')) $('brandVersion').textContent = shortVer;
@@ -2232,7 +2232,7 @@ function bindEvents() {
         }
         if (applyBtn) {
           applyBtn.classList.remove('hidden');
-          if ($('sysUpdateBtnText')) $('sysUpdateBtnText').textContent = `升级至 ${v.latest.replace(/^MyBox:\s*/, '')}`;
+          if ($('sysUpdateBtnText')) $('sysUpdateBtnText').textContent = `升级至 ${v.latest.replace(/^(?:MyBox|FluxBox):\s*/i, '')}`;
         }
         if (txt) txt.textContent = '有新版本';
         toast(`发现新版本 ${v.latest} 可更新！`);

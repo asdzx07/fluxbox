@@ -9,7 +9,8 @@ const projectRoot = path.resolve(toolsDir, '..');
 const windowsClientDir = path.join(projectRoot, 'windows-client');
 
 test('Windows launcher project includes required runtime files and elevation manifest', () => {
-  const project = fs.readFileSync(path.join(windowsClientDir, 'MyBox.csproj'), 'utf8');
+  const projectFile = fs.existsSync(path.join(windowsClientDir, 'FluxBox.csproj')) ? 'FluxBox.csproj' : 'MyBox.csproj';
+  const project = fs.readFileSync(path.join(windowsClientDir, projectFile), 'utf8');
   const buildScript = fs.readFileSync(path.join(windowsClientDir, 'build.cmd'), 'utf8');
   const manifest = fs.readFileSync(path.join(windowsClientDir, 'app.manifest'), 'utf8');
 
@@ -21,7 +22,7 @@ test('Windows launcher project includes required runtime files and elevation man
   assert.match(project, /<Content Include="core\\\*\*\\\*">/);
   assert.match(project, /<Content Include="ui\\\*\*\\\*">/);
   assert.match(project, /<Link>config\.json<\/Link>/);
-  assert.match(buildScript, /MyBox\.csproj/);
+  assert.match(buildScript, /(FluxBox|MyBox)\.csproj/);
   assert.match(manifest, /requestedExecutionLevel level="requireAdministrator"/);
 
   for (const required of [

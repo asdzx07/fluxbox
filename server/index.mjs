@@ -45,7 +45,7 @@ if (problem) {
 }
 
 const server = app.listen(port, '0.0.0.0', () => {
-  log.info('MyBox 面板已启动：http://0.0.0.0:%d', port);
+  log.info('FluxBox 面板已启动：http://0.0.0.0:%d', port);
   try {
     fs.writeFileSync(PORT_FILE, `${port}\n`, 'utf8');
     const legacyPortFile = path.join(path.dirname(PORT_FILE), 'port');

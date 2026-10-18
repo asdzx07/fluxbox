@@ -131,7 +131,7 @@ export function registerOperationRoutes(app, deps) {
       const shortVersion = semver
         ? `${semver}${Number.isFinite(buildNumber) ? ` (B${buildNumber})` : ''}`
         : '版本未知';
-      const current = `MyBox: ${shortVersion}`;
+      const current = `FluxBox: ${shortVersion}`;
 
       // 4. 从远程 GitHub 检测是否有最新版本与构建
       let remoteCommitSha = null;
@@ -200,8 +200,8 @@ export function registerOperationRoutes(app, deps) {
       // 最新版本文案格式统一规范化：有构建号时严格以构建号展示，绝不展示易引起混淆的 commit sha
       const latest = hasUpdate
         ? (Number.isFinite(remoteBuild)
-            ? `MyBox: ${remoteSemver || semver || 'v1.20'} (B${remoteBuild})`
-            : `MyBox: ${remoteSemver || semver || 'v1.20'} (${remoteCommitSha || '新提交'})`)
+            ? `FluxBox: ${remoteSemver || semver || 'v1.20'} (B${remoteBuild})`
+            : `FluxBox: ${remoteSemver || semver || 'v1.20'} (${remoteCommitSha || '新提交'})`)
         : current;
 
       res.json({

@@ -60,7 +60,7 @@ async function loginRemoteGateway(password = config.password, gatewayIp = config
               config.sessionCookie = cookieVal;
               config.password = password;
               saveConfig({ password, sessionCookie: cookieVal });
-              console.log('[MyBox Windows Companion] 旁路由登录成功，已获取并保存会话 Cookie');
+              console.log('[FluxBox Windows Companion] 旁路由登录成功，已获取并保存会话 Cookie');
               resolve({ ok: true, message: '登录成功' });
               return;
             }
@@ -103,7 +103,7 @@ let clientConnected = false;
 setInterval(() => {
   // 仅在未启用托盘常驻模式时，前端心跳超时才自动退出
   if (!config.minimizeToTray && clientConnected && Date.now() - lastHeartbeat > 12000) {
-    console.log('[MyBox Windows Companion] 检测到前端界面已关闭且未启用托盘常驻，正在还原网络并安全退出...');
+    console.log('[FluxBox Windows Companion] 检测到前端界面已关闭且未启用托盘常驻，正在还原网络并安全退出...');
     try {
       disconnectGateway(config.gatewayIp);
     } catch {}
@@ -239,7 +239,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, message: '网络已还原，服务即将退出' }));
     setTimeout(() => {
-      console.log('[MyBox Windows Companion] 收到退出请求，进程正在退出...');
+      console.log('[FluxBox Windows Companion] 收到退出请求，进程正在退出...');
       process.exit(0);
     }, 400);
     return;
@@ -306,21 +306,21 @@ const server = http.createServer(async (req, res) => {
 
 const PORT = 3038;
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`[MyBox Windows Companion] 服务已启动: http://127.0.0.1:${PORT}`);
-  console.log(`[MyBox Windows Companion] 旁路由目标: http://${config.gatewayIp}:${config.gatewayPort}`);
+  console.log(`[FluxBox Windows Companion] 服务已启动: http://127.0.0.1:${PORT}`);
+  console.log(`[FluxBox Windows Companion] 旁路由目标: http://${config.gatewayIp}:${config.gatewayPort}`);
 
   // 若配置了自动连接旁路由，在启动时自动生效
   if (config.autoConnect) {
     try {
       if (!isConnectedToGateway(config.gatewayIp)) {
-        console.log(`[MyBox Windows Companion] 正在自动连接旁路由 (${config.gatewayIp})...`);
+        console.log(`[FluxBox Windows Companion] 正在自动连接旁路由 (${config.gatewayIp})...`);
         connectGateway(config.gatewayIp);
-        console.log(`[MyBox Windows Companion] 旁路由连接成功！Windows 流量已由 MyBox 接管。`);
+        console.log(`[FluxBox Windows Companion] 旁路由连接成功！Windows 流量已由 FluxBox 接管。`);
       } else {
-        console.log(`[MyBox Windows Companion] 当前已处于旁路由接管状态。`);
+        console.log(`[FluxBox Windows Companion] 当前已处于旁路由接管状态。`);
       }
     } catch (err) {
-      console.warn(`[MyBox Windows Companion] 自动连接旁路由失败 (可能需要管理员权限):`, err.message);
+      console.warn(`[FluxBox Windows Companion] 自动连接旁路由失败 (可能需要管理员权限):`, err.message);
     }
   }
 
@@ -332,7 +332,7 @@ server.listen(PORT, '127.0.0.1', () => {
 
 // 优雅关机清理
 function cleanupAndExit() {
-  console.log('\n[MyBox Windows Companion] 正在退出，清理临时路由并恢复网络...');
+  console.log('\n[FluxBox Windows Companion] 正在退出，清理临时路由并恢复网络...');
   try {
     disconnectGateway(config.gatewayIp);
   } catch {}

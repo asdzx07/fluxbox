@@ -1,4 +1,4 @@
-document.title = 'MyBox';
+document.title = 'FluxBox';
 
 let localState = {
   connected: false,
@@ -233,7 +233,7 @@ function renderStatusUI() {
       }, 1000);
     }
     gwTitle.textContent = `当前状态：已接管 (经由旁路由 ${curIp} 代理分流)`;
-    gwDesc.textContent = 'Windows 网关与 DNS 已指向旁路由，全局流量正由 MyBox 智能分流。再次点击即可恢复。';
+    gwDesc.textContent = 'Windows 网关与 DNS 已指向旁路由，全局流量正由 FluxBox 智能分流。再次点击即可恢复。';
     btnGw.className = 'btn-toggle-gw active';
     btnGwText.textContent = '断开 (恢复主路由直连)';
     $('infoGwMode').textContent = `旁路由代理 (${curIp})`;
@@ -273,7 +273,7 @@ async function toggleGateway() {
       const res = await fetchLocal('/api/local/connect', { method: 'POST' });
       if (!res.ok) throw new Error(res.error || '连接失败');
       localState.connected = true;
-      toast('已连接旁路由！流量正由 MyBox 接管分流');
+      toast('已连接旁路由！流量正由 FluxBox 接管分流');
     }
     await syncLocalStatus();
   } catch (err) {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 应急工具：重置或清空 MyBox 控制面板登录密码
+ * 应急工具：重置或清空 FluxBox 控制面板登录密码
  *
  * 用法：
  *   node tools/reset-password.mjs <新密码>
@@ -19,7 +19,7 @@ const arg = process.argv[2];
 
 if (!arg || arg === '--help' || arg === '-h') {
   console.log(`
-MyBox 密码管理工具
+FluxBox 密码管理工具
 ==================
 用法:
   node tools/reset-password.mjs <新密码>       设置新的面板密码 (至少6位)

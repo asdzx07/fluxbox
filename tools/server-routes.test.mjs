@@ -168,7 +168,7 @@ test('version endpoint does not invent a semantic release when VERSION is absent
     const response = await request(baseUrl, '/api/system/version');
     assert.equal(response.status, 200);
     const version = await response.json();
-    assert.equal(version.current, 'MyBox: 版本未知');
+    assert.equal(version.current, 'FluxBox: 版本未知');
     assert.equal(version.shortVersion, '版本未知');
     assert.equal(version.semver, null);
     assert.ok(Number.isFinite(version.buildNumber));

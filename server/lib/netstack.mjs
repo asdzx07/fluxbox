@@ -243,7 +243,7 @@ export async function applyDnsmasq({ dnsPort = KERNEL.dnsPort, listen = '127.0.0
 
   const conflict = await globalOptionAlreadySet('noresolv', confDir);
   const lines = [
-    '# 由 MyBox 生成，请勿手工修改。',
+    '# 由 FluxBox 生成，请勿手工修改。',
     '# 上游指向内核的 DNS 入站，由内核按分流规则决定用哪个上游 DNS。',
     `server=${listen}#${dnsPort}`,
   ];
