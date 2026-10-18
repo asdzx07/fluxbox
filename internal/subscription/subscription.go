@@ -1,6 +1,7 @@
 package subscription
 
 import (
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -30,7 +31,14 @@ type Subscription struct {
 
 // FetchAndParse 拉取远程订阅并自动识别 sing-box JSON / Clash YAML / Base64 URI
 func FetchAndParse(subURL string) ([]map[string]any, error) {
-	client := &http.Client{Timeout: 25 * time.Second}
+	tr := &http.Transport{
+		Proxy:           nil, // 显式禁用环境变量中死锁的本地 127.0.0.1:7891 代理，直连拉取
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   25 * time.Second,
+	}
 	req, err := http.NewRequest("GET", subURL, nil)
 	if err != nil {
 		return nil, err

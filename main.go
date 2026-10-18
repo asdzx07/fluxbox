@@ -32,6 +32,14 @@ var (
 )
 
 func main() {
+	// 清理软路由可能残留的代理环境变量，防止自请求死锁 (如 dial 127.0.0.1:7891)
+	os.Unsetenv("http_proxy")
+	os.Unsetenv("https_proxy")
+	os.Unsetenv("all_proxy")
+	os.Unsetenv("HTTP_PROXY")
+	os.Unsetenv("HTTPS_PROXY")
+	os.Unsetenv("ALL_PROXY")
+
 	log.Printf("🚀 正在启动 FluxBox (%s, commit: %s, runtime: %s/%s)...", Version, Commit, runtime.GOOS, runtime.GOARCH)
 
 	// 1. 确定数据目录 (生产环境默认 /opt/fluxbox/data，开发环境自动回退当前 ./data)

@@ -18,7 +18,10 @@ import (
 const ClashAPIURL = "http://127.0.0.1:9095"
 
 func (s *Server) clashRequest(method, path string, body []byte) ([]byte, int, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{
+		Transport: &http.Transport{Proxy: nil},
+		Timeout:   10 * time.Second,
+	}
 	req, err := http.NewRequest(method, ClashAPIURL+path, bytes.NewReader(body))
 	if err != nil {
 		return nil, 0, err
