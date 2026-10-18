@@ -138,23 +138,24 @@ export function registerOperationRoutes(app, deps) {
       let remoteBuild = buildNumber;
       let hasUpdate = false;
 
-      // 优先从 raw 读取最新 VERSION 文件与 commit.sha（带国内镜像重试）
+      // 优先从 raw 读取最新 VERSION 文件与 commit.sha（带防缓存时间戳与国内镜像重试）
+      const cacheBust = `?t=${Date.now()}`;
       const versionCandidates = [
-        'https://ghfast.top/https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION',
-        'https://gh-proxy.com/https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION',
-        'https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION',
+        `https://ghfast.top/https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION${cacheBust}`,
+        `https://gh-proxy.com/https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION${cacheBust}`,
+        `https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION${cacheBust}`,
       ];
       const shaCandidates = [
-        'https://ghfast.top/https://raw.githubusercontent.com/asdzx07/mybox/main/commit.sha',
-        'https://gh-proxy.com/https://raw.githubusercontent.com/asdzx07/mybox/main/commit.sha',
-        'https://raw.githubusercontent.com/asdzx07/mybox/main/commit.sha',
+        `https://ghfast.top/https://raw.githubusercontent.com/asdzx07/mybox/main/commit.sha${cacheBust}`,
+        `https://gh-proxy.com/https://raw.githubusercontent.com/asdzx07/mybox/main/commit.sha${cacheBust}`,
+        `https://raw.githubusercontent.com/asdzx07/mybox/main/commit.sha${cacheBust}`,
       ];
 
       let fetchSucceeded = false;
       for (const vUrl of versionCandidates) {
         try {
           const rawRes = await fetchImpl(vUrl, {
-            headers: { 'User-Agent': 'mybox/2.0.0' },
+            headers: { 'User-Agent': 'mybox/2.0.0', 'Cache-Control': 'no-cache' },
             signal: AbortSignal.timeout(5000),
           });
           if (rawRes.ok) {
@@ -172,12 +173,12 @@ export function registerOperationRoutes(app, deps) {
       for (const sUrl of shaCandidates) {
         try {
           const shaRes = await fetchImpl(sUrl, {
-            headers: { 'User-Agent': 'mybox/2.0.0' },
+            headers: { 'User-Agent': 'mybox/2.0.0', 'Cache-Control': 'no-cache' },
             signal: AbortSignal.timeout(5000),
           });
           if (shaRes.ok) {
             const shaText = (await shaRes.text()).trim();
-            if (shaText) {
+            if (shaText && /^[a-f0-9]{7,40}$/i.test(shaText)) {
               remoteCommitSha = shaText.slice(0, 7);
               fetchSucceeded = true;
               break;
@@ -201,14 +202,27 @@ export function registerOperationRoutes(app, deps) {
         } catch {}
       }
 
-      // 严格以远程构建号是否大于本地构建号为准判定更新，杜绝假版本死循环
+      // 判定更新逻辑：
+      // 1. 若远程构建号严格大于本地构建号，判定为有新构建/版本
+      // 2. 若构建号相同或无法对比，但远程 commit sha 与本地 commit sha 不一致，也判定为有新代码提交更新
       if (Number.isFinite(buildNumber) && Number.isFinite(remoteBuild) && remoteBuild > buildNumber) {
+        hasUpdate = true;
+      } else if (
+        remoteCommitSha &&
+        commitSha &&
+        remoteCommitSha.toLowerCase() !== commitSha.toLowerCase() &&
+        (!Number.isFinite(buildNumber) || !Number.isFinite(remoteBuild) || remoteBuild >= buildNumber)
+      ) {
         hasUpdate = true;
       } else {
         hasUpdate = false;
       }
 
-      const latest = hasUpdate ? `MyBox: ${remoteSemver} (B${remoteBuild})` : current;
+      const latest = hasUpdate
+        ? (Number.isFinite(remoteBuild) && Number.isFinite(buildNumber) && remoteBuild > buildNumber
+            ? `MyBox: ${remoteSemver || semver || 'v1.20'} (B${remoteBuild})`
+            : `MyBox: ${remoteSemver || semver || 'v1.20'} (${remoteCommitSha || '新提交'})`)
+        : current;
 
       res.json({
         ok: true,
