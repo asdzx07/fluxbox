@@ -1156,40 +1156,42 @@ label.field > span, .field-title {
 .pwd-btn-box { display: flex; flex-direction: column; gap: 4px; }
 .pwd-btn-box button { height: 36px; margin-top: 22px; }
 
-/* 沉浸式 macOS 极客终端卡片 */
+/* 浅色现代控制台卡片 (Light-Themed Modern Terminal Card) */
 .terminal-card {
-  background: #090d16 !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
   padding: 0 !important;
   overflow: hidden;
+  box-shadow: var(--shadow), var(--shadow-inner);
 }
 .terminal-head {
-  background: #111827;
+  background: var(--surface-2) !important;
   margin-bottom: 0 !important;
   padding: 12px 18px !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-bottom: 1px solid var(--border) !important;
 }
-.term-dots { display: flex; gap: 6px; margin-right: 6px; }
-.tdot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+.term-dots { display: flex; gap: 6px; margin-right: 8px; }
+.tdot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; opacity: 0.9; }
 .tdot.red { background: #ef4444; }
 .tdot.yellow { background: #f59e0b; }
 .tdot.green { background: #10b981; }
 
 pre.log {
   margin: 0;
-  height: 440px;
+  height: 480px;
+  min-height: 440px;
   overflow: auto;
-  background: #060911;
+  background: #f8fafc;
   border: none;
   padding: 16px 20px;
   font: 12.5px/1.65 "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   white-space: pre-wrap;
   word-break: break-all;
-  color: #cbd5e1;
+  color: #1e293b;
 }
-.log-info { color: #38bdf8; font-weight: 600; }
-.log-warn { color: #fbbf24; font-weight: 600; }
-.log-err  { color: #fb7185; font-weight: 600; }
+.log-info { color: #0284c7; font-weight: 600; }
+.log-warn { color: #d97706; font-weight: 600; }
+.log-err  { color: #dc2626; font-weight: 600; }
 
 .note { color: var(--text-2); font-size: 12px; }
 .err-text { color: var(--err); font-size: 12.5px; }

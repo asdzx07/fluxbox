@@ -1546,7 +1546,7 @@ async function loadSettings() {
   // 面板语义化版本展示与官方源对比
   try {
     const v = await api('/system/version');
-    const cur = v.current || 'FluxBox: v1.20 (B112)';
+    const cur = v.current || 'FluxBox: v1.20 (B113)';
     const shortVer = v.shortVersion || cur.replace(/^(?:MyBox|FluxBox):\s*/i, '');
     if ($('sysVersion')) $('sysVersion').textContent = cur;
     if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = shortVer;
@@ -1579,10 +1579,10 @@ async function loadSettings() {
       if (applyBtn) applyBtn.classList.add('hidden');
     }
   } catch {
-    if ($('sysVersion')) $('sysVersion').textContent = 'FluxBox: v1.20 (B112)';
-    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v1.20 (B112)';
-    if ($('brandVersion')) $('brandVersion').textContent = 'v1.20 (B112)';
-    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'FluxBox: v1.20 (B112)';
+    if ($('sysVersion')) $('sysVersion').textContent = 'FluxBox: v1.20 (B113)';
+    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v1.20 (B113)';
+    if ($('brandVersion')) $('brandVersion').textContent = 'v1.20 (B113)';
+    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'FluxBox: v1.20 (B113)';
   }
 
   // 获取并展示内核最新版本
@@ -2205,7 +2205,7 @@ function bindEvents() {
     if (txt) txt.innerHTML = '<span class="animate-spin">↻</span> 检查中...';
     try {
       const v = await api('/system/version');
-      const cur = v.current || 'FluxBox: v1.20 (B112)';
+      const cur = v.current || 'FluxBox: v1.20 (B113)';
       const shortVer = v.shortVersion || cur.replace(/^(?:MyBox|FluxBox):\s*/i, '');
       if ($('sysVersion')) $('sysVersion').textContent = cur;
       if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = shortVer;
