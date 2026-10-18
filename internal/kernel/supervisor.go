@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -90,6 +92,12 @@ func (s *Supervisor) Start() error {
 		}
 	}
 
+	// 启动前先确保没有外部僵尸进程占用 7891、7893、9095 等核心端口
+	if extPid := findExternalSingBoxPid(); extPid > 0 {
+		_ = exec.Command("kill", "-9", fmt.Sprintf("%d", extPid)).Run()
+		time.Sleep(200 * time.Millisecond)
+	}
+
 	if _, err := os.Stat(s.configPath); err != nil {
 		return fmt.Errorf("config file not found: %s", s.configPath)
 	}
@@ -121,26 +129,29 @@ func (s *Supervisor) Stop() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.cmd == nil || s.cmd.Process == nil {
-		return nil
+	if s.cmd != nil && s.cmd.Process != nil {
+		_ = s.cmd.Process.Signal(os.Interrupt)
+
+		done := make(chan error, 1)
+		go func() {
+			done <- s.cmd.Wait()
+		}()
+
+		select {
+		case <-time.After(3 * time.Second):
+			_ = s.cmd.Process.Kill()
+			<-done
+		case <-done:
+		}
+
+		s.cmd = nil
+		s.startedAt = time.Time{}
 	}
 
-	_ = s.cmd.Process.Signal(os.Interrupt)
+	// 彻底清理系统中外部或旧版服务可能残留的 sing-box 进程
+	_ = exec.Command("killall", "-9", "sing-box").Run()
+	_ = exec.Command("/etc/init.d/mybox-kernel", "stop").Run()
 
-	done := make(chan error, 1)
-	go func() {
-		done <- s.cmd.Wait()
-	}()
-
-	select {
-	case <-time.After(3 * time.Second):
-		_ = s.cmd.Process.Kill()
-		<-done
-	case <-done:
-	}
-
-	s.cmd = nil
-	s.startedAt = time.Time{}
 	log.Printf("[KERNEL] sing-box 已安全停止")
 	return nil
 }
@@ -148,7 +159,7 @@ func (s *Supervisor) Stop() error {
 // Restart 优雅重启内核
 func (s *Supervisor) Restart() error {
 	_ = s.Stop()
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond)
 	return s.Start()
 }
 
@@ -168,6 +179,16 @@ func (s *Supervisor) Status() Status {
 		}
 	}
 
+	// 智能探测兜底：即使内核由系统 procd 或外部启动，只要 9095 可通信或进程存活即算运行中
+	if !running {
+		if extPid := findExternalSingBoxPid(); extPid > 0 {
+			running = true
+			pid = extPid
+		} else if isPortListening("127.0.0.1:9095") {
+			running = true
+		}
+	}
+
 	ver := s.Version()
 	return Status{
 		Running: running,
@@ -175,6 +196,28 @@ func (s *Supervisor) Status() Status {
 		Uptime:  uptime,
 		Version: ver,
 	}
+}
+
+func findExternalSingBoxPid() int {
+	out, err := exec.Command("pidof", "sing-box").Output()
+	if err == nil {
+		fields := strings.Fields(string(out))
+		if len(fields) > 0 {
+			if p, err := strconv.Atoi(fields[0]); err == nil && p > 0 {
+				return p
+			}
+		}
+	}
+	return 0
+}
+
+func isPortListening(addr string) bool {
+	conn, err := net.DialTimeout("tcp", addr, 200*time.Millisecond)
+	if err == nil {
+		_ = conn.Close()
+		return true
+	}
+	return false
 }
 
 func (s *Supervisor) Version() string {
