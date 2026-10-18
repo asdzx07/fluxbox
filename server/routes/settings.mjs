@@ -23,6 +23,7 @@ export function registerSettingsRoutes(app, deps) {
   app.get('/api/overview', async (req, res) => {
     const settings = loadSettings();
     const k = await kernel.status();
+    const policiesEnabled = settings.policies.filter((policy) => policy.enabled).length;
     res.json({
       kernel: { ...k, versionOutput: await kernel.versionOutput() },
       dnsmasq: await netstack.dnsmasqStatus(),
@@ -33,7 +34,14 @@ export function registerSettingsRoutes(app, deps) {
         nodes: settings.nodes.length,
         groups: settings.groups.filter((group) => group.enabled).length,
         policies: settings.policies.length,
-        policiesEnabled: settings.policies.filter((policy) => policy.enabled).length,
+        policiesEnabled,
+      },
+      nodes: {
+        total: settings.nodes.length,
+      },
+      policies: {
+        total: settings.policies.length,
+        enabled: policiesEnabled,
       },
       meta: settings.meta,
       node: process.version,

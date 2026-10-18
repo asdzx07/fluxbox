@@ -466,8 +466,11 @@ async function loadOverview() {
     }
 
     if ($('statVersion')) $('statVersion').textContent = data.kernel?.version || '—';
-    if ($('statNodes')) $('statNodes').textContent = data.nodes?.total ? `${data.nodes.total} 个` : '0 个';
-    if ($('statPolicies')) $('statPolicies').textContent = data.policies ? `${data.policies.enabled} / ${data.policies.total}` : '—';
+    const totalNodes = data.counts?.nodes ?? data.nodes?.total ?? (Array.isArray(data.nodes) ? data.nodes.length : 0);
+    if ($('statNodes')) $('statNodes').textContent = `${totalNodes} 个`;
+    const polEnabled = data.counts?.policiesEnabled ?? data.policies?.enabled;
+    const polTotal = data.counts?.policies ?? data.policies?.total;
+    if ($('statPolicies')) $('statPolicies').textContent = (polTotal != null) ? `${polEnabled ?? 0} / ${polTotal}` : '—';
 
     const hint = $('overviewHint');
     if (hint) {
@@ -533,6 +536,10 @@ async function loadOverviewSubs() {
     state.overviewSubs = data.subscriptions || [];
     if (state.overviewSelectedSubId !== 'all' && !state.overviewSubs.some((s) => s.id === state.overviewSelectedSubId)) {
       state.overviewSelectedSubId = 'all';
+    }
+    const totalFromSubs = state.overviewSubs.reduce((acc, s) => acc + (s.nodeCount || 0), 0);
+    if ($('statNodes') && ($('statNodes').textContent === '0 个' || $('statNodes').textContent === '—') && totalFromSubs > 0) {
+      $('statNodes').textContent = `${totalFromSubs} 个`;
     }
     renderOverviewSubs();
   } catch (err) {

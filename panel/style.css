@@ -1136,6 +1136,9 @@ label.field > span, .field-title {
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 12px;
   line-height: 1.55;
+  height: 460px;
+  min-height: 460px;
+  resize: vertical;
 }
 .dns-rules-foot {
   display: flex;
