@@ -129,12 +129,23 @@ body {
   font: 13.5px/1.55 "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
   letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* 强制所有监控数字、端口、延迟等宽对齐，彻底消除刷新抖动 */
-.num-mono, .lat, .bdg, .version-tag, .conn-traffic, .sysres-val, .stat .v {
+/* 强制纯数字等宽对齐，彻底消除监控刷新抖动 */
+.num-mono, .sysres-val, .stat .v {
   font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-variant-numeric: tabular-nums;
+}
+
+/* 卡片右上角徽章与标签：使用现代高清晰 UI 字体，数字保持等宽，消除模糊感 */
+.bdg, .tag, .kpi-pill, .version-tag, .lat, .conn-traffic, .policy-idx-badge, .sub-filter-pill, .node-proto {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -267,9 +278,10 @@ aside.sidebar {
   background: var(--accent-weak);
   border: 1px solid var(--accent-border);
   font-weight: 600;
-  padding: 2px 7px;
+  padding: 2.5px 8px;
   border-radius: var(--radius-full);
-  font-size: 10.5px;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
   margin-left: auto;
 }
 
@@ -446,13 +458,15 @@ h3 {
 .head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .version-tag {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: var(--radius-full);
   background: var(--accent-weak);
   color: var(--accent);
   border: 1px solid var(--accent-border);
+  letter-spacing: 0.02em;
+  line-height: 1.25;
 }
 
 /* ==========================================================================
@@ -509,21 +523,24 @@ h3 {
 }
 
 .kpi-label {
-  font-size: 11.5px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--text-2);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
 .kpi-pill {
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 1.5px 7px;
+  padding: 3px 9px;
   border-radius: var(--radius-full);
   background: var(--surface-solid);
   color: var(--accent);
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent-border);
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.08);
+  letter-spacing: 0.02em;
+  line-height: 1.25;
 }
 
 .kpi-ic {
@@ -605,6 +622,18 @@ h3 {
   border-bottom: 1px solid var(--border);
 }
 .card-head .spacer { margin-left: auto; }
+
+/* 卡片右上角状态文字与标签清晰度增强 */
+.card-head .note, .card-head span.note, .policy-target-note {
+  font-size: 12.5px !important;
+  font-weight: 500;
+  color: var(--text-2) !important;
+  letter-spacing: 0.01em !important;
+  line-height: 1.35;
+}
+.card-head .note strong, .policy-target-note strong {
+  font-weight: 700;
+}
 
 .card-title-link {
   display: inline-flex;
@@ -890,49 +919,59 @@ label.field > span, .field-title {
    ========================================================================== */
 
 .bdg {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 2.5px 8px;
+  padding: 3px 10px;
   border-radius: var(--radius-full);
-  background: var(--surface-2);
-  color: var(--text-2);
+  background: var(--surface-solid);
+  color: var(--text);
   border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   white-space: nowrap;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
 }
 
 .tag {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 2px 7px;
-  border-radius: var(--radius-full);
-  background: var(--accent-weak);
-  color: var(--accent);
-  white-space: nowrap;
-}
-.tag.muted {
-  background: var(--surface-2);
-  color: var(--text-2);
-  border: 1px solid var(--border-subtle);
-}
-
-.sub-filter-pill {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: var(--radius-full);
   background: var(--accent-weak);
   color: var(--accent);
   border: 1px solid var(--accent-border);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+}
+.tag.muted {
+  background: var(--surface-solid);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+}
+
+.sub-filter-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: var(--accent-weak);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+  letter-spacing: 0.02em;
+  line-height: 1.25;
 }
 
 .lat {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 2.5px 9px;
   border-radius: var(--radius-full);
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
 }
 .lat.good { background: var(--ok-weak); color: var(--ok); }
 .lat.mid { background: var(--warn-weak); color: var(--warn); }
@@ -971,13 +1010,15 @@ label.field > span, .field-title {
 .node-flag { font-size: 18px; line-height: 1; }
 .node-title { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .node-proto {
-  font-size: 10px;
+  font-size: 11.5px;
   font-weight: 700;
-  padding: 1.5px 5px;
-  border-radius: 4px;
-  background: var(--surface-2);
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--surface-solid);
   color: var(--accent);
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent-border);
+  letter-spacing: 0.03em;
+  line-height: 1.25;
 }
 .node-card-foot {
   display: flex;
@@ -1072,13 +1113,15 @@ label.field > span, .field-title {
 .conn-meta-sub { font-size: 11px; color: var(--text-3); margin-top: 3px; display: flex; gap: 6px; }
 .conn-stats-col { display: flex; align-items: center; gap: 6px; }
 .conn-traffic {
-  font-size: 11px;
-  background: var(--surface);
-  padding: 3px 7px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface-solid);
+  padding: 3px 8px;
   border-radius: var(--radius-xs);
   border: 1px solid var(--border);
   display: inline-flex;
   gap: 4px;
+  letter-spacing: 0.02em;
 }
 .conn-traffic .tf-down { color: var(--ok); }
 .conn-traffic .tf-up { color: var(--accent); }
@@ -1088,7 +1131,17 @@ label.field > span, .field-title {
 .card.policy-card.dragging { opacity: 0.35; transform: scale(0.98); border: 1.5px dashed var(--accent) !important; }
 .card.policy-card.drag-over { border-color: var(--accent) !important; box-shadow: 0 0 0 2px var(--accent-glow); }
 .drag-grip { cursor: grab; color: var(--text-3); padding: 3px; display: inline-flex; }
-.policy-idx-badge { font-size: 11px; font-weight: 700; color: var(--text-3); background: var(--surface-solid); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
+.policy-idx-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 7px;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+}
 
 /* ==========================================================================
    11. 核心设置表单与沉浸式终端日志 (Settings & macOS Terminal)
@@ -1112,9 +1165,17 @@ label.field > span, .field-title {
   flex-direction: column;
   gap: 8px;
 }
-.vmc-top { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--text-2); }
+.vmc-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
 .vmc-val { font-size: 19px; font-weight: 700; display: flex; align-items: baseline; gap: 8px; }
-.vmc-foot { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-3); padding-top: 8px; border-top: 1px dashed var(--border); }
+.vmc-foot { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-2); padding-top: 8px; border-top: 1px dashed var(--border); }
 
 .setting-list { display: flex; flex-direction: column; gap: 2px; }
 .setting-item {
