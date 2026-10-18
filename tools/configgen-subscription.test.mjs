@@ -151,18 +151,19 @@ test('config generation supports IPv6 dual-stack and prevents FakeIP route exclu
   assert.equal(config.dns.strategy, 'prefer_ipv4');
 });
 
-test('config generation applies aggressive throughput MTU 65535 and GSO', () => {
+test('config generation applies aggressive throughput MTU 65535 without deprecated gso field', () => {
   const settings = defaultSettings();
   settings.network.tun.aggressive = true;
   const { config } = generateConfig(settings);
   const tun = config.inbounds.find((i) => i.tag === 'tun-in');
   assert.equal(tun.mtu, 65535);
-  assert.equal(tun.gso, true);
+  // 确保绝对不包含在 sing-box 1.12+ 中被移除的 gso 选项
+  assert.equal('gso' in tun, false);
 
   const safeSettings = defaultSettings();
   safeSettings.network.tun.aggressive = false;
   const { config: safeConfig } = generateConfig(safeSettings);
   const safeTun = safeConfig.inbounds.find((i) => i.tag === 'tun-in');
   assert.equal(safeTun.mtu, 1500);
-  assert.equal(safeTun.gso, undefined);
+  assert.equal('gso' in safeTun, false);
 });

@@ -568,7 +568,6 @@ function buildInbounds(settings, bypassSets = []) {
       interface_name: KERNEL.tunName,
       address: ['172.19.0.1/30'],
       mtu: tunMtu,
-      ...(isAggressive || network.tun?.gso ? { gso: true } : {}),
       auto_route: network.tun.autoRoute !== false,
       strict_route: Boolean(network.tun.strictRoute),
       udp_timeout: '60s',
