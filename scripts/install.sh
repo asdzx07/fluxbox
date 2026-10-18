@@ -15,7 +15,7 @@
 set -eu
 
 REPO="${REPO:-asdzx07/fluxbox}"
-BRANCH="main"
+BRANCH="${BRANCH:-v1}"
 ROOT=/opt/mybox
 PORT=""
 USE_MIRROR=0

@@ -8,7 +8,7 @@
 set -eu
 
 REPO="${REPO:-asdzx07/fluxbox}"
-BRANCH="main"
+BRANCH="${BRANCH:-v1}"
 ROOT=/opt/mybox
 USE_MIRROR=0
 SRC_DIR=""
