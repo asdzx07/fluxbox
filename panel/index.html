@@ -13,28 +13,34 @@
     <h1>MyBox</h1>
     <p id="gateHint">请输入面板密码</p>
     <label class="field">
-      <span>密码</span>
-      <input id="gatePassword" type="password" autocomplete="current-password" placeholder="至少 6 位">
+      <span>管理密码</span>
+      <input id="gatePassword" type="password" autocomplete="current-password" placeholder="至少 6 位字符">
     </label>
     <label class="field hidden" id="gateConfirmField">
-      <span>再输一次</span>
-      <input id="gateConfirm" type="password" autocomplete="new-password">
+      <span>确认密码</span>
+      <input id="gateConfirm" type="password" autocomplete="new-password" placeholder="再次输入密码">
     </label>
-    <button id="gateSubmit" class="primary" style="width:100%">进入</button>
-    <p id="gateError" class="err-text" style="margin:12px 0 0"></p>
+    <button id="gateSubmit" class="primary" style="width:100%;margin-top:8px;height:40px">进入控制面板</button>
+    <p id="gateError" class="err-text" style="margin:12px 0 0;text-align:center"></p>
   </div>
 </div>
 
 <div id="app" class="hidden">
   <aside class="sidebar">
-    <div class="brand">MyBox<small id="brandVersion">v1.20 (B110)</small></div>
+    <div class="brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+      </div>
+      <span>MyBox</span>
+      <small id="brandVersion">v1.20 (B106)</small>
+    </div>
     
-    <div class="sb-sec">导航</div>
+    <div class="sb-sec">核心控制台</div>
     <nav class="sb-nav">
       <!-- 1. 概览 -->
       <button data-tab="overview" class="active">
-        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></span>
-        <span class="nav-text">概览</span>
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>
+        <span class="nav-text">运行概览</span>
       </button>
 
       <!-- 2. 节点分组 -->
@@ -43,7 +49,7 @@
         <span class="nav-text">节点分组</span>
       </button>
 
-      <!-- 3. 订阅管理 (移到节点分组下方) -->
+      <!-- 3. 订阅管理 -->
       <button data-tab="subscriptions">
         <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/></svg></span>
         <span class="nav-text">订阅管理</span>
@@ -55,16 +61,16 @@
         <span class="nav-text">目标分流</span>
       </button>
 
-      <!-- 5. 当前连接 -->
-      <button data-tab="connections">
-        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
-        <span class="nav-text">当前连接</span>
-      </button>
-
-      <!-- 6. 内网分流 -->
+      <!-- 5. 内网分流 -->
       <button data-tab="clients">
         <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
         <span class="nav-text">内网分流</span>
+      </button>
+
+      <!-- 6. 当前连接 -->
+      <button data-tab="connections">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
+        <span class="nav-text">活动连接</span>
       </button>
 
       <!-- 7. 核心设置 -->
@@ -76,66 +82,118 @@
 
     <div class="sb-foot">
       <button id="btnGlobalDeploy" class="sb-deploy-btn" title="立即部署当前所有配置到内核">
-        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
-        <span class="nav-text">部署配置</span>
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
+        <span class="nav-text">一键热部署配置</span>
       </button>
       <button data-tab="logout" class="ghost">
         <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg></span>
-        退出登录
+        <span>退出登录</span>
       </button>
     </div>
   </aside>
 
   <main>
-    <!-- ---------------------------------------------------------- 1. 概览 -->
+    <!-- ---------------------------------------------------------- 1. 概览 (Bento Dashboard) -->
     <section class="page active" id="page-overview">
-      <h2>概览</h2>
+      <div class="page-head-with-actions">
+        <div>
+          <h2>运行概览</h2>
+          <p class="note">sing-box 透明代理网关实时状态监控与快捷调度中心</p>
+        </div>
+        <div class="head-actions">
+          <button class="small" id="btnRestart">
+            <svg class="btn-ic text-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            重启内核
+          </button>
+          <button class="small danger" id="btnStop">
+            <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+            停止内核
+          </button>
+        </div>
+      </div>
 
-      <div class="card hero">
-        <div class="hero-main">
+      <!-- 顶部四宫格 Bento KPI 状态矩阵 -->
+      <div class="bento-kpi-grid">
+        <div class="bento-kpi-card hero-kpi">
+          <div class="kpi-top">
+            <span class="kpi-label">SING-BOX 引擎状态</span>
+            <span class="kpi-pill">TUN / TProxy</span>
+          </div>
           <div class="hero-status">
             <span class="dot" id="heroDot"></span>
             <span id="statKernel">—</span>
           </div>
-          <div class="hero-meta hidden" id="overviewNote"></div>
+          <div class="kpi-foot">
+            <span id="overviewNote" class="hidden">等待状态同步…</span>
+            <span id="overviewHint" class="warn-text hidden"></span>
+          </div>
         </div>
-        <div class="hero-actions">
-          <button class="small" id="btnRestart">重启内核</button>
-          <button class="small danger" id="btnStop">停止内核</button>
+
+        <div class="bento-kpi-card" data-nav-tab="settings" style="cursor:pointer" title="点击前往核心设置">
+          <div class="kpi-top">
+            <span class="kpi-label">当前内核版本</span>
+            <svg class="kpi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg>
+          </div>
+          <div class="kpi-val num-mono" id="statVersion">—</div>
+          <div class="kpi-foot">官方 SagerNet 原版核心</div>
         </div>
-        <p class="warn-text hidden" id="overviewHint"></p>
+
+        <div class="bento-kpi-card" data-nav-tab="nodes" style="cursor:pointer" title="点击前往节点分组">
+          <div class="kpi-top">
+            <span class="kpi-label">可用节点总数</span>
+            <svg class="kpi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </div>
+          <div class="kpi-val num-mono" id="statNodes">—</div>
+          <div class="kpi-foot">支持 Clash API 0断流切换</div>
+        </div>
+
+        <div class="bento-kpi-card" data-nav-tab="policies" style="cursor:pointer" title="点击前往目标分流">
+          <div class="kpi-top">
+            <span class="kpi-label">激活分流策略</span>
+            <svg class="kpi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          </div>
+          <div class="kpi-val num-mono" id="statPolicies">—</div>
+          <div class="kpi-foot">自上而下按优先级命中</div>
+        </div>
       </div>
 
+      <!-- 中部：实时流量趋势图 + 系统硬件负载 -->
       <div class="grid-trend">
         <div class="card">
           <div class="card-head">
-            <h3>实时流量监控</h3>
+            <h3>实时吞吐量监控</h3>
             <div class="spacer"></div>
-            <span class="note" id="trafficLegend"><span class="lg up"></span>上传 <span class="lg down"></span>下载</span>
-            <button class="small" id="btnTrafficReset">清零</button>
+            <span class="note" id="trafficLegend">
+              <span class="lg up"></span>上行速率
+              <span class="lg down"></span>下行速率
+            </span>
+            <button class="small" id="btnTrafficReset">流量清零</button>
           </div>
-          <canvas id="trafficChart" height="120"></canvas>
+          <canvas id="trafficChart" height="128"></canvas>
           <div class="grid" style="margin-top:14px">
-            <div class="stat"><div class="k">↑ 实时上传</div><div class="v" id="statUp" style="color:var(--accent)">—</div></div>
-            <div class="stat"><div class="k">↓ 实时下载</div><div class="v" id="statDown" style="color:var(--ok)">—</div></div>
-            <div class="stat"><div class="k">累计上传</div><div class="v" id="statTotalUp">—</div></div>
-            <div class="stat"><div class="k">累计下载</div><div class="v" id="statTotalDown">—</div></div>
+            <div class="stat"><div class="k">↑ 实时上行</div><div class="v num-mono" id="statUp" style="color:var(--accent)">—</div></div>
+            <div class="stat"><div class="k">↓ 实时下行</div><div class="v num-mono" id="statDown" style="color:var(--ok)">—</div></div>
+            <div class="stat"><div class="k">累计上传总量</div><div class="v num-mono" id="statTotalUp">—</div></div>
+            <div class="stat"><div class="k">累计下载总量</div><div class="v num-mono" id="statTotalDown">—</div></div>
           </div>
         </div>
 
         <div class="card" id="cardSysResources">
           <div class="card-head">
-            <h3>系统资源</h3>
+            <h3>系统硬件负载</h3>
+            <div class="spacer"></div>
+            <span class="bdg">实时遥测</span>
           </div>
           <div id="sysResources"><p class="mini-empty">加载中…</p></div>
         </div>
       </div>
 
+      <!-- 底部：出口节点组快捷切换 + 订阅源联动过滤 -->
       <div class="grid-trend grow">
         <div class="card" id="cardOverviewGroups">
           <div class="card-head">
             <h3 class="card-title-link" data-nav-tab="nodes" title="点击前往「节点分组」页面">
-              <span>出口节点组</span>
+              <span>出口节点组快捷切换</span>
               <svg class="title-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </h3>
             <div class="spacer"></div>
@@ -148,7 +206,7 @@
         <div class="card" id="cardOverviewSubs">
           <div class="card-head">
             <h3 class="card-title-link" data-nav-tab="subscriptions" title="点击前往「订阅管理」页面">
-              <span>订阅管理</span>
+              <span>机场订阅源过滤</span>
               <svg class="title-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </h3>
             <div class="spacer"></div>
@@ -161,42 +219,45 @@
 
     <!-- ---------------------------------------------------------- 2. 节点分组 -->
     <section class="page" id="page-nodes">
-      <h2>节点分组</h2>
+      <div class="page-head-with-actions">
+        <div>
+          <h2>节点分组</h2>
+          <p class="note">点击节点卡片即可通过 Clash API 毫秒级无缝切换出口，<strong>不重启内核、不断流</strong></p>
+        </div>
+        <div class="head-actions">
+          <button class="small" id="btnCollapseAll">全部折叠/展开</button>
+          <button class="small" id="btnReloadNodes">刷新状态</button>
+          <button class="small" id="btnDeployFromNodes" title="立即部署当前配置">部署配置</button>
+          <button class="primary" id="btnTestAll">⚡ 并发全量测速</button>
+        </div>
+      </div>
 
       <div class="card">
         <div class="card-head">
-          <h3>出口节点管理</h3>
-          <div class="spacer"></div>
-          <button class="small" id="btnCollapseAll">全部折叠</button>
-          <button class="small" id="btnReloadNodes">刷新</button>
-          <button class="small" id="btnDeployFromNodes" title="立即部署当前配置">部署配置</button>
-          <button class="small primary" id="btnTestAll">⚡ 全部测速</button>
+          <h3>出站策略组面板</h3>
         </div>
-        <p class="note" style="margin:-4px 0 14px">
-          点击节点卡片即可无缝切换出口，通过内核 Clash API 切换，<strong>不重启内核、不断流</strong>。
-        </p>
         <div id="nodeGroups"></div>
       </div>
 
       <!-- 分组策略配置 -->
       <div class="card">
         <div class="card-head">
-          <h3>分组规则配置</h3>
+          <h3>自定义分组规则配置</h3>
           <div class="spacer"></div>
           <button class="small primary" id="btnAddGroup">＋ 新建分组</button>
         </div>
-        <p class="note" style="margin:-4px 0 12px">「自动择优」组按延迟选最快节点；「手动选择」组自己挑。动态组会按关键词自动收编新节点。</p>
+        <p class="note" style="margin:-4px 0 14px">「自动择优」组按延迟自动选最快节点；「手动选择」组可自由指定。动态组会按关键词自动收编匹配节点。</p>
         <div id="groupList"></div>
-        <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
-          <button class="primary" id="btnSaveDeployGroups">⚡ 保存并部署</button>
+        <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+          <button class="primary" id="btnSaveDeployGroups">⚡ 保存并热部署</button>
           <button id="btnSaveGroups">仅保存分组</button>
         </div>
       </div>
 
       <div class="card">
         <div class="card-head">
-          <h3>全部节点</h3>
-          <span class="note" id="nodeCount" style="margin-left:8px"></span>
+          <h3>全部节点池</h3>
+          <span class="bdg num-mono" id="nodeCount" style="margin-left:6px">0 个</span>
           <div class="spacer"></div>
           <div class="col-switcher" id="nodeColsSwitcher" role="group" aria-label="节点列数">
             <button type="button" class="col-btn" data-cols="1" title="单列排版">1 列</button>
@@ -214,7 +275,7 @@
       <div class="page-head-with-actions">
         <div>
           <h2>目标分流</h2>
-          <p class="note" style="margin-top:2px">自上而下匹配分流 · 未命中的流量走「兜底」代理出口 <span id="rulesetGlobalDate" style="margin-left:8px;color:var(--text-muted)">· 规则集更新时间：<span id="rulesetDateText">未更新</span></span></p>
+          <p class="note">自上而下拖拽调整匹配优先级 · 未命中的流量走「兜底」出口 <span id="rulesetGlobalDate" style="margin-left:8px;color:var(--text-3)">· 规则集同步：<span id="rulesetDateText">未更新</span></span></p>
         </div>
         <div class="head-actions">
           <button class="small" id="btnCollapseAllPolicies">全部折叠</button>
@@ -228,13 +289,13 @@
 
       <div id="policyList"></div>
 
-      <div class="card" style="margin-top:16px">
+      <div class="card" style="margin-top:20px">
         <div class="card-head">
-          <h3>自定义规则集订阅</h3>
+          <h3>自定义远程规则集订阅 (Rule-Set)</h3>
           <div class="spacer"></div>
           <button class="small primary" id="btnAddRulesetSub">＋ 添加规则集</button>
         </div>
-        <p class="note" style="margin:-6px 0 12px">添加第三方规则集 URL（如广告过滤、特定分流），改动后自动保存。</p>
+        <p class="note" style="margin:-6px 0 14px">引入第三方 `.srs` 二进制或 `.json` 规则集 URL（如特定流媒体、游戏或去广告分流），改动后自动保存。</p>
         <div id="rulesetSubList"></div>
       </div>
     </section>
@@ -243,8 +304,8 @@
     <section class="page" id="page-connections">
       <div class="page-head-with-actions">
         <div>
-          <h2>当前连接</h2>
-          <p class="note" style="margin-top:2px">展示由 sing-box 透明代理接管的实时活动连接与流量传输</p>
+          <h2>活动连接</h2>
+          <p class="note">实时监控经过 sing-box 透明代理接管的活动会话、匹配规则与上下行链路流量</p>
         </div>
         <div class="head-actions">
           <button class="small danger" id="btnCloseAllConns" title="彻底断开并清空所有当前活动连接">
@@ -253,84 +314,93 @@
           </button>
           <button class="small" id="btnConnsRefresh" title="恢复显示并刷新所有连接">
             <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            刷新
+            刷新列表
           </button>
         </div>
       </div>
 
       <div class="card">
         <div class="card-head" style="flex-wrap:wrap;gap:10px">
-          <div style="display:flex;align-items:center;gap:6px;flex:1 1 260px">
-            <input type="search" id="connSearch" placeholder="搜索连接 (域名/IP/规则/链路)..." style="font-size:12px;padding:5px 10px;height:32px;flex:1;max-width:320px">
-            <button class="small" id="btnClearConnRecords" style="height:32px;padding:0 12px" title="清空当前页面显示的连接记录，方便观察后续新产生的连接">清空记录</button>
+          <div style="display:flex;align-items:center;gap:8px;flex:1 1 280px">
+            <input type="search" id="connSearch" placeholder="🔍 过滤连接 (域名 / 目标 IP / 命中的规则 / 出站链路)..." style="font-size:12.5px;padding:6px 12px;height:34px;flex:1;max-width:380px">
+            <button class="small" id="btnClearConnRecords" style="height:34px;padding:0 12px" title="清空当前页面显示的连接记录，方便观察后续新产生的连接">屏蔽现有连接</button>
           </div>
           <div class="spacer"></div>
-          <span class="note" id="connPageCount"></span>
+          <span class="bdg num-mono" id="connPageCount">0 条连接</span>
         </div>
         <div id="connsList"></div>
       </div>
     </section>
 
-    <!-- ---------------------------------------------------------- 5. 内网分流 (NEW) -->
+    <!-- ---------------------------------------------------------- 5. 内网分流 -->
     <section class="page" id="page-clients">
-      <h2>内网分流</h2>
-      <p class="note" style="margin:-6px 0 14px">
-        按局域网设备 IP 划分代理策略（如 NAS 下载机强制直连不封号，电视盒子全局走代理，手机电脑走规则分流）。
-      </p>
+      <div class="page-head-with-actions">
+        <div>
+          <h2>内网设备分流</h2>
+          <p class="note">按局域网客户端 IP 独立指定代理策略（如 NAS/PT 下载机强制直连、Apple TV 走全局代理、手机电脑走规则分流）</p>
+        </div>
+        <div class="head-actions">
+          <button class="small" id="btnScanClients">🔍 扫描局域网设备</button>
+          <button class="small" id="btnDeployClients" title="立即部署当前配置">部署配置</button>
+          <button class="primary" id="btnAddClient">＋ 手动添加设备</button>
+        </div>
+      </div>
 
       <div class="card">
         <div class="card-head">
-          <h3>局域网设备控制</h3>
+          <h3>局域网客户端策略表</h3>
           <div class="spacer"></div>
-          <button class="small" id="btnScanClients">刷新设备列表</button>
-          <button class="small" id="btnDeployClients" title="立即部署当前配置">部署配置</button>
-          <button class="small primary" id="btnAddClient">＋ 添加设备</button>
+          <span class="note">未单独指定的局域网设备默认走「规则分流」</span>
         </div>
         <div id="clientList"></div>
-        <p class="note" style="margin-top:12px">
-          通过系统 iptables/nftables 标记或路由旁路分流，未单独设置的局域网设备默认走「规则分流」。
-        </p>
       </div>
     </section>
 
     <!-- ---------------------------------------------------------- 6. 订阅管理 -->
     <section class="page" id="page-subscriptions">
-      <h2>订阅管理</h2>
-
-      <div class="card">
-        <h3>添加订阅</h3>
-        <div class="row">
-          <label class="field" style="flex:1 1 180px"><span>名称</span><input id="subName" placeholder="例如：极速机场主线"></label>
-          <label class="field" style="flex:2 1 280px"><span>订阅地址</span><input id="subUrl" placeholder="https://..."></label>
-          <div class="fixed"><button class="primary" id="btnAddSub">添加并拉取</button></div>
+      <div class="page-head-with-actions">
+        <div>
+          <h2>订阅管理</h2>
+          <p class="note">支持一键拉取解析 sing-box JSON、Clash Meta YAML 及 Base64 通用节点订阅链接</p>
         </div>
-        <p class="note">支持 sing-box JSON、Clash YAML、base64 分享链接。</p>
+        <div class="head-actions">
+          <button class="small" id="btnRefreshSubs">全部拉取更新</button>
+          <button class="primary" id="btnDeploySubs">⚡ 立即部署配置</button>
+        </div>
       </div>
 
       <div class="card">
         <div class="card-head">
-          <h3>已有订阅</h3>
-          <div class="spacer"></div>
-          <button class="small" id="btnRefreshSubs">全部刷新</button>
-          <button class="small primary" id="btnDeploySubs">⚡ 部署配置</button>
+          <h3>添加新订阅源</h3>
         </div>
-        <p class="note" id="subSwitchNote" style="margin:-4px 0 12px"></p>
+        <div class="row">
+          <label class="field" style="flex:1 1 180px;margin-bottom:0"><span>订阅备注名称</span><input id="subName" placeholder="例如：主力机场 IPLC"></label>
+          <label class="field" style="flex:2.5 1 300px;margin-bottom:0"><span>订阅 URL 地址</span><input id="subUrl" placeholder="https://..."></label>
+          <div class="fixed"><button class="primary" id="btnAddSub" style="height:36px">＋ 添加并拉取</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>已配置的订阅源</h3>
+          <div class="spacer"></div>
+          <span class="note" id="subSwitchNote"></span>
+        </div>
         <div class="list" id="subList"></div>
       </div>
     </section>
 
-    <!-- ---------------------------------------------------------- 7. 核心设置 -->
+    <!-- ---------------------------------------------------------- 7. 核心设置 (带胶囊分段导航) -->
     <section class="page" id="page-settings">
       <div class="page-head-with-actions">
         <div>
           <div class="page-title-row">
             <h2>核心设置</h2>
-            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B110)</span>
+            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B106)</span>
           </div>
-          <p class="note" style="margin-top:2px">网络栈协议、DNS 策略、内核系统及版本更新管理</p>
+          <p class="note" style="margin-top:2px">底层透明代理网络栈、DNS 防污染分流、广告拦截、版本升级与实时内核终端</p>
         </div>
         <div class="head-actions">
-          <!-- 按钮 1: 检查更新 / 立即更新 -->
           <button class="small" id="btnCheckSysUpdate">
             <svg class="btn-ic text-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
             <span id="checkUpdateBtnText">检查更新</span>
@@ -339,366 +409,181 @@
             <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
             <span id="sysUpdateBtnText">立即更新</span>
           </button>
-
-          <!-- 按钮 2: 内核更新 -->
           <button class="small" id="btnInstallKernel">
             <svg class="btn-ic text-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
             <span id="kernelBtnText">内核更新</span>
           </button>
-
-          <!-- 按钮 3: 保存并部署 -->
-          <button class="primary" id="btnSaveSettings" style="min-width:116px">
-            <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
+          <button class="primary" id="btnSaveSettings" style="min-width:124px">
+            <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 13l4 4L19 7"/></svg>
             <span id="saveSettingsBtnText">保存并部署</span>
           </button>
         </div>
       </div>
 
-      <!-- 核心卡片 1: 版本状态展板 -->
-      <div class="card">
-        <div class="card-head">
-          <h3>版本信息与在线状态</h3>
-          <div class="spacer"></div>
-          <span class="bdg" id="versionStatusBadge">已连接官方源</span>
-        </div>
-        <p class="note" style="margin:-4px 0 10px">采用标准语义化版本号 (SemVer) 与 GitHub 官方源自动对齐</p>
-        <div class="version-cards-grid">
-          <!-- 面板版本卡 -->
-          <div class="version-mini-card">
-            <div class="vmc-top">
-              <span>MyBox 控制面板</span>
-              <span class="bdg" id="panelUpdateBadge">当前已是最新</span>
+      <!-- 胶囊分段控制器 (Segmented Pill Tabs) 解决长页面滚动 -->
+      <div class="settings-subnav" id="settingsSubNav">
+        <button type="button" class="subnav-pill active" data-stab="netdns">🌐 网络栈与 DNS</button>
+        <button type="button" class="subnav-pill" data-stab="adblock">🛡️ DNS 广告拦截</button>
+        <button type="button" class="subnav-pill" data-stab="security">🔑 版本与面板安全</button>
+        <button type="button" class="subnav-pill" data-stab="logs">💻 内核运行日志</button>
+      </div>
+
+      <!-- 子标签页 1: 网络栈与 DNS -->
+      <div class="stab-pane active" id="stab-netdns">
+        <div class="settings-two-col-grid">
+          <div class="card">
+            <div class="card-head">
+              <h3>网络与 TUN 透明代理栈</h3>
+              <div class="spacer"></div>
+              <span class="bdg">底层转发</span>
             </div>
-            <div class="vmc-val">
-              <span id="sysVersion">MyBox: v1.20 (B110)</span>
-            </div>
-            <div class="vmc-foot">
-              <span>最新版本：<strong id="latestSysVersion">MyBox: v1.20 (B110)</strong></span>
-              <span id="panelCheckTime">刚刚检查</span>
+            <div class="setting-list">
+              <div class="setting-item">
+                <div class="grow">
+                  <div class="title">国内直连不进内核 (零损耗 Bypass)</div>
+                  <div class="sub">大陆 IP 集合在 TUN 路由层直接放行，流量不经过 sing-box 用户态，跑满千兆/万兆带宽</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setDirectBypass">
+                  <span></span>
+                </label>
+              </div>
+
+              <div class="setting-item">
+                <div class="grow">
+                  <div class="title">nftables 自动硬件级转发 (auto_redirect)</div>
+                  <div class="sub">由 Linux 内核 nftables 高效劫持并透明转发局域网流量</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setAutoRedirect">
+                  <span></span>
+                </label>
+              </div>
+
+              <div class="setting-item">
+                <div class="grow">
+                  <div class="title">代理节点服务器 IP 强制直连</div>
+                  <div class="sub">防止节点服务器自身握手流量产生回环死锁</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setDirectForNodes">
+                  <span></span>
+                </label>
+              </div>
+
+              <div class="setting-item">
+                <div class="grow">
+                  <div class="title">屏蔽 QUIC 协议 (UDP 443)</div>
+                  <div class="sub">阻断 HTTP/3 QUIC 流量，强制回退至更稳定、不易被运营商 QoS 限速的 TCP 链路</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setRejectQuic">
+                  <span></span>
+                </label>
+              </div>
+
+              <div class="setting-item">
+                <div class="grow">
+                  <div class="title">启用 IPv6 流量接管</div>
+                  <div class="sub">接管并分流局域网 IPv6 流量（若宽带无原生 IPv6 建议关闭以防连接拖慢）</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setIpv6">
+                  <span></span>
+                </label>
+              </div>
             </div>
           </div>
 
-          <!-- 内核版本卡 -->
-          <div class="version-mini-card">
-            <div class="vmc-top">
-              <span>sing-box 官方内核</span>
-              <span class="bdg" id="kernelStatusBadge">SagerNet 原版</span>
+          <div class="card">
+            <div class="card-head">
+              <h3>DNS 防污染分流与运行级别</h3>
+              <div class="spacer"></div>
+              <span class="bdg">防泄漏</span>
             </div>
-            <div class="vmc-val">
-              <span id="setKernelVersion">v1.15.0-alpha.12</span>
-              <small style="color:var(--ok)">● 运行中</small>
+
+            <div class="dns-grid">
+              <label class="field">
+                <span class="field-title">系统 DNS 接管方式</span>
+                <select id="setDnsMode">
+                  <option value="dnsmasq">dnsmasq 接管（推荐）</option>
+                  <option value="off">不接管（手动配置上游 DNS）</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span class="field-title">内核日志输出级别</span>
+                <select id="setLogLevel">
+                  <option value="info">info（标准推荐）</option>
+                  <option value="warn">warn（仅警告与错误）</option>
+                  <option value="error">error（仅严重错误）</option>
+                  <option value="debug">debug（调试详细信息）</option>
+                  <option value="trace">trace（全量链路追踪）</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span class="field-title">国内直连 DNS 服务器</span>
+                <input id="setDnsDirect" class="num-mono" placeholder="223.5.5.5">
+              </label>
+
+              <label class="field">
+                <span class="field-title">海外代理 DNS 服务器</span>
+                <input id="setDnsProxy" class="num-mono" placeholder="1.1.1.1">
+              </label>
+
+              <label class="field">
+                <span class="field-title">IP 解析偏好策略 (Strategy)</span>
+                <select id="setDnsStrategy">
+                  <option value="prefer_ipv4">优先 IPv4（推荐，兼容性最佳）</option>
+                  <option value="ipv4_only">仅 IPv4（彻底屏蔽 AAAA 记录）</option>
+                  <option value="prefer_ipv6">优先 IPv6（纯 IPv6 环境）</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span class="field-title">远程代理 DNS 传输协议</span>
+                <select id="setDnsProxyProtocol">
+                  <option value="tcp">TCP 代理隧道传输（防污染推荐）</option>
+                  <option value="udp">UDP 传输（极速低延迟）</option>
+                </select>
+              </label>
             </div>
-            <div class="vmc-foot">
-              <span>最新版本：<strong id="latestKernelVer">v1.15.0-alpha.12</strong></span>
-              <span class="note" id="kernelUpdateNote"></span>
+
+            <div class="setting-list" style="margin-top:auto;padding-top:12px;border-top:1px solid var(--border)">
+              <div class="setting-item" style="padding:9px 6px">
+                <div class="grow">
+                  <div class="title">海外代理域名启用 FakeIP</div>
+                  <div class="sub">立即返回虚拟保留 IP，省去远程 DNS 往返等待，大幅加速网页首屏打开速度</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setFakeIp">
+                  <span></span>
+                </label>
+              </div>
+
+              <div class="setting-item" style="padding:9px 6px">
+                <div class="grow">
+                  <div class="title">国内外域名智能分流解析</div>
+                  <div class="sub">国内域名走直连 DNS 拿最佳 CDN，海外域名走代理通道防 DNS 抢答污染</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setDnsSplit">
+                  <span></span>
+                </label>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 核心设置双列网格: 左右 2 张大卡片并列 -->
-      <div class="settings-two-col-grid">
-        <!-- 核心卡片 1: DNS 分流与规则配置 (参数与名单集中区 - 放置于左侧) -->
-        <div class="card" style="display:flex; flex-direction:column;">
+      <!-- 子标签页 2: DNS 广告拦截 -->
+      <div class="stab-pane" id="stab-adblock">
+        <div class="card">
           <div class="card-head">
-            <h3>DNS 分流与规则配置</h3>
+            <h3>DNS 级广告过滤与黑白名单控制</h3>
             <div class="spacer"></div>
-            <span class="bdg" style="border-color:rgba(16,185,129,0.3);color:var(--ok)">参数设置 &amp; 名单</span>
-          </div>
-
-          <!-- 核心解析与日志参数 (双列网格) -->
-          <div class="dns-grid">
-            <label class="field">
-              <span class="field-title">接管方式</span>
-              <select id="setDnsMode">
-                <option value="dnsmasq">dnsmasq 接管（推荐）</option>
-                <option value="off">不接管（自行配置系统 DNS）</option>
-              </select>
-            </label>
-
-            <label class="field">
-              <span class="field-title">内核日志级别</span>
-              <select id="setLogLevel">
-                <option value="info">info（标准推荐）</option>
-                <option value="warn">warn（仅警告与错误）</option>
-                <option value="error">error（仅严重错误）</option>
-                <option value="debug">debug（调试详细信息）</option>
-                <option value="trace">trace（全量链路追踪）</option>
-              </select>
-            </label>
-
-            <label class="field">
-              <span class="field-title">直连 DNS 服务器</span>
-              <input id="setDnsDirect" placeholder="223.5.5.5">
-            </label>
-
-            <label class="field">
-              <span class="field-title">代理 DNS 服务器</span>
-              <input id="setDnsProxy" placeholder="1.1.1.1">
-            </label>
-
-            <label class="field">
-              <span class="field-title">解析策略 (Strategy)</span>
-              <select id="setDnsStrategy">
-                <option value="prefer_ipv4">优先 IPv4（推荐，最稳定）</option>
-                <option value="ipv4_only">仅 IPv4（屏蔽 AAAA 记录）</option>
-                <option value="prefer_ipv6">优先 IPv6（纯 IPv6 环境）</option>
-              </select>
-            </label>
-
-            <label class="field">
-              <span class="field-title">代理 DNS 传输协议</span>
-              <select id="setDnsProxyProtocol">
-                <option value="tcp">TCP 传输（推荐，防 DNS 污染）</option>
-                <option value="udp">UDP 传输（极速低延迟）</option>
-              </select>
-            </label>
-          </div>
-
-          <!-- 广告过滤黑白名单 (双列文本域并排，高度铺满卡片) -->
-          <div class="dns-rules-grid">
-            <label class="field">
-              <span class="field-title">手动广告黑名单（强制拦截）</span>
-              <textarea id="setAdblockCustom" placeholder="每行一个域名，例如：&#10;ads.example.com&#10;adservice.google.com"></textarea>
-            </label>
-            <label class="field">
-              <span class="field-title">广告白名单（放行防误杀）</span>
-              <textarea id="setAdblockAllow" placeholder="每行一个域名，例如：&#10;example.com&#10;analytics.trusted.org"></textarea>
-            </label>
-          </div>
-
-          <!-- 底部规则更新操作栏 -->
-          <div class="dns-rules-foot">
-            <span class="note">远程 Geosite 规则集每日自动同步 <span id="adblockRulesetDate" style="margin-left:6px;color:var(--text-muted)">(上次更新: <span id="adblockRulesetDateText">未更新</span>)</span></span>
-            <button class="small" id="btnAdblockRefresh">
-              <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              <span id="btnAdblockRefreshText">更新广告规则集</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- 核心卡片 2: 网络特性与功能开关 (全开关集中区 - 放置于右侧) -->
-        <div class="card" style="display:flex; flex-direction:column;">
-          <div class="card-head">
-            <h3>网络特性与功能开关</h3>
-            <div class="spacer"></div>
-            <span class="bdg">11 项特性开关</span>
-          </div>
-
-          <div class="setting-list" style="gap:0">
-            <!-- 1. 直连不进内核 -->
-            <div class="setting-item-clean">
-              <span class="title-clean">直连不进内核 (零损耗)</span>
-              <label class="switch">
-                <input type="checkbox" id="setDirectBypass">
-                <span></span>
-              </label>
-            </div>
-
-            <!-- 2. nftables 转发 -->
-            <div class="setting-item-clean">
-              <span class="title-clean">nftables 转发 (auto_redirect)</span>
-              <label class="switch">
-                <input type="checkbox" id="setAutoRedirect">
-                <span></span>
-              </label>
-            </div>
-
-            <!-- 3. 严格路由保护 (strict_route) -->
-            <div class="setting-item-clean">
-              <span class="title-clean">严格路由保护 (strict_route)</span>
-              <label class="switch">
-                <input type="checkbox" id="setStrictRoute">
-                <span></span>
-              </label>
-            </div>
-
-            <!-- 4. 节点服务器直连 -->
-            <div class="setting-item-clean">
-              <span class="title-clean">节点服务器直连</span>
-              <label class="switch">
-                <input type="checkbox" id="setDirectForNodes">
-                <span></span>
-              </label>
-            </div>
-
-            <!-- 5. 屏蔽 QUIC (UDP 443) -->
-            <div class="setting-item-clean">
-              <span class="title-clean">屏蔽 QUIC (UDP 443)</span>
-              <label class="switch">
-                <input type="checkbox" id="setRejectQuic">
-                <span></span>
-              </label>
-            </div>
-
-            <!-- 6. 流量协议嗅探 (SNI / Host) -->
-            <div class="setting-item-clean">
-              <span class="title-clean">流量协议嗅探 (SNI / Host)</span>
-              <label class="switch">
-                <input type="checkbox" id="setSniff">
-                <span></span>
-              </label>
-            </div>
-
-            <!-- 7. 启用 IPv6 -->
-            <div class="setting-item-clean">
-              <span class="title-clean">启用 IPv6</span>
-              <label class="switch">
-                <input type="checkbox" id="setIpv6">
-                <span></span>
-              </label>
-            </div>
-
-            <!-- 8. 代理域名使用 FakeIP -->
-            <div class="setting-item-clean">
-              <span class="title-clean">代理域名使用 FakeIP</span>
-              <label class="switch">
-                <input type="checkbox" id="setFakeIp">
-                <span></span>
-              </label>
-            </div>
-
-            <!-- 9. 国内外域名智能分流解析 -->
-            <div class="setting-item-clean">
-              <span class="title-clean">国内外域名智能分流解析</span>
-              <label class="switch">
-                <input type="checkbox" id="setDnsSplit">
-                <span></span>
-              </label>
-            </div>
-
-            <!-- 10. DNS 广告过滤拦截 -->
-            <div class="setting-item-clean">
-              <span class="title-clean">DNS 广告过滤拦截</span>
-              <label class="switch">
-                <input type="checkbox" id="setAdblock">
-                <span></span>
-              </label>
-            </div>
-
-            <!-- 11. 内核开机自启与进程守护 -->
-            <div class="setting-item-clean">
-              <span class="title-clean">内核开机自启与进程守护</span>
-              <label class="switch">
-                <input type="checkbox" id="setAutoStart">
-                <span></span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 核心卡片 4: 面板安全与管理密码修改 -->
-      <div class="card">
-        <div class="card-head">
-          <h3>面板安全设置</h3>
-          <div class="spacer"></div>
-          <span class="bdg" id="pwdStatusBadge">密码保护已启用</span>
-        </div>
-        <p class="note" style="margin:-4px 0 16px">
-          修改旁路由 MyBox 面板的管理访问密码。保存后所有已发放的历史登录凭据将立即失效。
-        </p>
-
-        <div class="pwd-row-form">
-          <label class="field">
-            <span class="field-title">当前管理密码</span>
-            <input type="password" id="setCurrPassword" autocomplete="current-password" placeholder="请输入当前密码">
-            <span class="field-hint">验证当前管理员身份</span>
-          </label>
-
-          <label class="field">
-            <span class="field-title">新管理密码</span>
-            <input type="password" id="setNewPassword" autocomplete="new-password" placeholder="至少 6 位新密码">
-            <span class="field-hint">长度至少 6 位</span>
-          </label>
-
-          <label class="field">
-            <span class="field-title">确认新密码</span>
-            <input type="password" id="setConfirmPassword" autocomplete="new-password" placeholder="再次输入新密码">
-            <span class="field-hint">确保两次输入一致</span>
-          </label>
-
-          <div class="pwd-btn-box">
-            <button class="primary" id="btnUpdatePassword">
-              <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-              修改密码
-            </button>
-            <span class="field-hint" id="pwdChangeHint">自动轮换安全密钥</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 核心卡片 5: 内核运行日志 -->
-      <div class="card">
-        <div class="card-head">
-          <h3>内核运行日志</h3>
-          <div class="spacer"></div>
-          <input id="logSearch" placeholder="搜索日志…" style="width:180px">
-          <label class="inline note"><input type="checkbox" id="logAuto" style="width:auto"> 自动刷新</label>
-          <button class="small" id="btnLog">刷新</button>
-        </div>
-        <pre class="log" id="kernelLog">—</pre>
-      </div>
-    </section>
-  </main>
-</div>
-
-<!-- 内网设备编辑/添加弹窗 -->
-<div id="clientModal" class="modal-overlay hidden">
-  <div class="modal-card">
-    <h3 id="modalTitle">编辑内网设备</h3>
-    <input type="hidden" id="modalClientIndex" value="-1">
-    <label class="field">
-      <span>设备名称 / 备注</span>
-      <input id="modalClientName" placeholder="例如：客厅 Apple TV、群晖 NAS">
-    </label>
-    <label class="field">
-      <span>设备 IP 地址</span>
-      <input id="modalClientIp" placeholder="例如：192.168.1.188">
-    </label>
-    <label class="field">
-      <span>分流策略</span>
-      <select id="modalClientMode">
-        <option value="rule">规则分流 (推荐)</option>
-        <option value="proxy">全局代理</option>
-        <option value="direct">完全直连 (绕过代理)</option>
-      </select>
-    </label>
-    <div class="modal-actions">
-      <button class="small" id="btnCancelClientModal">取消</button>
-      <button class="small primary" id="btnSaveClientModal">保存</button>
-    </div>
-  </div>
-</div>
-
-<!-- 自定义规则集订阅添加弹窗 -->
-<div id="rulesetModal" class="modal-overlay hidden">
-  <div class="modal-card">
-    <h3>添加自定义规则集订阅</h3>
-    <p class="note" style="margin-bottom:12px">支持引入第三方 geosite / geoip 远程规则集（如特殊分流、去广告等）</p>
-    <label class="field">
-      <span>规则集标识 (Tag)</span>
-      <input id="modalRsTag" placeholder="例如：geosite-apple 或 custom-ads">
-    </label>
-    <label class="field">
-      <span>规则集订阅 URL</span>
-      <input id="modalRsUrl" placeholder="https://raw.githubusercontent.com/.../geosite.srs">
-    </label>
-    <label class="field">
-      <span>格式类型</span>
-      <select id="modalRsFormat">
-        <option value="binary">Binary 二进制 (.srs，性能最佳)</option>
-        <option value="source">Source 源码 (.json)</option>
-      </select>
-    </label>
-    <div class="modal-actions">
-      <button class="small" id="btnCancelRulesetModal">取消</button>
-      <button class="small primary" id="btnSaveRulesetModal">添加并保存</button>
-    </div>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
-<script src="./app.js"></script>
-</body>
-</html>
+            <span class="note" style="margin-right:6px">启用全局去广告拦截</span>
+            <label class="switch" title="开启/关闭广告过滤">
+              <input type="checkbox" id="setAdblock">
+              <span></span>
