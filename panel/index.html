@@ -27,7 +27,7 @@
 
 <div id="app" class="hidden">
   <aside class="sidebar">
-    <div class="brand">MyBox<small id="brandVersion">v1.20 (B109)</small></div>
+    <div class="brand">MyBox<small id="brandVersion">v1.20 (B110)</small></div>
     
     <div class="sb-sec">导航</div>
     <nav class="sb-nav">
@@ -325,7 +325,7 @@
         <div>
           <div class="page-title-row">
             <h2>核心设置</h2>
-            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B109)</span>
+            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B110)</span>
           </div>
           <p class="note" style="margin-top:2px">网络栈协议、DNS 策略、内核系统及版本更新管理</p>
         </div>
@@ -370,10 +370,10 @@
               <span class="bdg" id="panelUpdateBadge">当前已是最新</span>
             </div>
             <div class="vmc-val">
-              <span id="sysVersion">MyBox: v1.20 (B109)</span>
+              <span id="sysVersion">MyBox: v1.20 (B110)</span>
             </div>
             <div class="vmc-foot">
-              <span>最新版本：<strong id="latestSysVersion">MyBox: v1.20 (B109)</strong></span>
+              <span>最新版本：<strong id="latestSysVersion">MyBox: v1.20 (B110)</strong></span>
               <span id="panelCheckTime">刚刚检查</span>
             </div>
           </div>
@@ -398,7 +398,86 @@
 
       <!-- 核心设置双列网格: 左右 2 张大卡片并列 -->
       <div class="settings-two-col-grid">
-        <!-- 核心卡片 1: 网络特性与功能开关 (全开关集中区) -->
+        <!-- 核心卡片 1: DNS 分流与规则配置 (参数与名单集中区 - 放置于左侧) -->
+        <div class="card" style="display:flex; flex-direction:column;">
+          <div class="card-head">
+            <h3>DNS 分流与规则配置</h3>
+            <div class="spacer"></div>
+            <span class="bdg" style="border-color:rgba(16,185,129,0.3);color:var(--ok)">参数设置 &amp; 名单</span>
+          </div>
+
+          <!-- 核心解析与日志参数 (双列网格) -->
+          <div class="dns-grid">
+            <label class="field">
+              <span class="field-title">接管方式</span>
+              <select id="setDnsMode">
+                <option value="dnsmasq">dnsmasq 接管（推荐）</option>
+                <option value="off">不接管（自行配置系统 DNS）</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field-title">内核日志级别</span>
+              <select id="setLogLevel">
+                <option value="info">info（标准推荐）</option>
+                <option value="warn">warn（仅警告与错误）</option>
+                <option value="error">error（仅严重错误）</option>
+                <option value="debug">debug（调试详细信息）</option>
+                <option value="trace">trace（全量链路追踪）</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field-title">直连 DNS 服务器</span>
+              <input id="setDnsDirect" placeholder="223.5.5.5">
+            </label>
+
+            <label class="field">
+              <span class="field-title">代理 DNS 服务器</span>
+              <input id="setDnsProxy" placeholder="1.1.1.1">
+            </label>
+
+            <label class="field">
+              <span class="field-title">解析策略 (Strategy)</span>
+              <select id="setDnsStrategy">
+                <option value="prefer_ipv4">优先 IPv4（推荐，最稳定）</option>
+                <option value="ipv4_only">仅 IPv4（屏蔽 AAAA 记录）</option>
+                <option value="prefer_ipv6">优先 IPv6（纯 IPv6 环境）</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field-title">代理 DNS 传输协议</span>
+              <select id="setDnsProxyProtocol">
+                <option value="tcp">TCP 传输（推荐，防 DNS 污染）</option>
+                <option value="udp">UDP 传输（极速低延迟）</option>
+              </select>
+            </label>
+          </div>
+
+          <!-- 广告过滤黑白名单 (双列文本域并排，高度铺满卡片) -->
+          <div class="dns-rules-grid">
+            <label class="field">
+              <span class="field-title">手动广告黑名单（强制拦截）</span>
+              <textarea id="setAdblockCustom" placeholder="每行一个域名，例如：&#10;ads.example.com&#10;adservice.google.com"></textarea>
+            </label>
+            <label class="field">
+              <span class="field-title">广告白名单（放行防误杀）</span>
+              <textarea id="setAdblockAllow" placeholder="每行一个域名，例如：&#10;example.com&#10;analytics.trusted.org"></textarea>
+            </label>
+          </div>
+
+          <!-- 底部规则更新操作栏 -->
+          <div class="dns-rules-foot">
+            <span class="note">远程 Geosite 规则集每日自动同步 <span id="adblockRulesetDate" style="margin-left:6px;color:var(--text-muted)">(上次更新: <span id="adblockRulesetDateText">未更新</span>)</span></span>
+            <button class="small" id="btnAdblockRefresh">
+              <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span id="btnAdblockRefreshText">更新广告规则集</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 核心卡片 2: 网络特性与功能开关 (全开关集中区 - 放置于右侧) -->
         <div class="card" style="display:flex; flex-direction:column;">
           <div class="card-head">
             <h3>网络特性与功能开关</h3>
@@ -505,85 +584,6 @@
                 <span></span>
               </label>
             </div>
-          </div>
-        </div>
-
-        <!-- 核心卡片 2: DNS 分流与规则配置 (参数与名单集中区) -->
-        <div class="card" style="display:flex; flex-direction:column;">
-          <div class="card-head">
-            <h3>DNS 分流与规则配置</h3>
-            <div class="spacer"></div>
-            <span class="bdg" style="border-color:rgba(16,185,129,0.3);color:var(--ok)">参数设置 &amp; 名单</span>
-          </div>
-
-          <!-- 核心解析与日志参数 (双列网格) -->
-          <div class="dns-grid">
-            <label class="field">
-              <span class="field-title">接管方式</span>
-              <select id="setDnsMode">
-                <option value="dnsmasq">dnsmasq 接管（推荐）</option>
-                <option value="off">不接管（自行配置系统 DNS）</option>
-              </select>
-            </label>
-
-            <label class="field">
-              <span class="field-title">内核日志级别</span>
-              <select id="setLogLevel">
-                <option value="info">info（标准推荐）</option>
-                <option value="warn">warn（仅警告与错误）</option>
-                <option value="error">error（仅严重错误）</option>
-                <option value="debug">debug（调试详细信息）</option>
-                <option value="trace">trace（全量链路追踪）</option>
-              </select>
-            </label>
-
-            <label class="field">
-              <span class="field-title">直连 DNS 服务器</span>
-              <input id="setDnsDirect" placeholder="223.5.5.5">
-            </label>
-
-            <label class="field">
-              <span class="field-title">代理 DNS 服务器</span>
-              <input id="setDnsProxy" placeholder="1.1.1.1">
-            </label>
-
-            <label class="field">
-              <span class="field-title">解析策略 (Strategy)</span>
-              <select id="setDnsStrategy">
-                <option value="prefer_ipv4">优先 IPv4（推荐，最稳定）</option>
-                <option value="ipv4_only">仅 IPv4（屏蔽 AAAA 记录）</option>
-                <option value="prefer_ipv6">优先 IPv6（纯 IPv6 环境）</option>
-              </select>
-            </label>
-
-            <label class="field">
-              <span class="field-title">代理 DNS 传输协议</span>
-              <select id="setDnsProxyProtocol">
-                <option value="tcp">TCP 传输（推荐，防 DNS 污染）</option>
-                <option value="udp">UDP 传输（极速低延迟）</option>
-              </select>
-            </label>
-          </div>
-
-          <!-- 广告过滤黑白名单 (双列文本域并排，高度铺满卡片) -->
-          <div class="dns-rules-grid">
-            <label class="field">
-              <span class="field-title">手动广告黑名单（强制拦截）</span>
-              <textarea id="setAdblockCustom" placeholder="每行一个域名，例如：&#10;ads.example.com&#10;adservice.google.com"></textarea>
-            </label>
-            <label class="field">
-              <span class="field-title">广告白名单（放行防误杀）</span>
-              <textarea id="setAdblockAllow" placeholder="每行一个域名，例如：&#10;example.com&#10;analytics.trusted.org"></textarea>
-            </label>
-          </div>
-
-          <!-- 底部规则更新操作栏 -->
-          <div class="dns-rules-foot">
-            <span class="note">远程 Geosite 规则集每日自动同步 <span id="adblockRulesetDate" style="margin-left:6px;color:var(--text-muted)">(上次更新: <span id="adblockRulesetDateText">未更新</span>)</span></span>
-            <button class="small" id="btnAdblockRefresh">
-              <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              <span id="btnAdblockRefreshText">更新广告规则集</span>
-            </button>
           </div>
         </div>
       </div>
