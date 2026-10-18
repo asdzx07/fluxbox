@@ -1,9 +1,10 @@
 import crypto from 'node:crypto';
 import { loadRulesetMeta, refreshRulesets, formatDateTime } from '../lib/rulesets.mjs';
 
-export const UPDATE_SCRIPT_SHA256 = 'bed9b1d8c6fc2088a6cbcfa303c0157e98d069a53620fc73daa16d86c609cf5a';
+export const UPDATE_SCRIPT_SHA256 = '2046d836791a3f6ce3552a04616cde9da6bf2f694e7c8e589ee6b8d610498b68';
 export const TRUSTED_UPDATE_SCRIPT_SHA256 = [
   UPDATE_SCRIPT_SHA256,
+  'bed9b1d8c6fc2088a6cbcfa303c0157e98d069a53620fc73daa16d86c609cf5a',
 ];
 
 export function registerOperationRoutes(app, deps) {
@@ -139,9 +140,12 @@ export function registerOperationRoutes(app, deps) {
       let remoteBuild = buildNumber;
       let hasUpdate = false;
 
-      // 优先从 raw 读取最新 VERSION 文件（带防缓存时间戳与国内镜像重试）
+      // 优先从 raw 读取最新 VERSION 文件（带防缓存时间戳与国内镜像重试，兼顾 fluxbox 与 mybox 仓库地址）
       const cacheBust = `?t=${Date.now()}`;
       const versionCandidates = [
+        `https://ghfast.top/https://raw.githubusercontent.com/asdzx07/fluxbox/main/VERSION${cacheBust}`,
+        `https://gh-proxy.com/https://raw.githubusercontent.com/asdzx07/fluxbox/main/VERSION${cacheBust}`,
+        `https://raw.githubusercontent.com/asdzx07/fluxbox/main/VERSION${cacheBust}`,
         `https://ghfast.top/https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION${cacheBust}`,
         `https://gh-proxy.com/https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION${cacheBust}`,
         `https://raw.githubusercontent.com/asdzx07/mybox/main/VERSION${cacheBust}`,
@@ -151,7 +155,7 @@ export function registerOperationRoutes(app, deps) {
       for (const vUrl of versionCandidates) {
         try {
           const rawRes = await fetchImpl(vUrl, {
-            headers: { 'User-Agent': 'mybox/2.0.0', 'Cache-Control': 'no-cache' },
+            headers: { 'User-Agent': 'fluxbox/2.0.0', 'Cache-Control': 'no-cache' },
             signal: AbortSignal.timeout(5000),
           });
           if (rawRes.ok) {
@@ -168,17 +172,22 @@ export function registerOperationRoutes(app, deps) {
 
       // 仅在本地或远程缺少数字构建号时（例如开发环境源码调试），才退化到检查最新 Git Commit SHA
       if (!Number.isFinite(buildNumber) || !Number.isFinite(remoteBuild)) {
-        try {
-          const response = await fetchImpl('https://api.github.com/repos/asdzx07/mybox/commits/main', {
-            headers: { 'User-Agent': 'mybox/2.0.0' },
-            signal: AbortSignal.timeout(5000),
-          });
-          if (response.ok) {
-            const json = await response.json();
-            remoteCommitSha = json.sha?.slice(0, 7) || null;
-            if (remoteCommitSha) fetchSucceeded = true;
-          }
-        } catch {}
+        for (const repoName of ['asdzx07/fluxbox', 'asdzx07/mybox']) {
+          try {
+            const response = await fetchImpl(`https://api.github.com/repos/${repoName}/commits/main`, {
+              headers: { 'User-Agent': 'fluxbox/2.0.0' },
+              signal: AbortSignal.timeout(5000),
+            });
+            if (response.ok) {
+              const json = await response.json();
+              remoteCommitSha = json.sha?.slice(0, 7) || null;
+              if (remoteCommitSha) {
+                fetchSucceeded = true;
+                break;
+              }
+            }
+          } catch {}
+        }
       }
 
       // 判定更新逻辑（确立唯一权威准绳）：

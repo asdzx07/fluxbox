@@ -1,19 +1,19 @@
-# MyBox 🚀
+# FluxBox 🚀
 
 基于 **官方原版 sing-box** 的现代化透明代理控制面板与网络管理系统。
 
-[![Release](https://img.shields.io/badge/version-v2.0.0-blue.svg)](https://github.com/asdzx07/mybox/releases)
+[![Release](https://img.shields.io/badge/version-v1.20%20(B112)-blue.svg)](https://github.com/asdzx07/fluxbox/releases)
 [![sing-box](https://img.shields.io/badge/sing--box-official%20binary-orange.svg)](https://github.com/SagerNet/sing-box)
-[![Platform](https://img.shields.io/badge/platform-OpenWrt%20%7C%20iStoreOS%20%7C%20Linux-green.svg)](https://github.com/asdzx07/mybox)
+[![Platform](https://img.shields.io/badge/platform-OpenWrt%20%7C%20iStoreOS%20%7C%20Linux-green.svg)](https://github.com/asdzx07/fluxbox)
 [![License](https://img.shields.io/badge/license-MIT-purple.svg)](./LICENSE)
 
 ---
 
 ## 📖 简介
 
-**MyBox** 是一款轻量、优雅且高效的旁路由 / 软路由透明代理控制面板。它将「订阅管理 → 节点调度 → 目标分流 → 内核编排」全流程图形化，并自动完成系统网络栈（TUN / nftables / 路由策略 / dnsmasq / Fake-IP）的深度接管。
+**FluxBox** 是一款轻量、优雅且高效的旁路由 / 软路由透明代理控制面板。它将「订阅管理 → 节点调度 → 目标分流 → 内核编排」全流程图形化，并自动完成系统网络栈（TUN / nftables / 路由策略 / dnsmasq / Fake-IP）的深度接管。
 
-### 为什么选择 MyBox？
+### 为什么选择 FluxBox？
 
 - **原版官方内核**：坚持使用 `SagerNet/sing-box` 官方原版 Release 二进制，安全透明，第一时间无缝同步官方最新特性与安全修复。
 - **真·零断流热切换**：巧妙利用 sing-box 原生的 `rule-set: local` 规则集监听机制，分流策略和节点切换**无需重启内核进程**，已有会话与连接零中断。
@@ -40,10 +40,10 @@
 
 ## ⚡ 不重启内核是如何实现的？
 
-很多代理客户端修改规则或切换节点需要重启内核进程，导致下载中断或游戏掉线。MyBox 使用singbox官方内核平滑切换：
+很多代理客户端修改规则或切换节点需要重启内核进程，导致下载中断或游戏掉线。FluxBox 使用 sing-box 官方内核实现平滑切换：
 
 1. **原理**：sing-box 官方原生的本地规则集（`type: local`）由 `fswatch` 进行文件监听（源码见上游 `route/rule/rule_set_local.go`）。文件内容发生变动时，内核立即重新加载该规则集并触发热回调，**进程不动、PID 不变、已有连接不断**。
-2. **状态轻量化**：MyBox 为每个策略分配一个微型的状态文件（约 50 字节）：
+2. **状态轻量化**：FluxBox 为每个策略分配一个微型的状态文件（约 50 字节）：
    ```jsonc
    // data/flip/flip-<id>.json —— 启用
    { "version": 3, "rules": [{ "network": ["tcp", "udp"] }] }
@@ -57,28 +57,29 @@
 
 ## 🚀 快速安装
 
-### 1. 一键安装脚本
+### 1. 一键安装命令
 
-在终端中以 `root` 权限执行以下命令：
+在终端中以 `root` 权限执行以下命令即可：
 
 **OpenWrt / iStoreOS（安装为 procd 系统服务）：**
 ```sh
-curl -fsSL https://raw.githubusercontent.com/asdzx07/mybox/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/asdzx07/fluxbox/main/scripts/install.sh | sh
 ```
 
 **Debian / Ubuntu / Linux（安装为 systemd 系统服务）：**
 ```sh
-curl -fsSL https://raw.githubusercontent.com/asdzx07/mybox/main/scripts/install.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/asdzx07/fluxbox/main/scripts/install.sh | sudo sh
 ```
 
 > [!TIP]
-> 安装脚本将自动检测您的硬件架构（x86_64、aarch64 等）及系统环境，自动拉取对应平台的 Node.js 运行时与官方原版 sing-box 二进制程序。
+> - 安装脚本全自动检测硬件架构（x86_64、aarch64 等）及系统环境，自动拉取官方原版二进制；
+> - 若 GitHub 仓库重命名刚完成或网络重定向过渡期，系统亦同时兼容历史 `asdzx07/mybox` 安装地址。
 
 ### 2. 访问控制面板
 
 安装完成后，在浏览器中打开：
 ```
-http://<路由器或服务器IP>:52155
+http://<旁路由或服务器IP>:52155
 ```
 首次访问将提示您设置管理密码，设置完成后即可登录控制台。
 
@@ -87,10 +88,14 @@ http://<路由器或服务器IP>:52155
 ## 🔄 系统更新与维护
 
 ### 在线一键更新（推荐）
-在 Web 面板左侧进入【系统设置】，点击【检查更新】，检测到最新版本后直接点击【立即更新】，系统将平滑拉取最新代码并热重启面板服务。
+在 Web 面板左侧进入【核心设置】→【版本与安全】，点击【检查更新】，检测到最新版本后直接点击【立即更新】，系统将平滑拉取最新代码并热重启面板服务。
 
-### 终端手动更新
-在 SSH 终端中执行更新脚本即可：
+### 终端快捷更新
+在 SSH 终端中直接运行快捷命令即可（亦同时兼容旧命令 `mybox-update`）：
+```sh
+fluxbox-update
+```
+或直接调用升级脚本：
 ```sh
 /opt/mybox/scripts/update.sh
 ```
@@ -98,7 +103,7 @@ http://<路由器或服务器IP>:52155
 ### 密码重置
 若遗忘面板登录密码，可通过终端一键重置：
 ```sh
-node /opt/mybox/server/tools/reset-password.mjs <新密码>
+node /opt/mybox/tools/reset-password.mjs <新密码>
 ```
 
 ---
@@ -107,12 +112,12 @@ node /opt/mybox/server/tools/reset-password.mjs <新密码>
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                       Web 控制台 (SPA)                       │
-│    仪表盘 / 节点管理 / 目标分流 / 局域网控制 / 实时连接 / 系统设置    │
+│                      Web 控制台 (SPA)                       │
+│    仪表盘 / 节点管理 / 目标分流 / 局域网控制 / 实时连接 / 核心设置    │
 └──────────────────────────────┬──────────────────────────────┘
                                │ HTTP (:52155)
 ┌──────────────────────────────▼──────────────────────────────┐
-│                    MyBox 服务端 (Node.js)                    │
+│                   FluxBox 服务端 (Node.js)                   │
 │  ├─ 订阅解析引擎 (Clash / Base64 / sing-box)                 │
 │  ├─ 配置编译器 (生成标准 sing-box 1.14+ 候选与正式配置)        │
 │  ├─ 热状态管理 (data/flip/*.json)                           │
@@ -147,7 +152,7 @@ node /opt/mybox/server/tools/reset-password.mjs <新密码>
 │   ├── flip/                 # 策略 0 断流热切换开关文件
 │   ├── rulesets/             # 节点直连等本地规则集
 │   └── panel-port            # 面板自定义端口配置
-├── panel/                    # Web 面板静态资源
+├── panel/                    # Web 面板静态资源 (FluxBox SPA)
 ├── server/                   # 后端 Express 服务与核心驱动模块
 └── scripts/                  # 启动、安装与更新维护脚本
 ```
@@ -158,7 +163,7 @@ node /opt/mybox/server/tools/reset-password.mjs <新密码>
 
 <details>
 <summary><b>Q: 为什么我访问国内网站非常快，且连接列表里没有大量直连连接？</b></summary>
-这是 MyBox 的特色优势之一。通过将国内 IP 与私网 CIDR 置入 TUN 的 <code>route_exclude_address_set</code>，国内直连流量完全不经过内核，不占用 TUN 路由，直接在物理网卡层面秒发，实现了极致的“零损耗”。
+这是 FluxBox 的特色优势之一。通过将国内 IP 与私网 CIDR 置入 TUN 的 <code>route_exclude_address_set</code>，国内直连流量完全不经过内核，不占用 TUN 路由，直接在物理网卡层面秒发，实现了极致的“零损耗”。
 </details>
 
 <details>
@@ -170,15 +175,15 @@ node /opt/mybox/server/tools/reset-password.mjs <新密码>
 <summary><b>Q: 如何配合家庭主路由作为旁路由使用？</b></summary>
 只需将局域网内其他设备（电脑/手机/电视盒子）的网络设置中：
 1. <b>IP 地址</b>：设为同一网段静态 IP 或 DHCP 自动获取；
-2. <b>默认网关</b>：填写运行 MyBox 的设备 IP；
-3. <b>DNS 服务器</b>：填写运行 MyBox 的设备 IP。
-所有设备流量即可由 MyBox 自动接管并分流。
+2. <b>默认网关</b>：填写运行 FluxBox 的设备 IP；
+3. <b>DNS 服务器</b>：填写运行 FluxBox 的设备 IP。
+所有设备流量即可由 FluxBox 自动接管并分流。
 </details>
 
 <details>
 <summary><b>Q: Windows 电脑不想每次手动改网卡固定 IP 和网关怎么办？</b></summary>
 使用仓库内置的 <code>windows-client</code> 桌面伴侣客户端！
-本地网卡<b>永久保持主路由 DHCP 自动分配 IP 不变</b>，直接双击运行 <code>windows-client/启动MyBox.bat</code>，即可瞬间无感接入旁路由接管流量；支持一键断开恢复主路由直连，并可在客户端内直接修改 MyBox 的分流策略与切换节点。
+本地网卡<b>永久保持主路由 DHCP 自动分配 IP 不变</b>，直接双击运行 <code>FluxBox.exe</code>（或桌面上的快捷方式 <code>FluxBox.lnk</code>），即可瞬间无感接入旁路由接管流量；支持一键断开恢复主路由直连，并可在客户端内直接修改 FluxBox 的分流策略与切换节点。
 </details>
 
 ---

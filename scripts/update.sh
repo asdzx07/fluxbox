@@ -1,13 +1,13 @@
 #!/bin/sh
-# MyBox 升级脚本：更新面板代码，保留 data/（订阅、设置、开关文件）。
+# FluxBox 升级脚本：更新面板代码，保留 data/（订阅、设置、开关文件）。
 #
-#   curl -fsSL https://raw.githubusercontent.com/asdzx07/mybox/main/scripts/update.sh | sudo sh
+#   curl -fsSL https://raw.githubusercontent.com/asdzx07/fluxbox/main/scripts/update.sh | sudo sh
 #
 # 内核不在本脚本里升级——在面板「设置 → 内核」里点「安装/更新官方内核」，
 # 这样内核版本和面板版本可以各自独立。
 set -eu
 
-REPO="asdzx07/mybox"
+REPO="${REPO:-asdzx07/fluxbox}"
 BRANCH="main"
 ROOT=/opt/mybox
 USE_MIRROR=0
@@ -132,7 +132,16 @@ else
     fi
   }
 
-  api_get "$API_BASE/commits/$BRANCH" "$COMMIT_JSON" || die "无法从 GitHub API 验证更新提交；已停止更新"
+  if ! api_get "$API_BASE/commits/$BRANCH" "$COMMIT_JSON" 2>/dev/null; then
+    if [ "$REPO" != "asdzx07/mybox" ]; then
+      say "尝试回退仓库 asdzx07/mybox..."
+      REPO="asdzx07/mybox"
+      API_BASE="https://api.github.com/repos/$REPO"
+      api_get "$API_BASE/commits/$BRANCH" "$COMMIT_JSON" || die "无法从 GitHub API 验证更新提交；已停止更新"
+    else
+      die "无法从 GitHub API 验证更新提交；已停止更新"
+    fi
+  fi
   COMMIT_META=$("$NODE_BIN" -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!/^[a-f0-9]{40}$/i.test(j.sha||"")||!/^[a-f0-9]{40}$/i.test(j.commit?.tree?.sha||""))process.exit(2);process.stdout.write(`${j.sha} ${j.commit.tree.sha}`)' "$COMMIT_JSON") || die "GitHub 提交元数据无效"
   set -- $COMMIT_META
   COMMIT_SHA=$1
@@ -381,6 +390,7 @@ if [ "$PLATFORM" = openwrt ]; then
   fi
 
   chmod +x "$ROOT/scripts/"*.sh 2>/dev/null || true
+  ln -sf "$ROOT/scripts/update.sh" /usr/bin/fluxbox-update 2>/dev/null || true
   ln -sf "$ROOT/scripts/update.sh" /usr/bin/mybox-update 2>/dev/null || true
 
   KERNEL_WAS_RUNNING=0
@@ -402,6 +412,9 @@ else
     [ -f "$ROOT/system/$unit.service" ] && put 0644 "$ROOT/system/$unit.service" "/etc/systemd/system/$unit.service"
   done
   systemctl daemon-reload
+  chmod +x "$ROOT/scripts/"*.sh 2>/dev/null || true
+  ln -sf "$ROOT/scripts/update.sh" /usr/bin/fluxbox-update 2>/dev/null || true
+  ln -sf "$ROOT/scripts/update.sh" /usr/bin/mybox-update 2>/dev/null || true
 
   say "重启面板"
   systemctl restart mybox-panel || die "面板重启失败，正在回滚并恢复上一版"

@@ -1,11 +1,11 @@
 #!/bin/sh
-# MyBox 安全自举升级脚本：用于旧设备脱离更新死锁，通过 SHA-256 校验安全恢复并更新系统。
+# FluxBox 安全自举升级脚本：用于旧设备脱离更新死锁，通过 SHA-256 校验安全恢复并更新系统。
 #
 #   sh scripts/bootstrap-update.sh [--mirror]
 #
 set -eu
 
-REPO="asdzx07/mybox"
+REPO="${REPO:-asdzx07/fluxbox}"
 BRANCH="main"
 ROOT=/opt/mybox
 USE_MIRROR=0
@@ -14,7 +14,7 @@ SRC_FILE=""
 TOKEN="${GITHUB_TOKEN:-}"
 
 # 已固定的可信 update.sh SHA-256（严格校验，防止任意代码执行）
-EXPECTED_SHA256="bed9b1d8c6fc2088a6cbcfa303c0157e98d069a53620fc73daa16d86c609cf5a"
+EXPECTED_SHA256="2046d836791a3f6ce3552a04616cde9da6bf2f694e7c8e589ee6b8d610498b68"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -52,25 +52,28 @@ else
   MIRRORS="https://ghfast.top https://gh-proxy.com"
   
   got=0
-  if [ -n "$TOKEN" ]; then
-    if curl -fsSL -H "Authorization: Bearer $TOKEN" "$RAW_URL" -o "$TMP_FILE" 2>/dev/null; then
-      got=1
-    fi
-  else
-    if [ "$USE_MIRROR" = "1" ]; then
-      for m in $MIRRORS; do
-        if curl -fsSL "$m/$RAW_URL" -o "$TMP_FILE" 2>/dev/null; then
-          got=1
-          break
-        fi
-      done
-    fi
-    if [ "$got" = "0" ]; then
+  for current_repo in "$REPO" "asdzx07/mybox"; do
+    RAW_URL="https://raw.githubusercontent.com/$current_repo/$BRANCH/scripts/update.sh"
+    if [ -n "$TOKEN" ]; then
+      if curl -fsSL -H "Authorization: Bearer $TOKEN" "$RAW_URL" -o "$TMP_FILE" 2>/dev/null; then
+        got=1
+        break
+      fi
+    else
+      if [ "$USE_MIRROR" = "1" ]; then
+        for m in $MIRRORS; do
+          if curl -fsSL "$m/$RAW_URL" -o "$TMP_FILE" 2>/dev/null; then
+            got=1
+            break 2
+          fi
+        done
+      fi
       if curl -fsSL "$RAW_URL" -o "$TMP_FILE" 2>/dev/null; then
         got=1
+        break
       fi
     fi
-  fi
+  done
   [ "$got" = "1" ] || die "下载新版更新脚本失败，请检查网络连接"
 fi
 

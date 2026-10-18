@@ -1,10 +1,10 @@
 #!/bin/sh
-# MyBox 安装脚本
+# FluxBox 安装脚本
 #
 #   OpenWrt / iStoreOS:
-#     curl -fsSL https://raw.githubusercontent.com/asdzx07/mybox/main/scripts/install.sh | sh
+#     curl -fsSL https://raw.githubusercontent.com/asdzx07/fluxbox/main/scripts/install.sh | sh
 #   Debian / Ubuntu:
-#     curl -fsSL https://raw.githubusercontent.com/asdzx07/mybox/main/scripts/install.sh | sudo sh
+#     curl -fsSL https://raw.githubusercontent.com/asdzx07/fluxbox/main/scripts/install.sh | sudo sh
 #
 # 可选参数：
 #   --port <端口>      面板端口（默认 52155）
@@ -14,7 +14,7 @@
 #   --node-version <v> 指定 Node 版本（OpenWrt 用，默认 v22.22.0）
 set -eu
 
-REPO="asdzx07/mybox"
+REPO="${REPO:-asdzx07/fluxbox}"
 BRANCH="main"
 ROOT=/opt/mybox
 PORT=""
@@ -236,6 +236,7 @@ if [ "$PLATFORM" = openwrt ]; then
   cp "$ROOT/system/openwrt/luci/view/mybox/status.htm" /usr/lib/lua/luci/view/mybox/status.htm
   rm -rf /tmp/luci-indexcache 2>/dev/null || true
   chmod +x "$ROOT/scripts/"*.sh 2>/dev/null || true
+  ln -sf "$ROOT/scripts/update.sh" /usr/bin/fluxbox-update 2>/dev/null || true
   ln -sf "$ROOT/scripts/update.sh" /usr/bin/mybox-update 2>/dev/null || true
   /etc/init.d/mybox-panel enable >/dev/null 2>&1 || warn "开机自启设置失败"
   /etc/init.d/mybox-panel start >/dev/null 2>&1 || warn "面板启动失败，看 logread -e mybox"
@@ -247,6 +248,9 @@ else
     [ -f "$ROOT/system/$s.service" ] && put 0644 "$ROOT/system/$s.service" "/etc/systemd/system/$s.service"
   done
   systemctl daemon-reload
+  chmod +x "$ROOT/scripts/"*.sh 2>/dev/null || true
+  ln -sf "$ROOT/scripts/update.sh" /usr/bin/fluxbox-update 2>/dev/null || true
+  ln -sf "$ROOT/scripts/update.sh" /usr/bin/mybox-update 2>/dev/null || true
   systemctl enable --now mybox-panel >/dev/null 2>&1 || warn "面板服务启动失败，看 journalctl -u mybox-panel"
   LOGHINT="journalctl -u mybox-panel -f"
 fi
@@ -257,7 +261,7 @@ IP=$(ip -4 route get 1.1.1.1 2>/dev/null | grep -o 'src [0-9.]*' | awk '{print $
 
 cat <<EOF
 
-  MyBox 安装完成。
+  FluxBox 安装完成。
 
   面板地址：http://$IP:$PORT
   首次打开会要求设置面板密码。
@@ -268,6 +272,7 @@ cat <<EOF
     3. 把局域网设备的网关/DNS 指向本机（$IP）
 
   常用命令：
+    fluxbox-update                     # 一键在线升级（亦支持 mybox-update）
     /etc/init.d/mybox-panel status     # 面板状态
     /etc/init.d/mybox-kernel restart   # 重启内核
     $LOGHINT

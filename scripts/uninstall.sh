@@ -1,7 +1,7 @@
 #!/bin/sh
-# MyBox 卸载脚本。
+# FluxBox 卸载脚本。
 #
-#   curl -fsSL https://raw.githubusercontent.com/asdzx07/mybox/main/scripts/uninstall.sh | sudo sh
+#   curl -fsSL https://raw.githubusercontent.com/asdzx07/fluxbox/main/scripts/uninstall.sh | sudo sh
 #
 # 默认只停服务、删程序，保留 data/（订阅、设置）。加 --purge 连数据一起删。
 set -eu
@@ -46,9 +46,10 @@ if [ -f "$ROOT/data/netstack-state.json" ]; then
   fi
 fi
 
-# 残留的 tun 网卡和 nft 表
+# 残留的 tun 网卡和 nft 表及快捷命令
 ip link del mybox-tun 2>/dev/null || true
 nft delete table inet mybox 2>/dev/null || true
+rm -f /usr/bin/fluxbox-update /usr/bin/mybox-update 2>/dev/null || true
 
 if [ "$PURGE" = "1" ]; then
   say "删除 $ROOT（含数据、内核、Node 运行时）"
