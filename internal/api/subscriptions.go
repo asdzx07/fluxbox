@@ -48,7 +48,7 @@ func (s *Server) handleSubscriptions(w http.ResponseWriter, r *http.Request) {
 				"nodeCount":   len(nodeTags),
 				"nodeTags":    nodeTags,
 				"sampleNodes": sampleNodes,
-				"updatedAt":   sub.UpdatedAt,
+				"updatedAt":   formatTimeVal(sub.UpdatedAt),
 			})
 		}
 		s.writeJSON(w, map[string]any{
@@ -240,4 +240,26 @@ func (s *Server) handleNodes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.writeJSON(w, map[string]any{"nodes": out})
+}
+
+func formatTimeVal(v any) string {
+	if v == nil {
+		return ""
+	}
+	switch val := v.(type) {
+	case string:
+		return val
+	case float64:
+		if val > 1e11 {
+			return time.UnixMilli(int64(val)).Format("2006-01-02 15:04:05")
+		}
+		return time.Unix(int64(val), 0).Format("2006-01-02 15:04:05")
+	case int64:
+		if val > 1e11 {
+			return time.UnixMilli(val).Format("2006-01-02 15:04:05")
+		}
+		return time.Unix(val, 0).Format("2006-01-02 15:04:05")
+	default:
+		return fmt.Sprintf("%v", val)
+	}
 }

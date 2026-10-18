@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -195,6 +196,9 @@ func (s *Store) loadFromDisk() error {
 				loaded.DNS.HijackPort = 36053
 			}
 			s.settings = loaded
+			log.Printf("✅ 成功加载 settings.json: %d 个订阅, %d 个节点, %d 条策略", len(s.settings.Subscriptions), len(s.settings.Nodes), len(s.settings.Policies))
+		} else {
+			log.Printf("❌ 解析 settings.json 遇到错误: %v", err)
 		}
 	} else {
 		// 首次生成初始配置

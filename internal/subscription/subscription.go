@@ -23,7 +23,9 @@ type Subscription struct {
 	NodeCount int              `json:"nodeCount"`
 	NodeTags  []string         `json:"nodeTags"`
 	Nodes     []map[string]any `json:"nodes"`
-	UpdatedAt string           `json:"updatedAt"`
+	UpdatedAt any              `json:"updatedAt"`
+	AddedAt   any              `json:"addedAt,omitempty"`
+	Format    string           `json:"format,omitempty"`
 }
 
 // FetchAndParse 拉取远程订阅并自动识别 sing-box JSON / Clash YAML / Base64 URI
