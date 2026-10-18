@@ -438,10 +438,7 @@
             </div>
             <div class="setting-list">
               <div class="setting-item">
-                <div class="grow">
-                  <div class="title">国内直连不进内核 (零损耗 Bypass)</div>
-                  <div class="sub">大陆 IP 集合在 TUN 路由层直接放行，流量不经过 sing-box 用户态，跑满千兆/万兆带宽</div>
-                </div>
+                <div class="title">国内直连不进内核 (零损耗 Bypass)</div>
                 <label class="switch">
                   <input type="checkbox" id="setDirectBypass">
                   <span></span>
@@ -449,10 +446,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="grow">
-                  <div class="title">nftables 自动硬件级转发 (auto_redirect)</div>
-                  <div class="sub">由 Linux 内核 nftables 高效劫持并透明转发局域网流量</div>
-                </div>
+                <div class="title">nftables 自动硬件级转发 (auto_redirect)</div>
                 <label class="switch">
                   <input type="checkbox" id="setAutoRedirect">
                   <span></span>
@@ -460,10 +454,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="grow">
-                  <div class="title">TUN 激进吞吐模式 (MTU 65535 大包加速)</div>
-                  <div class="sub">将 TUN 虚拟网卡 MTU 设为 65535，大幅提升千兆/万兆测速与高带宽吞吐；默认关闭（1500 标准兼容模式）</div>
-                </div>
+                <div class="title">TUN 激进吞吐模式 (MTU 65535 大包加速)</div>
                 <label class="switch">
                   <input type="checkbox" id="setTunAggressive">
                   <span></span>
@@ -471,10 +462,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="grow">
-                  <div class="title">代理节点服务器 IP 强制直连</div>
-                  <div class="sub">防止节点服务器自身握手流量产生回环死锁</div>
-                </div>
+                <div class="title">代理节点服务器 IP 强制直连</div>
                 <label class="switch">
                   <input type="checkbox" id="setDirectForNodes">
                   <span></span>
@@ -482,10 +470,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="grow">
-                  <div class="title">屏蔽 QUIC 协议 (UDP 443)</div>
-                  <div class="sub">阻断 HTTP/3 QUIC 流量，强制回退至更稳定、不易被运营商 QoS 限速的 TCP 链路</div>
-                </div>
+                <div class="title">屏蔽 QUIC 协议 (UDP 443)</div>
                 <label class="switch">
                   <input type="checkbox" id="setRejectQuic">
                   <span></span>
@@ -493,10 +478,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="grow">
-                  <div class="title">严格路由保护 (strict_route)</div>
-                  <div class="sub">防止跨网络接口路由回环与隐性流量泄漏</div>
-                </div>
+                <div class="title">严格路由保护 (strict_route)</div>
                 <label class="switch">
                   <input type="checkbox" id="setStrictRoute">
                   <span></span>
@@ -504,10 +486,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="grow">
-                  <div class="title">流量协议嗅探 (SNI / Host)</div>
-                  <div class="sub">精准提取 TLS/HTTP 首包域名以准确匹配分流规则</div>
-                </div>
+                <div class="title">流量协议嗅探 (SNI / Host)</div>
                 <label class="switch">
                   <input type="checkbox" id="setSniff">
                   <span></span>
@@ -515,10 +494,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="grow">
-                  <div class="title">启用 IPv6 流量接管</div>
-                  <div class="sub">接管并分流局域网 IPv6 流量（若宽带无原生 IPv6 建议关闭以防连接拖慢）</div>
-                </div>
+                <div class="title">启用 IPv6 流量接管</div>
                 <label class="switch">
                   <input type="checkbox" id="setIpv6">
                   <span></span>
@@ -526,10 +502,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="grow">
-                  <div class="title">内核开机自启与进程守护</div>
-                  <div class="sub">系统引导时自动启动 sing-box，异常崩溃时由守护进程即刻拉起</div>
-                </div>
+                <div class="title">内核开机自启与进程守护</div>
                 <label class="switch">
                   <input type="checkbox" id="setAutoStart">
                   <span></span>
@@ -595,10 +568,7 @@
 
             <div class="setting-list" style="margin-top:auto;padding-top:12px;border-top:1px solid var(--border)">
               <div class="setting-item" style="padding:9px 6px">
-                <div class="grow">
-                  <div class="title">海外代理域名启用 FakeIP</div>
-                  <div class="sub">立即返回虚拟保留 IP，省去远程 DNS 往返等待，大幅加速网页首屏打开速度</div>
-                </div>
+                <div class="title">海外代理域名启用 FakeIP</div>
                 <label class="switch">
                   <input type="checkbox" id="setFakeIp">
                   <span></span>
@@ -606,10 +576,7 @@
               </div>
 
               <div class="setting-item" style="padding:9px 6px">
-                <div class="grow">
-                  <div class="title">国内外域名智能分流解析</div>
-                  <div class="sub">国内域名走直连 DNS 拿最佳 CDN，海外域名走代理通道防 DNS 抢答污染</div>
-                </div>
+                <div class="title">国内外域名智能分流解析</div>
                 <label class="switch">
                   <input type="checkbox" id="setDnsSplit">
                   <span></span>
