@@ -151,8 +151,48 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 		},
 	}
 
-	cfgBytes, err := json.MarshalIndent(fullConfig, "", "  ")
+	cleanedConfig := cleanConfig(fullConfig)
+	cfgBytes, err := json.MarshalIndent(cleanedConfig, "", "  ")
 	return cfgBytes, nodeServerDomains, err
+}
+
+func cleanConfig(v any) any {
+	if v == nil {
+		return nil
+	}
+	switch val := v.(type) {
+	case map[string]any:
+		res := make(map[string]any)
+		for k, item := range val {
+			if strings.HasPrefix(k, "__") {
+				continue
+			}
+			cleanedItem := cleanConfig(item)
+			if cleanedItem != nil {
+				res[k] = cleanedItem
+			}
+		}
+		return res
+	case []any:
+		var res []any
+		for _, item := range val {
+			cleanedItem := cleanConfig(item)
+			if cleanedItem != nil {
+				res = append(res, cleanedItem)
+			}
+		}
+		return res
+	case []map[string]any:
+		var res []map[string]any
+		for _, item := range val {
+			if cleanedItem, ok := cleanConfig(item).(map[string]any); ok {
+				res = append(res, cleanedItem)
+			}
+		}
+		return res
+	default:
+		return v
+	}
 }
 
 func buildOutbounds(nodes []map[string]any, groups []GroupConfig, allTags []string) []map[string]any {
@@ -223,8 +263,16 @@ func buildOutbounds(nodes []map[string]any, groups []GroupConfig, allTags []stri
 		}
 	}
 
-	// 注入全部真实节点
-	out = append(out, nodes...)
+	// 注入全部真实节点（清洗内部使用的 __ 字段）
+	for _, n := range nodes {
+		cleanedNode := make(map[string]any)
+		for k, v := range n {
+			if !strings.HasPrefix(k, "__") {
+				cleanedNode[k] = v
+			}
+		}
+		out = append(out, cleanedNode)
+	}
 
 	// 内置基础出站
 	out = append(out,
