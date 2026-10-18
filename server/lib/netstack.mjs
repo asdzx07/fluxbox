@@ -11,6 +11,9 @@ const log = createLogger('netstack');
 
 const STATE_FILE = path.join(DATA_DIR, 'netstack-state.json');
 const MANAGED_CONF = 'mybox.conf';
+const FASTPATH_TABLE = KERNEL.nftTable || 'fluxbox';
+const BYPASS_MARK = '0x02000000/0x02000000';
+const RULE_PRIO = '8998';
 
 async function run(cmd, args, { allowFail = true } = {}) {
   try {
@@ -180,7 +183,7 @@ async function uciCommit() {
  * mosdns 占着 5335）不会消失，dnsmasq 会同时问两个上游，分流就漏了。
  * 必须把 server 列表整体接管过来，并且把原值备份下来以便还原。
  */
-async function applyDnsmasqOpenWrt({ dnsPort, listen }) {
+async function applyDnsmasqOpenWrt({ dnsPort, listen, directBypass = false }) {
   const section = 'dhcp.@dnsmasq[0]';
   const currentServers = await uciGet(`${section}.server`);
 
@@ -190,6 +193,7 @@ async function applyDnsmasqOpenWrt({ dnsPort, listen }) {
   const before = {
     server: cleanServers ?? await discoverUpstreamDns(),
     noresolv: await uciGet(`${section}.noresolv`),
+    nftset: await uciGet(`${section}.nftset`),
     replacedSelfReferential: Boolean(currentServers && !cleanServers),
   };
   if (before.replacedSelfReferential) {
@@ -199,6 +203,12 @@ async function applyDnsmasqOpenWrt({ dnsPort, listen }) {
   await run('uci', ['-q', 'delete', `${section}.server`]);
   await run('uci', ['-q', 'add_list', `${section}.server=${listen}#${dnsPort}`]);
   await run('uci', ['-q', 'set', `${section}.noresolv=1`]);
+
+  if (directBypass) {
+    await run('uci', ['-q', 'delete', `${section}.nftset`]);
+    await run('uci', ['-q', 'add_list', `${section}.nftset=/cn/4#inet#${FASTPATH_TABLE}#direct_fastpath4,6#inet#${FASTPATH_TABLE}#direct_fastpath6`]);
+  }
+
   await uciCommit();
 
   const restart = await dnsmasqRestart();
@@ -210,7 +220,7 @@ async function applyDnsmasqOpenWrt({ dnsPort, listen }) {
 
   writeJsonAtomic(STATE_FILE, { ...readJson(STATE_FILE, {}), dnsmasq: { mode: 'uci', section, before } });
   log.info('dnsmasq 已接管（uci）→ %s#%d', listen, dnsPort);
-  return { confDir: 'uci', noresolv: true };
+  return { confDir: 'uci', noresolv: true, nftset: Boolean(directBypass) };
 }
 
 async function uciRollbackDnsmasq(before) {
@@ -228,6 +238,12 @@ async function uciRollbackDnsmasq(before) {
   } else {
     await run('uci', ['-q', 'delete', `${section}.noresolv`]);
   }
+  await run('uci', ['-q', 'delete', `${section}.nftset`]);
+  if (before?.nftset?.length) {
+    for (const item of before.nftset) {
+      await run('uci', ['-q', 'add_list', `${section}.nftset=${item}`]);
+    }
+  }
   await uciCommit();
 }
 
@@ -235,8 +251,8 @@ async function uciRollbackDnsmasq(before) {
  * 接管 dnsmasq：把它的上游指向内核的 DNS 入站。
  * 失败时抛错并回滚——调用方负责记录。
  */
-export async function applyDnsmasq({ dnsPort = KERNEL.dnsPort, listen = '127.0.0.1' } = {}) {
-  if (isOpenWrt()) return applyDnsmasqOpenWrt({ dnsPort, listen });
+export async function applyDnsmasq({ dnsPort = KERNEL.dnsPort, listen = '127.0.0.1', directBypass = false } = {}) {
+  if (isOpenWrt()) return applyDnsmasqOpenWrt({ dnsPort, listen, directBypass });
 
   const confDir = await dnsmasqConfDir();
   fs.mkdirSync(confDir, { recursive: true });
@@ -249,6 +265,10 @@ export async function applyDnsmasq({ dnsPort = KERNEL.dnsPort, listen = '127.0.0
   ];
   if (!conflict) lines.push('noresolv=1');
   else log.warn('noresolv 已被 %s 设置，跳过（避免 dnsmasq 重复关键字启动失败）', conflict);
+
+  if (directBypass) {
+    lines.push(`nftset=/cn/4#inet#${FASTPATH_TABLE}#direct_fastpath4,6#inet#${FASTPATH_TABLE}#direct_fastpath6`);
+  }
 
   const target = path.join(confDir, MANAGED_CONF);
   const before = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null;
@@ -293,10 +313,175 @@ export async function restoreDnsmasq() {
   return { restored: true };
 }
 
+/* -------------------------------------------------------- TUN 网卡性能调优 */
+
+export async function tuneTunDevice(settings = {}) {
+  const tunName = KERNEL.tunName || 'mybox-tun';
+  if (!fs.existsSync(`/sys/class/net/${tunName}`)) {
+    return { ok: false, reason: `网卡 ${tunName} 尚未创建` };
+  }
+
+  const isAggressive = Boolean(settings.network?.tun?.aggressive);
+  const userMtu = Number(settings.network?.tun?.mtu);
+  const targetMtu = (Number.isFinite(userMtu) && userMtu > 0)
+    ? userMtu
+    : (isAggressive ? 65535 : 1500);
+
+  // 1. 同步 TUN 网卡 MTU
+  await run('ip', ['link', 'set', 'dev', tunName, 'mtu', String(targetMtu)]);
+
+  // 2. 优化队列长度，防止高速并发时在网卡队列上溢出丢包
+  await run('ip', ['link', 'set', 'dev', tunName, 'txqueuelen', '1000']);
+
+  // 3. 激进模式：尝试开启硬件分段卸载特性（GSO/GRO/TSO）
+  if (isAggressive || settings.network?.tun?.gso) {
+    const ethtool = await run('ethtool', ['-K', tunName, 'rx', 'on', 'tx', 'on', 'tso', 'on', 'gso', 'on', 'gro', 'on']);
+    log.info('TUN 网卡 %s 已优化为激进吞吐模式 (MTU=%d, GSO/GRO=on)%s', tunName, targetMtu, ethtool.ok ? '' : ` [ethtool: ${ethtool.out}]`);
+  } else {
+    log.info('TUN 网卡 %s 已应用标准安全模式 (MTU=%d)', tunName, targetMtu);
+  }
+
+  return { ok: true, dev: tunName, mtu: targetMtu, aggressive: isAggressive };
+}
+
+/* ---------------------------------------------------- 直连动态快速通道 (Fastpath) */
+
+export async function setupDirectFastpath(settings = {}) {
+  // 1. 确保 nftables 表与集合存在
+  const nftInit = `
+table inet ${FASTPATH_TABLE} {
+  set direct_fastpath4 {
+    type ipv4_addr
+    flags timeout
+  }
+  set direct_fastpath6 {
+    type ipv6_addr
+    flags timeout
+  }
+  chain bypass_in {
+    type filter hook prerouting priority mangle - 10; policy accept;
+    ip daddr @direct_fastpath4 meta l4proto { tcp, udp } th dport != 53 mark |= 0x02000000
+    ip daddr @direct_fastpath4 meta l4proto != { tcp, udp } mark |= 0x02000000
+    ip6 daddr @direct_fastpath6 meta l4proto { tcp, udp } th dport != 53 mark |= 0x02000000
+    ip6 daddr @direct_fastpath6 meta l4proto != { tcp, udp } mark |= 0x02000000
+  }
+}
+`.trim();
+
+  const tmpNft = path.join(DATA_DIR, 'tmp', 'fastpath-init.nft');
+  try {
+    fs.mkdirSync(path.dirname(tmpNft), { recursive: true });
+    fs.writeFileSync(tmpNft, `${nftInit}\n`);
+    const r = await run('nft', ['-f', tmpNft]);
+    if (!r.ok) {
+      log.warn('nftables 快速通道规则载入警告：%s', r.out);
+    }
+  } finally {
+    fs.rmSync(tmpNft, { force: true });
+  }
+
+  // 2. 确保 ip rule 路由放行规则存在（priority 8998 在 TUN 表之前直接走 main 表直连，绕过内核）
+  const rulesV4 = await run('ip', ['rule', 'show']);
+  if (rulesV4.ok && !rulesV4.out.includes('0x2000000/0x2000000')) {
+    await run('ip', ['rule', 'add', 'fwmark', BYPASS_MARK, 'lookup', 'main', 'priority', RULE_PRIO]);
+    log.info('已配置 IPv4 动态直连快速通道 ip rule (priority %s -> main)', RULE_PRIO);
+  }
+
+  if (settings.network?.ipv6) {
+    const rulesV6 = await run('ip', ['-6', 'rule', 'show']);
+    if (rulesV6.ok && !rulesV6.out.includes('0x2000000/0x2000000')) {
+      await run('ip', ['-6', 'rule', 'add', 'fwmark', BYPASS_MARK, 'lookup', 'main', 'priority', RULE_PRIO]);
+      log.info('已配置 IPv6 动态直连快速通道 ip rule (priority %s -> main)', RULE_PRIO);
+    }
+  }
+
+  writeJsonAtomic(STATE_FILE, {
+    ...readJson(STATE_FILE, {}),
+    fastpath: { table: FASTPATH_TABLE, mark: BYPASS_MARK, priority: RULE_PRIO },
+  });
+
+  return { ok: true, table: FASTPATH_TABLE, mark: '0x02000000', priority: RULE_PRIO };
+}
+
+export async function teardownDirectFastpath() {
+  const rulesV4 = await run('ip', ['rule', 'show']);
+  if (rulesV4.ok && rulesV4.out.includes('0x2000000/0x2000000')) {
+    await run('ip', ['rule', 'del', 'fwmark', BYPASS_MARK, 'lookup', 'main', 'priority', RULE_PRIO]);
+  }
+  const rulesV6 = await run('ip', ['-6', 'rule', 'show']);
+  if (rulesV6.ok && rulesV6.out.includes('0x2000000/0x2000000')) {
+    await run('ip', ['-6', 'rule', 'del', 'fwmark', BYPASS_MARK, 'lookup', 'main', 'priority', RULE_PRIO]);
+  }
+
+  await run('nft', ['delete', 'table', 'inet', FASTPATH_TABLE]);
+
+  const state = readJson(STATE_FILE, {});
+  delete state.fastpath;
+  writeJsonAtomic(STATE_FILE, state);
+  log.info('动态直连快速通道已清理');
+}
+
+/** 动态向直连快速通道集合塞入 IP（带超时 TTL，如 '2h'） */
+export async function addDirectFastpathIps(ips = [], { timeout = '2h' } = {}) {
+  if (!fs.existsSync('/proc/sys/net/ipv4')) return { ok: false, count: 0, reason: '非 Linux 系统' };
+  const v4 = [];
+  const v6 = [];
+  for (const raw of ips) {
+    const ip = String(raw).trim();
+    if (!ip) continue;
+    if (ip.includes(':')) v6.push(ip);
+    else if (/^\d+\.\d+\.\d+\.\d+$/.test(ip)) v4.push(ip);
+  }
+
+  let added = 0;
+  if (v4.length) {
+    const elements = v4.map((ip) => `${ip} timeout ${timeout}`).join(', ');
+    const r = await run('nft', ['add', 'element', 'inet', FASTPATH_TABLE, 'direct_fastpath4', `{ ${elements} }`]);
+    if (r.ok) added += v4.length;
+  }
+  if (v6.length) {
+    const elements = v6.map((ip) => `${ip} timeout ${timeout}`).join(', ');
+    const r = await run('nft', ['add', 'element', 'inet', FASTPATH_TABLE, 'direct_fastpath6', `{ ${elements} }`]);
+    if (r.ok) added += v6.length;
+  }
+
+  return { ok: true, added, totalRequested: ips.length };
+}
+
+/** 查询当前直连快速通道的条目数与状态 */
+export async function getDirectFastpathStatus() {
+  if (!fs.existsSync('/proc/sys/net/ipv4')) {
+    return { enabled: false, supported: false, count4: 0, count6: 0, total: 0 };
+  }
+  const r4 = await run('nft', ['list', 'set', 'inet', FASTPATH_TABLE, 'direct_fastpath4']);
+  const r6 = await run('nft', ['list', 'set', 'inet', FASTPATH_TABLE, 'direct_fastpath6']);
+  const countElements = (out = '') => {
+    const m = out.match(/elements\s*=\s*\{([^}]*)\}/s);
+    if (!m || !m[1]) return 0;
+    return m[1].split(',').map((s) => s.trim()).filter(Boolean).length;
+  };
+  const count4 = r4.ok ? countElements(r4.out) : 0;
+  const count6 = r6.ok ? countElements(r6.out) : 0;
+  return {
+    enabled: r4.ok,
+    table: FASTPATH_TABLE,
+    count4,
+    count6,
+    total: count4 + count6,
+  };
+}
+
+/** 一键清空直连快速通道集合 */
+export async function flushDirectFastpath() {
+  await run('nft', ['flush', 'set', 'inet', FASTPATH_TABLE, 'direct_fastpath4']);
+  await run('nft', ['flush', 'set', 'inet', FASTPATH_TABLE, 'direct_fastpath6']);
+  return { ok: true };
+}
+
 /* -------------------------------------------------------------- 入口 */
 
 export async function apply(settings) {
-  const result = { forwarding: null, dnsmasq: null, warnings: [] };
+  const result = { forwarding: null, dnsmasq: null, tun: null, fastpath: null, warnings: [] };
 
   if (!fs.existsSync('/proc/sys/net/ipv4')) {
     result.warnings.push('非 Linux 环境：跳过系统网络配置（仅生成配置、启停内核）。');
@@ -308,9 +493,33 @@ export async function apply(settings) {
     writeJsonAtomic(STATE_FILE, { ...readJson(STATE_FILE, {}), forwarding: result.forwarding });
   }
 
+  // 1. TUN 网卡性能调优（MTU / GSO 硬件卸载 / 发送队列）
+  try {
+    result.tun = await tuneTunDevice(settings);
+  } catch (err) {
+    result.warnings.push(`TUN 网卡调优提示：${err.message}`);
+  }
+
+  // 2. 直连快速通道（nftables 动态集合与 0x02000000 硬件级直连放行规则）
+  if (settings.network?.directBypass) {
+    try {
+      result.fastpath = await setupDirectFastpath(settings);
+    } catch (err) {
+      result.warnings.push(`动态直连快速通道建立失败：${err.message}`);
+    }
+  } else {
+    try {
+      await teardownDirectFastpath();
+    } catch {}
+  }
+
+  // 3. dnsmasq 接管与直连域名 nftset 联动
   if (settings.dns.mode === 'dnsmasq') {
     try {
-      result.dnsmasq = await applyDnsmasq({ dnsPort: settings.dns.hijackPort || KERNEL.dnsPort });
+      result.dnsmasq = await applyDnsmasq({
+        dnsPort: settings.dns.hijackPort || KERNEL.dnsPort,
+        directBypass: Boolean(settings.network?.directBypass),
+      });
     } catch (err) {
       result.warnings.push(`dnsmasq 接管失败：${err.message}`);
     }
@@ -324,6 +533,7 @@ export async function apply(settings) {
 export async function cleanup() {
   const state = readJson(STATE_FILE, {});
   await restoreDnsmasq();
+  await teardownDirectFastpath();
   if (state.forwarding) await restoreForwarding(state.forwarding);
   fs.rmSync(STATE_FILE, { force: true });
 }
@@ -342,3 +552,4 @@ export async function dnsmasqStatus(targetPort = null) {
   }
   return { takenOver: Boolean(state.file && fs.existsSync(state.file)), confDir: state.confDir, file: state.file };
 }
+

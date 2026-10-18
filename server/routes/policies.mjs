@@ -41,14 +41,42 @@ export function registerPolicyRoutes(app, deps) {
     });
   });
 
+  function arraysEqual(a = [], b = []) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+
+  function isOnlyToggleChange(oldList, newList) {
+    if (!Array.isArray(oldList) || !Array.isArray(newList)) return false;
+    if (oldList.length !== newList.length) return false;
+    for (let i = 0; i < oldList.length; i++) {
+      const a = oldList[i];
+      const b = newList[i];
+      if (a.id !== b.id || a.name !== b.name || a.target !== b.target) return false;
+      if (!arraysEqual(a.rulesets, b.rulesets)) return false;
+      if (!arraysEqual(a.domain, b.domain)) return false;
+      if (!arraysEqual(a.domainSuffix, b.domainSuffix)) return false;
+      if (!arraysEqual(a.ipCidr, b.ipCidr)) return false;
+    }
+    return true;
+  }
+
   app.put('/api/policies', async (req, res) => {
     const list = req.body?.policies;
     if (!Array.isArray(list)) return res.status(400).json({ error: 'policies 必须是数组' });
     const clean = list.map(normalizePolicyInput);
     if (clean.some((policy) => !policy.name)) return res.status(400).json({ error: '策略名不能为空' });
+
+    const currentPolicies = loadSettings().policies || [];
+    const onlyToggle = isOnlyToggleChange(currentPolicies, clean);
+
     mutateSettings((settings) => {
       settings.policies = clean;
     });
+
     for (const policy of clean) {
       try {
         setFlip(policy.id, policy.enabled);
@@ -56,13 +84,19 @@ export function registerPolicyRoutes(app, deps) {
         log.warn('写入策略 %s 的热切换状态失败：%s', policy.id, err.message);
       }
     }
+
+    if (onlyToggle) {
+      log.info('策略开关更新，已通过规则集 Flip 无缝热生效（0 重启）');
+      return res.json({ ok: true, hotReloaded: true, policies: clean });
+    }
+
     try {
       await deploy.deploy({ restart: true });
-      log.info('策略配置保存并已部署生效');
+      log.info('策略配置结构更新，配置已重新生成并部署生效');
     } catch (err) {
       log.warn('策略配置已保存，但内核部署未完成；运行配置可能仍是旧版本：%s', err.message);
     }
-    res.json({ ok: true, policies: clean });
+    res.json({ ok: true, deployed: true, policies: clean });
   });
 
   /**

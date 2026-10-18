@@ -555,14 +555,22 @@ function buildInbounds(settings, bypassSets = []) {
   const inbounds = [];
 
   if (network.tun?.enabled) {
+    const isAggressive = Boolean(network.tun?.aggressive);
+    const configuredMtu = Number(network.tun?.mtu);
+    // 激进吞吐模式设为 65535，普通安全兼容模式设为 1500；若用户明确填了大于0的数值则优先采用
+    const tunMtu = (Number.isFinite(configuredMtu) && configuredMtu > 0)
+      ? configuredMtu
+      : (isAggressive ? 65535 : 1500);
+
     const tun = {
       type: 'tun',
       tag: 'tun-in',
       interface_name: KERNEL.tunName,
       address: ['172.19.0.1/30'],
+      mtu: tunMtu,
+      ...(isAggressive || network.tun?.gso ? { gso: true } : {}),
       auto_route: network.tun.autoRoute !== false,
       strict_route: Boolean(network.tun.strictRoute),
-      // stack/mtu 不写，完全由 sing-box 自己决定（1.15+ 已弃用手动指定）
       udp_timeout: '60s',
       route_exclude_address: [
         '10.0.0.0/8', '100.64.0.0/10', '169.254.0.0/16', '172.16.0.0/12',

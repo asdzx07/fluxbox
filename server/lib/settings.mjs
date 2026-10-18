@@ -71,6 +71,8 @@ export function defaultSettings() {
         enabled: true,
         stack: 'mixed',
         mtu: 0,
+        aggressive: false,
+        gso: false,
         autoRoute: true,
         autoRedirect: true,
         strictRoute: false,

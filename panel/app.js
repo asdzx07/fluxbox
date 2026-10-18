@@ -1519,6 +1519,7 @@ async function loadSettings() {
     if ($('setIpv6')) $('setIpv6').checked = Boolean(s.network?.ipv6);
     if ($('setRejectQuic')) $('setRejectQuic').checked = Boolean(s.network?.rejectQuic);
     if ($('setAutoRedirect')) $('setAutoRedirect').checked = s.network?.tun?.autoRedirect !== false;
+    if ($('setTunAggressive')) $('setTunAggressive').checked = Boolean(s.network?.tun?.aggressive);
     if ($('setStrictRoute')) $('setStrictRoute').checked = Boolean(s.network?.tun?.strictRoute);
     if ($('setDirectBypass')) $('setDirectBypass').checked = s.network?.directBypass !== false;
     if ($('setDirectForNodes')) $('setDirectForNodes').checked = s.network?.directForNodes !== false;
@@ -2154,6 +2155,7 @@ function bindEvents() {
           sniff: $('setSniff') ? $('setSniff').checked : true,
           tun: {
             autoRedirect: $('setAutoRedirect') ? $('setAutoRedirect').checked : true,
+            aggressive: Boolean($('setTunAggressive')?.checked),
             strictRoute: Boolean($('setStrictRoute')?.checked),
           },
         },

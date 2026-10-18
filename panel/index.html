@@ -461,6 +461,17 @@
 
               <div class="setting-item">
                 <div class="grow">
+                  <div class="title">TUN 激进吞吐模式 (MTU 65535 / GSO 硬件卸载)</div>
+                  <div class="sub">将 TUN 虚拟网卡 MTU 设为 65535 并启用内核 GSO/GRO 分段卸载，大幅提升千兆/万兆测速吞吐；默认关闭（1500 安全兼容模式）</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setTunAggressive">
+                  <span></span>
+                </label>
+              </div>
+
+              <div class="setting-item">
+                <div class="grow">
                   <div class="title">代理节点服务器 IP 强制直连</div>
                   <div class="sub">防止节点服务器自身握手流量产生回环死锁</div>
                 </div>

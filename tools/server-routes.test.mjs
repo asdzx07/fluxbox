@@ -93,7 +93,14 @@ async function withServer(overrides, run) {
       fetchLatestVersion: async () => ({ version: 'v1.15.0' }),
       isResponding: async () => false,
     },
-    netstack: { dnsmasqStatus: async () => ({ takenOver: false }), restoreDnsmasq: async () => {}, applyDnsmasq: async () => {} },
+    netstack: {
+      dnsmasqStatus: async () => ({ takenOver: false }),
+      restoreDnsmasq: async () => {},
+      applyDnsmasq: async () => {},
+      getDirectFastpathStatus: async () => ({ ok: true, enabled: false, count4: 0, count6: 0, total: 0 }),
+      addDirectFastpathIps: async () => ({ ok: true, added: 0 }),
+      flushDirectFastpath: async () => ({ ok: true }),
+    },
     platform: { describe: () => ({ id: 'test', label: 'test' }) },
     getTraffic: () => ({ up: 1, down: 2 }),
     resetTrafficTotals: () => {},
@@ -215,6 +222,22 @@ test('subscription, ruleset, group and policy route response shapes remain stabl
     assert.equal(policyBody.ok, true);
     assert.equal(policyBody.policies[0].target, 'builtin-direct');
     assert.deepEqual(calls.flips, [['p-new', true]]);
+
+    const prevDeployCount = calls.deploy.length;
+    // 仅切换开关状态：走 Flip 规则集快速热重载，0 重启
+    const policyToggleOnly = await request(baseUrl, '/api/policies', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ policies: [{ id: 'p-new', name: 'New policy', target: 'builtin-direct', enabled: false }] }),
+    });
+    const toggleBody = await policyToggleOnly.json();
+    assert.equal(toggleBody.ok, true);
+    assert.equal(toggleBody.hotReloaded, true);
+    assert.equal(calls.deploy.length, prevDeployCount); // 验证零重启
+
+    const fastpath = await request(baseUrl, '/api/netstack/fastpath');
+    assert.equal(fastpath.status, 200);
+    const fastpathBody = await fastpath.json();
+    assert.equal(fastpathBody.ok, true);
   });
 });
 

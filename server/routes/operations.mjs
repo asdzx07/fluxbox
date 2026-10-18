@@ -8,7 +8,7 @@ export const TRUSTED_UPDATE_SCRIPT_SHA256 = [
 ];
 
 export function registerOperationRoutes(app, deps) {
-  const { fs, path, spawn, ROOT, DATA_DIR, loadSettings, mutateSettings, getTraffic, resetTrafficTotals, kernel, deploy, log } = deps;
+  const { fs, path, spawn, ROOT, DATA_DIR, loadSettings, mutateSettings, getTraffic, resetTrafficTotals, kernel, deploy, netstack, log } = deps;
   const fetchImpl = deps.fetchImpl || globalThis.fetch;
 
   app.get('/api/traffic', (req, res) => {
@@ -18,6 +18,35 @@ export function registerOperationRoutes(app, deps) {
   app.post('/api/traffic/reset', (req, res) => {
     resetTrafficTotals();
     res.json({ ok: true });
+  });
+
+  app.get('/api/netstack/fastpath', async (req, res) => {
+    try {
+      const status = await netstack.getDirectFastpathStatus();
+      res.json({ ok: true, ...status });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  app.post('/api/netstack/fastpath', async (req, res) => {
+    try {
+      const ips = Array.isArray(req.body?.ips) ? req.body.ips : [req.body?.ip].filter(Boolean);
+      const timeout = req.body?.timeout ? String(req.body.timeout).trim() : '2h';
+      const result = await netstack.addDirectFastpathIps(ips, { timeout });
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/netstack/fastpath', async (req, res) => {
+    try {
+      await netstack.flushDirectFastpath();
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
   });
 
   app.get('/api/rulesets/status', (req, res) => {
