@@ -20,6 +20,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/overview", s.handleOverview)
 	mux.HandleFunc("/api/system/stats", s.handleSystemStats)
 	mux.HandleFunc("/api/system/version", s.handleSystemVersion)
+	mux.HandleFunc("/api/system/update", s.handleSystemUpdate)
 	mux.HandleFunc("/api/traffic", s.handleTraffic)
 	mux.HandleFunc("/api/traffic/reset", s.handleTrafficReset)
 

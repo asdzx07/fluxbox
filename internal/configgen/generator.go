@@ -260,22 +260,25 @@ func buildDNS(s Settings, nodeServers []string) map[string]any {
 
 	servers := []map[string]any{
 		{
-			"tag":     "dns-direct",
-			"address": directDNS,
-			"detour":  "直连",
+			"tag":         "dns-direct",
+			"type":        "udp",
+			"server":      directDNS,
+			"server_port": 53,
+			"detour":      "直连",
 		},
 		{
-			"tag":              "dns-proxy",
-			"address":          proxyProto + "://" + proxyDNS,
-			"address_resolver": "dns-direct",
-			"detour":           "所有-自动",
+			"tag":         "dns-proxy",
+			"type":        proxyProto,
+			"server":      proxyDNS,
+			"server_port": 53,
+			"detour":      "所有-自动",
 		},
 	}
 
 	if s.DNS.FakeIP {
 		servers = append(servers, map[string]any{
-			"tag":   "dns-fakeip",
-			"type":  "fakeip",
+			"tag":         "dns-fakeip",
+			"type":        "fakeip",
 			"inet4_range": "198.19.0.0/16",
 		})
 	}

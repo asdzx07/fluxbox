@@ -1,7 +1,13 @@
 package api
 
 import (
+	"crypto/tls"
+	"fmt"
+	"io"
+	"log"
 	"net/http"
+	"os"
+	"os/exec"
 	"runtime"
 	"time"
 
@@ -111,4 +117,68 @@ func (s *Server) handleTraffic(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleTrafficReset(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, map[string]any{"ok": true})
+}
+
+func (s *Server) handleSystemUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+		return
+	}
+
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		arch := runtime.GOARCH
+		binName := fmt.Sprintf("fluxboxd-linux-%s", arch)
+		urls := []string{
+			fmt.Sprintf("https://github.com/asdzx07/fluxbox/releases/latest/download/%s", binName),
+			fmt.Sprintf("https://ghfast.top/https://github.com/asdzx07/fluxbox/releases/latest/download/%s", binName),
+			fmt.Sprintf("https://raw.githubusercontent.com/asdzx07/fluxbox/main/dist/%s", binName),
+			fmt.Sprintf("https://ghfast.top/https://raw.githubusercontent.com/asdzx07/fluxbox/main/dist/%s", binName),
+		}
+
+		selfPath, err := os.Executable()
+		if err != nil {
+			selfPath = "/opt/fluxbox/bin/fluxboxd"
+		}
+		newPath := selfPath + ".new"
+
+		var downloadSuccess bool
+		client := &http.Client{
+			Transport: &http.Transport{
+				Proxy:           nil,
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+			Timeout: 60 * time.Second,
+		}
+
+		for _, u := range urls {
+			resp, err := client.Get(u)
+			if err == nil && resp.StatusCode == http.StatusOK {
+				data, err := io.ReadAll(resp.Body)
+				resp.Body.Close()
+				if err == nil && len(data) > 5*1024*1024 { // 二进制通常大于 10MB
+					if err := os.WriteFile(newPath, data, 0755); err == nil {
+						downloadSuccess = true
+						break
+					}
+				}
+			}
+		}
+
+		if downloadSuccess {
+			_ = os.Rename(newPath, selfPath)
+			log.Printf("🎉 自更新完成，准备重启服务...")
+			time.Sleep(1 * time.Second)
+			if _, err := os.Stat("/etc/init.d/fluxbox"); err == nil {
+				_ = exec.Command("/etc/init.d/fluxbox", "restart").Run()
+			} else {
+				os.Exit(0)
+			}
+		}
+	}()
+
+	s.writeJSON(w, map[string]any{
+		"ok":      true,
+		"message": "更新已在后台开始，面板服务即将重启，请稍后刷新页面",
+	})
 }

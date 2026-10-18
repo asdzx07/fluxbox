@@ -1,11 +1,13 @@
 package subscription
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -31,9 +33,22 @@ type Subscription struct {
 
 // FetchAndParse 拉取远程订阅并自动识别 sing-box JSON / Clash YAML / Base64 URI
 func FetchAndParse(subURL string) ([]map[string]any, error) {
+	// 直连公共 DNS 解析器，彻底避开软路由本地未就绪的 [::1]:53 超时问题
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{Timeout: 3 * time.Second}
+			return d.DialContext(ctx, "udp", "223.5.5.5:53")
+		},
+	}
 	tr := &http.Transport{
 		Proxy:           nil, // 显式禁用环境变量中死锁的本地 127.0.0.1:7891 代理，直连拉取
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+			Resolver:  resolver,
+		}).DialContext,
 	}
 	client := &http.Client{
 		Transport: tr,
