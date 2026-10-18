@@ -97,19 +97,16 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 	// 2. 构建 Inbounds (使用 eBPF 配套的 TProxy 入站替代传统高开销 TUN 入站)
 	inbounds := []map[string]any{
 		{
-			"type":                       "tproxy",
-			"tag":                        "ebpf-tproxy-in",
-			"listen":                     "::",
-			"listen_port":                7893,
-			"sniff":                      true,
-			"sniff_override_destination": false,
+			"type":        "tproxy",
+			"tag":         "ebpf-tproxy-in",
+			"listen":      "::",
+			"listen_port": 7893,
 		},
 		{
 			"type":        "mixed",
 			"tag":         "mixed-in",
 			"listen":      "0.0.0.0",
 			"listen_port": 7891,
-			"sniff":       true,
 		},
 		{
 			"type":        "direct",
