@@ -79,6 +79,7 @@ export function defaultSettings() {
       rejectQuic: true,
       directBypass: true,
       directForNodes: true,
+      sniff: true,
       bypassPorts: '',
     },
     dns: {

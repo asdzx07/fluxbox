@@ -413,7 +413,7 @@ function buildRoute(settings, names) {
   const { network, policies } = settings;
   const rules = [];
 
-  rules.push({ action: 'sniff' });
+  if (network.sniff !== false) rules.push({ action: 'sniff' });
 
   if (settings.dns.mode === 'dnsmasq') rules.push({ inbound: ['dns-in'], action: 'hijack-dns' });
   rules.push({ protocol: 'dns', action: 'hijack-dns' });

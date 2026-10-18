@@ -1512,8 +1512,11 @@ async function loadSettings() {
     if ($('setIpv6')) $('setIpv6').checked = Boolean(s.network?.ipv6);
     if ($('setRejectQuic')) $('setRejectQuic').checked = Boolean(s.network?.rejectQuic);
     if ($('setAutoRedirect')) $('setAutoRedirect').checked = s.network?.tun?.autoRedirect !== false;
+    if ($('setStrictRoute')) $('setStrictRoute').checked = Boolean(s.network?.tun?.strictRoute);
     if ($('setDirectBypass')) $('setDirectBypass').checked = s.network?.directBypass !== false;
     if ($('setDirectForNodes')) $('setDirectForNodes').checked = s.network?.directForNodes !== false;
+    if ($('setSniff')) $('setSniff').checked = s.network?.sniff !== false;
+    if ($('setAutoStart')) $('setAutoStart').checked = s.kernel?.autoStart !== false;
     if ($('setDnsMode')) $('setDnsMode').value = s.dns?.mode || 'dnsmasq';
     if ($('setDnsDirect')) $('setDnsDirect').value = s.dns?.direct === 'wan' ? '' : (s.dns?.directAddress || '');
     if ($('setDnsProxy')) $('setDnsProxy').value = s.dns?.proxy || '';
@@ -2137,11 +2140,15 @@ function bindEvents() {
     try {
       const patch = {
         network: {
-          ipv6: $('setIpv6').checked,
-          rejectQuic: $('setRejectQuic').checked,
-          directBypass: $('setDirectBypass').checked,
-          directForNodes: $('setDirectForNodes').checked,
-          tun: { autoRedirect: $('setAutoRedirect').checked },
+          ipv6: $('setIpv6') ? $('setIpv6').checked : false,
+          rejectQuic: $('setRejectQuic') ? $('setRejectQuic').checked : true,
+          directBypass: $('setDirectBypass') ? $('setDirectBypass').checked : true,
+          directForNodes: $('setDirectForNodes') ? $('setDirectForNodes').checked : true,
+          sniff: $('setSniff') ? $('setSniff').checked : true,
+          tun: {
+            autoRedirect: $('setAutoRedirect') ? $('setAutoRedirect').checked : true,
+            strictRoute: Boolean($('setStrictRoute')?.checked),
+          },
         },
         dns: {
           mode: $('setDnsMode').value,
@@ -2156,7 +2163,10 @@ function bindEvents() {
           adblockAllow: $('setAdblockAllow').value.split('\n').map((s) => s.trim()).filter(Boolean),
           adblockCustom: $('setAdblockCustom').value.split('\n').map((s) => s.trim()).filter(Boolean),
         },
-        kernel: { logLevel: $('setLogLevel') ? $('setLogLevel').value : 'warn' },
+        kernel: {
+          logLevel: $('setLogLevel') ? $('setLogLevel').value : 'warn',
+          autoStart: $('setAutoStart') ? $('setAutoStart').checked : true,
+        },
       };
       await api('/settings', { method: 'PUT', body: patch });
       await api('/deploy', { method: 'POST', body: { restart: true } });

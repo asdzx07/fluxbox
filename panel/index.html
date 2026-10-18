@@ -396,75 +396,133 @@
         </div>
       </div>
 
-      <!-- 核心设置双列网格: 左侧网络与TUN, 右侧DNS分流 -->
+      <!-- 核心设置双列网格: 左右 2 张大卡片并列 -->
       <div class="settings-two-col-grid">
-        <!-- 核心卡片 2: 网络与 TUN 栈设置 -->
-        <div class="card">
+        <!-- 核心卡片 1: 网络特性与功能开关 (全开关集中区) -->
+        <div class="card" style="display:flex; flex-direction:column;">
           <div class="card-head">
-            <h3>网络与 TUN 栈设置</h3>
+            <h3>网络特性与功能开关</h3>
+            <div class="spacer"></div>
+            <span class="bdg">11 项特性开关</span>
           </div>
-          <div class="setting-list">
-            <div class="setting-item">
-              <div class="grow">
-                <div class="title">直连不进内核 (零损耗)</div>
-                <div class="sub">国内直连 IP 集合在 tun 路由中直接排除，流量根本不进内核，直连零开销</div>
-              </div>
+
+          <div class="setting-list" style="gap:0">
+            <!-- 1. 直连不进内核 -->
+            <div class="setting-item-clean">
+              <span class="title-clean">直连不进内核 (零损耗)</span>
               <label class="switch">
                 <input type="checkbox" id="setDirectBypass">
                 <span></span>
               </label>
             </div>
 
-            <div class="setting-item">
-              <div class="grow">
-                <div class="title">nftables 转发 (auto_redirect)</div>
-                <div class="sub">由系统 nftables 负责自动劫持和转发透明代理流量</div>
-              </div>
+            <!-- 2. nftables 转发 -->
+            <div class="setting-item-clean">
+              <span class="title-clean">nftables 转发 (auto_redirect)</span>
               <label class="switch">
                 <input type="checkbox" id="setAutoRedirect">
                 <span></span>
               </label>
             </div>
 
-            <div class="setting-item">
-              <div class="grow">
-                <div class="title">节点服务器直连</div>
-                <div class="sub">代理节点服务器自身的 IP 强制直连，防止节点握手流量产生环路</div>
-              </div>
+            <!-- 3. 严格路由保护 (strict_route) -->
+            <div class="setting-item-clean">
+              <span class="title-clean">严格路由保护 (strict_route)</span>
+              <label class="switch">
+                <input type="checkbox" id="setStrictRoute">
+                <span></span>
+              </label>
+            </div>
+
+            <!-- 4. 节点服务器直连 -->
+            <div class="setting-item-clean">
+              <span class="title-clean">节点服务器直连</span>
               <label class="switch">
                 <input type="checkbox" id="setDirectForNodes">
                 <span></span>
               </label>
             </div>
 
-            <div class="setting-item">
-              <div class="grow">
-                <div class="title">屏蔽 QUIC (UDP 443)</div>
-                <div class="sub">阻止浏览器或客户端走 HTTP3/QUIC，回退至更稳定的 TCP 代理链路</div>
-              </div>
+            <!-- 5. 屏蔽 QUIC (UDP 443) -->
+            <div class="setting-item-clean">
+              <span class="title-clean">屏蔽 QUIC (UDP 443)</span>
               <label class="switch">
                 <input type="checkbox" id="setRejectQuic">
                 <span></span>
               </label>
             </div>
 
-            <div class="setting-item">
-              <div class="grow">
-                <div class="title">启用 IPv6</div>
-                <div class="sub">接管并分流局域网 IPv6 流量（若局域网未配置 IPv6 建议关闭）</div>
-              </div>
+            <!-- 6. 流量协议嗅探 (SNI / Host) -->
+            <div class="setting-item-clean">
+              <span class="title-clean">流量协议嗅探 (SNI / Host)</span>
+              <label class="switch">
+                <input type="checkbox" id="setSniff">
+                <span></span>
+              </label>
+            </div>
+
+            <!-- 7. 启用 IPv6 -->
+            <div class="setting-item-clean">
+              <span class="title-clean">启用 IPv6</span>
               <label class="switch">
                 <input type="checkbox" id="setIpv6">
                 <span></span>
               </label>
             </div>
+
+            <!-- 8. 代理域名使用 FakeIP -->
+            <div class="setting-item-clean">
+              <span class="title-clean">代理域名使用 FakeIP</span>
+              <label class="switch">
+                <input type="checkbox" id="setFakeIp">
+                <span></span>
+              </label>
+            </div>
+
+            <!-- 9. 国内外域名智能分流解析 -->
+            <div class="setting-item-clean">
+              <span class="title-clean">国内外域名智能分流解析</span>
+              <label class="switch">
+                <input type="checkbox" id="setDnsSplit">
+                <span></span>
+              </label>
+            </div>
+
+            <!-- 10. DNS 广告过滤拦截 -->
+            <div class="setting-item-clean">
+              <span class="title-clean">DNS 广告过滤拦截</span>
+              <label class="switch">
+                <input type="checkbox" id="setAdblock">
+                <span></span>
+              </label>
+            </div>
+
+            <!-- 11. 内核开机自启与进程守护 -->
+            <div class="setting-item-clean">
+              <span class="title-clean">内核开机自启与进程守护</span>
+              <label class="switch">
+                <input type="checkbox" id="setAutoStart">
+                <span></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 底部透明代理网络栈状态条 (自然填补留白) -->
+          <div class="netstack-status-box" style="margin-top:auto">
+            <div class="dot"></div>
+            <div class="netstack-info">
+              <div class="netstack-title">TUN 模式: mybox-tun (Mixed 栈)</div>
+              <div class="netstack-sub">nftables 表: mybox ｜ ip rule 优先级: 9000</div>
+            </div>
           </div>
         </div>
 
-        <!-- 核心卡片 3: DNS 分流与运行级别 (极简无冗余解释) -->
-        <div class="card">
+        <!-- 核心卡片 2: DNS 分流与规则配置 (参数与名单集中区) -->
+        <div class="card" style="display:flex; flex-direction:column;">
           <div class="card-head">
-            <h3>DNS 分流与运行级别</h3>
+            <h3>DNS 分流与规则配置</h3>
+            <div class="spacer"></div>
+            <span class="bdg" style="border-color:rgba(16,185,129,0.3);color:var(--ok)">参数设置 &amp; 名单</span>
           </div>
 
           <!-- 核心解析与日志参数 (双列网格) -->
@@ -516,62 +574,26 @@
             </label>
           </div>
 
-          <!-- 实用 DNS 特性开关列表 -->
-          <div class="setting-list" style="margin-top:auto;padding-top:10px;border-top:1px solid var(--border)">
-            <div class="setting-item" style="padding:8px 0">
-              <div class="grow">
-                <div class="title">代理域名使用 FakeIP</div>
-                <div class="sub">分配虚拟保留保留 IP，加速握手并消除本地延迟</div>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="setFakeIp">
-                <span></span>
-              </label>
-            </div>
-
-            <div class="setting-item" style="padding:8px 0">
-              <div class="grow">
-                <div class="title">国内外域名智能分流解析</div>
-                <div class="sub">国内域名直连 DNS、国外代理 DNS，防解析污染</div>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="setDnsSplit">
-                <span></span>
-              </label>
-            </div>
+          <!-- 广告过滤黑白名单 (双列文本域并排) -->
+          <div class="dns-rules-grid" style="margin-top:auto;padding-top:12px;border-top:1px solid var(--border)">
+            <label class="field">
+              <span class="field-title">手动广告黑名单（强制拦截）</span>
+              <textarea id="setAdblockCustom" rows="5" placeholder="每行一个域名，例如：&#10;ads.example.com&#10;adservice.google.com"></textarea>
+            </label>
+            <label class="field">
+              <span class="field-title">广告白名单（放行防误杀）</span>
+              <textarea id="setAdblockAllow" rows="5" placeholder="每行一个域名，例如：&#10;example.com&#10;analytics.trusted.org"></textarea>
+            </label>
           </div>
-        </div>
-      </div>
 
-      <!-- 核心卡片: DNS 广告过滤与黑白名单 (独立通栏卡片) -->
-      <div class="card">
-        <div class="card-head">
-          <h3>DNS 广告过滤与黑白名单</h3>
-          <div class="spacer"></div>
-          <span class="note" style="margin-right:6px">开启拦截</span>
-          <label class="switch" title="开启/关闭广告过滤">
-            <input type="checkbox" id="setAdblock">
-            <span></span>
-          </label>
-        </div>
-
-        <div class="dns-rules-grid">
-          <label class="field">
-            <span class="field-title">手动广告黑名单（强制拦截）</span>
-            <textarea id="setAdblockCustom" rows="3" placeholder="每行一个域名，例如：&#10;ads.example.com&#10;adservice.google.com"></textarea>
-          </label>
-          <label class="field">
-            <span class="field-title">广告白名单（放行防误杀）</span>
-            <textarea id="setAdblockAllow" rows="3" placeholder="每行一个域名，例如：&#10;example.com&#10;analytics.trusted.org"></textarea>
-          </label>
-        </div>
-
-        <div class="dns-rules-foot" style="margin-top:10px">
-          <span class="note">远程 Geosite 规则集每日自动同步，亦可随时手动拉取 <span id="adblockRulesetDate" style="margin-left:6px;color:var(--text-muted)">(上次更新: <span id="adblockRulesetDateText">未更新</span>)</span></span>
-          <button class="small" id="btnAdblockRefresh">
-            <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            <span id="btnAdblockRefreshText">更新广告规则集</span>
-          </button>
+          <!-- 底部规则更新操作栏 -->
+          <div class="dns-rules-foot" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+            <span class="note">远程 Geosite 规则集每日自动同步 <span id="adblockRulesetDate" style="margin-left:6px;color:var(--text-muted)">(上次更新: <span id="adblockRulesetDateText">未更新</span>)</span></span>
+            <button class="small" id="btnAdblockRefresh">
+              <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span id="btnAdblockRefreshText">更新广告规则集</span>
+            </button>
+          </div>
         </div>
       </div>
 

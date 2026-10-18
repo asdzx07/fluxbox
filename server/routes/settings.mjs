@@ -78,7 +78,15 @@ export function registerSettingsRoutes(app, deps) {
     // 接受已知的顶层区块，防止把任意字段写进配置
     for (const key of ['kernel', 'network', 'dns', 'meta']) {
       if (incoming[key] && typeof incoming[key] === 'object') {
-        current[key] = { ...current[key], ...incoming[key] };
+        if (key === 'network' && incoming.network?.tun && typeof incoming.network.tun === 'object') {
+          current.network = {
+            ...current.network,
+            ...incoming.network,
+            tun: { ...(current.network?.tun || {}), ...incoming.network.tun },
+          };
+        } else {
+          current[key] = { ...current[key], ...incoming[key] };
+        }
       }
     }
     // 兼容直接通过 settings 接口保存 groups / policies
