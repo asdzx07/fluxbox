@@ -2403,10 +2403,10 @@ function bindEvents() {
       if ($('latestKernelVer')) $('latestKernelVer').textContent = targetVersion;
       if (latest.current && $('setKernelVersion')) $('setKernelVersion').textContent = latest.current;
 
-      const cur = (latest.current || state.settings?.kernel?.version || '').replace(/^v/, '');
-      const tar = (targetVersion || '').replace(/^v/, '');
-      if (cur && tar && cur === tar) {
-        toast(`当前内核已是最新 (${targetVersion})`);
+      const cur = (latest.current || state.settings?.kernel?.version || '').replace(/^(sing-box version |v)/i, '').trim();
+      const tar = (targetVersion || '').replace(/^v/, '').trim();
+      if (!latest.hasUpdate || (cur && tar && cur === tar)) {
+        toast(`当前内核已是最新 (${targetVersion || latest.current})`);
         if (txt) txt.textContent = '内核已是最新';
         setTimeout(() => {
           btn.disabled = false;
@@ -2415,6 +2415,7 @@ function bindEvents() {
         return;
       }
       if (!confirm(`下载并安装官方 sing-box ${targetVersion}？（安装后自动重启内核）`)) {
+
         btn.disabled = false;
         if (txt) txt.textContent = '内核更新';
         return;
