@@ -15,4 +15,4 @@ package-lock.json
 *.old
 windows-client/obj/
 windows-client/bin/
-
+build/

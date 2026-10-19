@@ -110,6 +110,9 @@ func (s *Supervisor) Start() error {
 	cmd.Env = append(os.Environ(),
 		"ENABLE_DEPRECATED_MISSING_DOMAIN_RESOLVER=true",
 		"ENABLE_DEPRECATED_LEGACY_RULE_SET_DOWNLOAD_DETOUR=true",
+		// 【核心内存优化】强制将 sing-box 运行时堆内存软上限锁死在 55MB，提高 GC 回收频率
+		"GOMEMLIMIT=55MiB",
+		"GOGC=40",
 	)
 
 	stdoutPipe, err := cmd.StdoutPipe()

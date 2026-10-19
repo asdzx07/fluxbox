@@ -17,18 +17,24 @@ import (
 
 const ClashAPIURL = "http://127.0.0.1:9095"
 
+var defaultClashClient = &http.Client{
+	Transport: &http.Transport{
+		Proxy:               nil,
+		MaxIdleConns:        10,
+		IdleConnTimeout:     30 * time.Second,
+		DisableKeepAlives:   false,
+	},
+	Timeout: 10 * time.Second,
+}
+
 func (s *Server) clashRequest(method, path string, body []byte) ([]byte, int, error) {
-	client := &http.Client{
-		Transport: &http.Transport{Proxy: nil},
-		Timeout:   10 * time.Second,
-	}
 	req, err := http.NewRequest(method, ClashAPIURL+path, bytes.NewReader(body))
 	if err != nil {
 		return nil, 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := client.Do(req)
+	resp, err := defaultClashClient.Do(req)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -255,14 +261,15 @@ func (s *Server) handleControllerProxy() http.Handler {
 // StartDirectIPLearner 自动从 sing-box 活动连接中收割被规则判定为「直连」的目标 IP 注入 eBPF 硬件旁路表
 func (s *Server) StartDirectIPLearner() {
 	go func() {
-		ticker := time.NewTicker(3 * time.Second)
+		seen := make(map[string]bool, 1024)
+		ticker := time.NewTicker(8 * time.Second) // 放宽至 8 秒一次，大幅降低 JSON 解析开销
 		defer ticker.Stop()
 		for range ticker.C {
 			if s.bpfEngine == nil {
 				continue
 			}
 			raw, _, err := s.clashRequest(http.MethodGet, "/connections", nil)
-			if err != nil {
+			if err != nil || len(raw) == 0 {
 				continue
 			}
 			var data struct {
@@ -276,11 +283,15 @@ func (s *Server) StartDirectIPLearner() {
 			if json.Unmarshal(raw, &data) != nil {
 				continue
 			}
+			// 防止 map 无限增长
+			if len(seen) > 4096 {
+				clear(seen)
+			}
 			for _, c := range data.Connections {
-				// 只要 sing-box 的规则引擎判定该连接最终出口是「直连」
-				if len(c.Chains) > 0 && c.Chains[0] == "直连" && c.Metadata.DestinationIP != "" {
-					// 立即将该目标 IP 写入 eBPF 内核旁路表，后续流量直接走网卡硬件直出！
-					_ = s.bpfEngine.AddLearnedDirectIP(c.Metadata.DestinationIP)
+				ip := c.Metadata.DestinationIP
+				if ip != "" && !seen[ip] && len(c.Chains) > 0 && c.Chains[0] == "直连" {
+					seen[ip] = true
+					_ = s.bpfEngine.AddLearnedDirectIP(ip)
 				}
 			}
 		}

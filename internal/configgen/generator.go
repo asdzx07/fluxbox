@@ -447,7 +447,7 @@ func buildDNS(s Settings, nodeServers []string) map[string]any {
 			})
 		}
 		rules = append(rules, map[string]any{
-			"rule_set": []string{"geosite-category-ads-all"},
+			"rule_set": []string{"geosite-category-ads"},
 			"action":   "reject",
 		})
 	}
@@ -522,10 +522,13 @@ func buildRoute(in BuildInput, flipDir string, nodeServerDomains, nodeServerIPs 
 		}
 	}
 
+	// 在 buildRoute 中：如果 eBPF DirectBypass 已开启，国内 IP 已在网卡 TC 层直接旁路，sing-box 无需重复加载 geoip-cn！
+	needGeoipCN := !in.Settings.Network.DirectBypass
+
 	referencedRulesets := map[string]bool{
-		"geosite-cn":               true,
-		"geoip-cn":                 true,
-		"geosite-category-ads-all": in.Settings.DNS.Adblock,
+		"geosite-cn":           true,
+		"geoip-cn":             needGeoipCN,
+		"geosite-category-ads": in.Settings.DNS.Adblock,
 	}
 	var flipRuleSets []map[string]any
 
@@ -546,10 +549,17 @@ func buildRoute(in BuildInput, flipDir string, nodeServerDomains, nodeServerIPs 
 
 		var matchSubRules []map[string]any
 		if len(p.Rulesets) > 0 {
+			var activeRulesets []string
 			for _, rs := range p.Rulesets {
+				if rs == "geoip-cn" && !needGeoipCN {
+					continue // eBPF 已在网卡 TC 层接管大陆 IP 旁路，无需 sing-box 重复下载与加载
+				}
 				referencedRulesets[rs] = true
+				activeRulesets = append(activeRulesets, rs)
 			}
-			matchSubRules = append(matchSubRules, map[string]any{"rule_set": p.Rulesets})
+			if len(activeRulesets) > 0 {
+				matchSubRules = append(matchSubRules, map[string]any{"rule_set": activeRulesets})
+			}
 		}
 		if len(p.DomainSuffix) > 0 {
 			matchSubRules = append(matchSubRules, map[string]any{"domain_suffix": p.DomainSuffix})
@@ -575,8 +585,12 @@ func buildRoute(in BuildInput, flipDir string, nodeServerDomains, nodeServerIPs 
 	}
 
 	// 国内流量兜底直连
+	cnRuleSets := []string{"geosite-cn"}
+	if needGeoipCN {
+		cnRuleSets = append(cnRuleSets, "geoip-cn")
+	}
 	rules = append(rules, map[string]any{
-		"rule_set": []string{"geosite-cn", "geoip-cn"},
+		"rule_set": cnRuleSets,
 		"outbound": "直连",
 	})
 

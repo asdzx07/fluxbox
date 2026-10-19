@@ -181,17 +181,17 @@ namespace FluxBox.Client
 
         public static string FindBrowserExecutable()
         {
-            string chrome1 = @"C:\Program Files\Google\Chrome\Application\chrome.exe";
-            if (File.Exists(chrome1)) return chrome1;
-
-            string chrome2 = @"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe";
-            if (File.Exists(chrome2)) return chrome2;
-
             string edge1 = @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe";
             if (File.Exists(edge1)) return edge1;
 
             string edge2 = @"C:\Program Files\Microsoft\Edge\Application\msedge.exe";
             if (File.Exists(edge2)) return edge2;
+
+            string chrome1 = @"C:\Program Files\Google\Chrome\Application\chrome.exe";
+            if (File.Exists(chrome1)) return chrome1;
+
+            string chrome2 = @"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe";
+            if (File.Exists(chrome2)) return chrome2;
 
             return null;
         }

@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -32,6 +33,10 @@ var (
 )
 
 func main() {
+	// 【核心内存优化】将 fluxboxd 守护进程自身内存软上限限制为 20MB，杜绝内存膨胀
+	debug.SetGCPercent(50)
+	debug.SetMemoryLimit(20 * 1024 * 1024)
+
 	// 清理软路由可能残留的代理环境变量，防止自请求死锁 (如 dial 127.0.0.1:7891)
 	os.Unsetenv("http_proxy")
 	os.Unsetenv("https_proxy")
@@ -90,13 +95,13 @@ func main() {
 	apiServer := api.NewServer(st, bpfEngine, sup)
 	apiServer.StartDirectIPLearner()
 
-	// 6. 若配置了自动启动且存在节点配置，在启动时自动执行一次配置下发
+	// 6. 若存在节点配置，在启动时自动执行最新配置重新生成与下发
 	go func() {
 		settings := st.GetSettings()
-		if settings.Kernel.AutoStart && (len(settings.Subscriptions) > 0 || len(settings.Nodes) > 0) {
-			log.Printf("🔄 检测到已有配置与节点，正在自动拉起内核与网络栈...")
-			if err := apiServer.DeployCore(false); err != nil {
-				log.Printf("⚠️  开机自动部署提示: %v", err)
+		if len(settings.Subscriptions) > 0 || len(settings.Nodes) > 0 {
+			log.Printf("🔄 检测到已有配置与节点，正在自动重新生成最新轻量配置并拉起内核...")
+			if err := apiServer.DeployCore(true); err != nil {
+				log.Printf("⚠️  启动自动部署提示: %v", err)
 			}
 		}
 	}()
