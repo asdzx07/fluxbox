@@ -14,10 +14,12 @@ namespace FluxBox.Client
 {
     public static class Program
     {
+        public static Process AgentProcess = null;
         public static Process NodeProcess = null;
         public static string AppDir = "";
         public static Mutex AppMutex = null;
         public static string BrowserExe = "";
+        public static string AgentExe = "";
         public static string NodeExe = "";
         public static DateTime LastLaunchTime = DateTime.MinValue;
         private static bool isCleaningUp = false;
@@ -61,12 +63,21 @@ namespace FluxBox.Client
 
             try
             {
-                // 3. 寻找 Node.js 运行环境
-                NodeExe = FindNodeExecutable();
-                if (string.IsNullOrEmpty(NodeExe))
+                // 3. 寻找本地伴侣服务运行环境 (优先使用纯 Go 单文件伴侣 fluxbox-agent.exe，免除 Node.js 依赖)
+                string agentCandidate = Path.Combine(AppDir, "fluxbox-agent.exe");
+                bool useGoAgent = File.Exists(agentCandidate);
+                if (useGoAgent)
                 {
-                    MessageBox.Show("未检测到 Node.js 运行环境！\n请确保已安装 Node.js (v18 或以上)。", "启动失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
+                    AgentExe = agentCandidate;
+                }
+                else
+                {
+                    NodeExe = FindNodeExecutable();
+                    if (string.IsNullOrEmpty(NodeExe))
+                    {
+                        MessageBox.Show("未检测到 fluxbox-agent.exe 且未安装 Node.js 运行环境！\n建议使用内置 fluxbox-agent.exe 或安装 Node.js (v18 或以上)。", "启动失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
                 }
 
                 // 4. 寻找浏览器 (优先 Edge 独立应用模式，其次 Chrome)
@@ -88,14 +99,24 @@ namespace FluxBox.Client
                         Thread.Sleep(300);
                     }
 
-                    StartNodeServer(NodeExe);
+                    if (useGoAgent)
+                    {
+                        StartAgentServer(AgentExe);
+                    }
+                    else
+                    {
+                        StartNodeServer(NodeExe);
+                    }
 
                     bool ready = WaitForServerReady(3038, 8000);
                     if (!ready)
                     {
                         if (!IsPortOccupiedTcp(3038))
                         {
-                            MessageBox.Show("本地伴侣服务启动超时，请尝试在命令行运行：\nnode core/server.mjs\n排查报错原因。", "服务超时", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            string hint = useGoAgent
+                                ? "本地 Go 伴侣服务 (fluxbox-agent.exe) 启动超时，请排查安全软件拦截或管理员权限。"
+                                : "本地伴侣服务启动超时，请尝试在命令行运行：\nnode core/server.mjs\n排查报错原因。";
+                            MessageBox.Show(hint, "服务超时", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                             return;
                         }
                     }
@@ -172,6 +193,20 @@ namespace FluxBox.Client
             if (File.Exists(chrome2)) return chrome2;
 
             return null;
+        }
+
+        public static void StartAgentServer(string agentExe)
+        {
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = agentExe,
+                WorkingDirectory = AppDir,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+
+            AgentProcess = Process.Start(psi);
         }
 
         public static void StartNodeServer(string nodeExe)
@@ -478,7 +513,11 @@ namespace FluxBox.Client
             // 2. 兜底恢复所有物理网卡为 DHCP
             ResetNetworkDirectly();
 
-            // 3. 杀掉后台 node 服务进程
+            // 3. 杀掉后台伴侣服务进程
+            if (AgentProcess != null && !AgentProcess.HasExited)
+            {
+                try { AgentProcess.Kill(); } catch { }
+            }
             if (NodeProcess != null && !NodeProcess.HasExited)
             {
                 try { NodeProcess.Kill(); } catch { }
@@ -618,7 +657,12 @@ namespace FluxBox.Client
             pollTimer.Interval = 2500; // 每 2.5 秒更新一次托盘状态
             pollTimer.Tick += (s, e) =>
             {
-                // 若 Node 服务已结束(如用户在界面中点击彻底退出)，则同步退出托盘
+                // 若伴侣服务已结束(如用户在界面中点击彻底退出)，则同步退出托盘
+                if (Program.AgentProcess != null && Program.AgentProcess.HasExited)
+                {
+                    ExitAndCleanup();
+                    return;
+                }
                 if (Program.NodeProcess != null && Program.NodeProcess.HasExited)
                 {
                     ExitAndCleanup();
