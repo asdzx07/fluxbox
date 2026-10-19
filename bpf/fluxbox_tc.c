@@ -86,7 +86,7 @@ int fluxbox_tc_ingress(struct __sk_buff *skb) {
     __u32 src_ip = iph->saddr;
     __u32 dst_ip = iph->daddr;
 
-    // 2. 處理 UDP 特例：放行 DHCP (67/68)，接管 DNS (53)
+    // 2. 放行 DHCP (UDP 67/68) 广播包
     if (iph->protocol == IPPROTO_UDP) {
         struct udphdr *udph = (void *)iph + (iph->ihl * 4);
         if ((void *)(udph + 1) <= data_end) {
@@ -95,22 +95,14 @@ int fluxbox_tc_ingress(struct __sk_buff *skb) {
                 skb->mark = FWMARK_BYPASS;
                 return TC_ACT_OK;
             }
-            if (dport == 53) {
-                skb->mark = FWMARK_TPROXY;
-                return TC_ACT_OK;
-            }
         }
     }
 
-    // 3. 局域网私有保留地址互访 (192.168/16, 10/8 等)：打上 BYPASS 免死金牌防止进 TProxy/TUN
-    struct ipv4_lpm_key lpm_key = { .prefixlen = 32 };
-    __builtin_memcpy(lpm_key.addr, &dst_ip, 4);
-
-    // 4. 内网设备分流匹配 (对应面板「内网分流」页)
+    // 3. 【核心修复】内网设备分流优先判定（对应面板「内网分流」页）
+    // 若设备被设为「完全直连」，其所有流量（含 DNS）打上 BYPASS 直接由物理网卡转发，严禁劫持入 Fake-IP！
     __u8 *client_mode = bpf_map_lookup_elem(&lan_clients_map, &src_ip);
     if (client_mode) {
         if (*client_mode == CLIENT_MODE_DIRECT) {
-            // 关键修复：显式打上 0x2024 标记，让后续 ip rule 与 nftables 100% 绕过代理！
             skb->mark = FWMARK_BYPASS;
             inc_stat(0);
             return TC_ACT_OK;
@@ -121,6 +113,21 @@ int fluxbox_tc_ingress(struct __sk_buff *skb) {
             return TC_ACT_OK;
         }
     }
+
+    // 4. 接管普通规则设备的 DNS (UDP 53) 送入 sing-box 进行 Fake-IP 解析与分流
+    if (iph->protocol == IPPROTO_UDP) {
+        struct udphdr *udph = (void *)iph + (iph->ihl * 4);
+        if ((void *)(udph + 1) <= data_end) {
+            if (bpf_ntohs(udph->dest) == 53) {
+                skb->mark = FWMARK_TPROXY;
+                return TC_ACT_OK;
+            }
+        }
+    }
+
+    // 5. 局域网私有保留地址互访 (192.168/16, 10/8 等)
+    struct ipv4_lpm_key lpm_key = { .prefixlen = 32 };
+    __builtin_memcpy(lpm_key.addr, &dst_ip, 4);
 
     // 5. 硬件级屏蔽 QUIC (UDP 443)
     __u32 cfg_quic_key = 1;
