@@ -16,8 +16,8 @@ let state = {
 /* --------------------------------------------------------------- 基础工具 */
 
 async function api(path, options = {}) {
-  // 部署接口可能耗时数分钟，单独给更长的超时
-  const timeoutMs = path === '/deploy' ? 300000 : 30000;
+  // 部署与拉取订阅接口涉及海外网络，单独给更长的超时 (2~5分钟)
+  const timeoutMs = path === '/deploy' ? 300000 : (path.startsWith('/subscriptions') ? 120000 : 30000);
   const res = await fetch(`/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
@@ -996,7 +996,7 @@ function renderSubList(subs) {
       </label>
       <div class="grow">
         <div class="title">${escapeHtml(s.name || s.id)}</div>
-        <div class="sub">${escapeHtml(s.url || '')} · 节点: ${s.nodes?.length || 0} 个</div>
+        <div class="sub">${escapeHtml(s.url || '')} · 节点: ${s.nodeCount ?? s.nodes?.length ?? 0} 个</div>
       </div>
       <div class="inline">
         <button class="small" data-refresh="${escapeHtml(s.id)}">刷新</button>

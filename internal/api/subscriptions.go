@@ -24,16 +24,61 @@ func (s *Server) handleSubscriptions(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		st := s.store.GetSettings()
 		var resList []map[string]any
-		for _, sub := range st.Subscriptions {
+
+		// 收集未显式关联订阅 ID 的节点
+		var orphanNodes []string
+		for _, n := range st.Nodes {
+			subID, _ := n["__subscriptionId"].(string)
+			if subID == "" {
+				subID, _ = n["subscriptionId"].(string)
+			}
+			if subID == "" {
+				subID, _ = n["subscription_id"].(string)
+			}
+			if subID == "" {
+				subID, _ = n["subId"].(string)
+			}
+			if subID == "" {
+				if tag, ok := n["tag"].(string); ok && tag != "" {
+					orphanNodes = append(orphanNodes, tag)
+				}
+			}
+		}
+
+		for idx, sub := range st.Subscriptions {
 			var nodeTags []string
-			var sampleNodes []string
 			for _, n := range st.Nodes {
-				if subID, ok := n["__subscriptionId"].(string); ok && subID == sub.ID {
+				subID, _ := n["__subscriptionId"].(string)
+				if subID == "" {
+					subID, _ = n["subscriptionId"].(string)
+				}
+				if subID == "" {
+					subID, _ = n["subscription_id"].(string)
+				}
+				if subID == "" {
+					subID, _ = n["subId"].(string)
+				}
+				if subID == sub.ID {
 					if tag, ok := n["tag"].(string); ok && tag != "" {
 						nodeTags = append(nodeTags, tag)
 					}
 				}
 			}
+			// 容错：如果该订阅未匹配到节点，但有旧项目迁移过来的孤儿节点，自动挂载
+			if len(nodeTags) == 0 && len(orphanNodes) > 0 && (len(st.Subscriptions) == 1 || sub.Enabled || idx == 0) {
+				nodeTags = orphanNodes
+				orphanNodes = nil
+			}
+			nCount := len(nodeTags)
+			if nCount == 0 && sub.NodeCount > 0 {
+				nCount = sub.NodeCount
+			}
+			if len(nodeTags) == 0 && len(sub.NodeTags) > 0 {
+				nodeTags = sub.NodeTags
+				nCount = len(nodeTags)
+			}
+
+			var sampleNodes []string
 			if len(nodeTags) > 4 {
 				sampleNodes = nodeTags[:4]
 			} else {
@@ -45,7 +90,8 @@ func (s *Server) handleSubscriptions(w http.ResponseWriter, r *http.Request) {
 				"name":        sub.Name,
 				"url":         sub.URL,
 				"enabled":     sub.Enabled,
-				"nodeCount":   len(nodeTags),
+				"nodeCount":   nCount,
+				"nodes":       nodeTags, // 兼容前端 app.js s.nodes?.length
 				"nodeTags":    nodeTags,
 				"sampleNodes": sampleNodes,
 				"updatedAt":   formatTimeVal(sub.UpdatedAt),

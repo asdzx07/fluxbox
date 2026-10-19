@@ -89,10 +89,41 @@ func (s *Server) DeployCore(restart bool) error {
 	fullSettings := s.store.GetSettings()
 	dataDir := s.store.GetDataDir()
 
+	// 收集处于启用状态订阅下的节点，未分类的孤儿节点默认全量保留
+	enabledSubMap := make(map[string]bool)
+	hasEnabledSub := false
+	for _, sub := range fullSettings.Subscriptions {
+		if sub.Enabled {
+			enabledSubMap[sub.ID] = true
+			hasEnabledSub = true
+		}
+	}
+
+	var activeNodes []map[string]any
+	for _, n := range fullSettings.Nodes {
+		subID, _ := n["__subscriptionId"].(string)
+		if subID == "" {
+			subID, _ = n["subscriptionId"].(string)
+		}
+		if subID == "" {
+			subID, _ = n["subscription_id"].(string)
+		}
+		if subID == "" {
+			subID, _ = n["subId"].(string)
+		}
+
+		if subID == "" || !hasEnabledSub || enabledSubMap[subID] {
+			activeNodes = append(activeNodes, n)
+		}
+	}
+	if len(activeNodes) == 0 && len(fullSettings.Nodes) > 0 {
+		activeNodes = fullSettings.Nodes
+	}
+
 	in := configgen.BuildInput{
 		DataDir:     dataDir,
 		Settings:    settings,
-		Nodes:       fullSettings.Nodes,
+		Nodes:       activeNodes,
 		Groups:      fullSettings.Groups,
 		Policies:    fullSettings.Policies,
 		RulesetSubs: fullSettings.RulesetSubs,

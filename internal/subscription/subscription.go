@@ -1,6 +1,7 @@
 package subscription
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -451,30 +452,30 @@ func asBool(v any) bool {
 }
 
 func fetchRawBytes(subURL string) ([]byte, error) {
-	// 优先尝试直连公共 DNS 拉取 (自带 0x2024 直连标记)
-	data, err := doFetch(subURL, nil)
-	if err == nil {
+	// 1. 优先尝试直连公共 DNS 快速拉取 (自带 0x2024 免死金牌)
+	data, directErr := doFetch(subURL, nil, 6*time.Second)
+	if directErr == nil && len(data) > 0 {
 		return data, nil
 	}
 
-	// 若直连失败，探测本地 7891 代理端口是否存活，若存活则自动通过代理拉取（避免海外机场被墙）
+	// 2. 若直连失败，探测本地 7891 代理端口是否存活，若存活则自动通过代理拉取（解决海外机场被阻断）
 	proxyURL, pErr := url.Parse("http://127.0.0.1:7891")
 	if pErr == nil {
-		conn, cErr := net.DialTimeout("tcp", "127.0.0.1:7891", 200*time.Millisecond)
+		conn, cErr := net.DialTimeout("tcp", "127.0.0.1:7891", 300*time.Millisecond)
 		if cErr == nil {
 			_ = conn.Close()
-			if proxyData, proxyErr := doFetch(subURL, http.ProxyURL(proxyURL)); proxyErr == nil {
+			if proxyData, proxyErr := doFetch(subURL, http.ProxyURL(proxyURL), 15*time.Second); proxyErr == nil && len(proxyData) > 0 {
 				return proxyData, nil
 			}
 		}
 	}
 
-	return nil, err
+	return nil, fmt.Errorf("直连拉取失败: %v (若为海外机场请先启用已有节点并热部署后再试)", directErr)
 }
 
-func doFetch(subURL string, proxyFunc func(*http.Request) (*url.URL, error)) ([]byte, error) {
+func doFetch(subURL string, proxyFunc func(*http.Request) (*url.URL, error), timeout time.Duration) ([]byte, error) {
 	dialer := &net.Dialer{
-		Timeout:   12 * time.Second,
+		Timeout:   timeout,
 		KeepAlive: 30 * time.Second,
 		Control: func(network, address string, c syscall.RawConn) error {
 			return c.Control(func(fd uintptr) {
@@ -482,6 +483,25 @@ func doFetch(subURL string, proxyFunc func(*http.Request) (*url.URL, error)) ([]
 			})
 		},
 	}
+
+	// 直连时使用带有 SO_MARK=0x2024 的直连 DNS 解析器，避开软路由本机可能被劫持或死锁的本地 dnsmasq
+	if proxyFunc == nil {
+		dialer.Resolver = &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{
+					Timeout: 3 * time.Second,
+					Control: func(network, address string, c syscall.RawConn) error {
+						return c.Control(func(fd uintptr) {
+							_ = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_MARK, 0x2024)
+						})
+					},
+				}
+				return d.DialContext(ctx, "udp", "223.5.5.5:53")
+			},
+		}
+	}
+
 	tr := &http.Transport{
 		Proxy:           proxyFunc,
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -489,13 +509,13 @@ func doFetch(subURL string, proxyFunc func(*http.Request) (*url.URL, error)) ([]
 	}
 	client := &http.Client{
 		Transport: tr,
-		Timeout:   25 * time.Second,
+		Timeout:   timeout + 5*time.Second,
 	}
 	req, err := http.NewRequest("GET", subURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "sing-box/1.15.0 Clash.Meta/v1.18.0 Mihomo/1.18")
+	req.Header.Set("User-Agent", "Clash.Meta/v1.18.0 Mihomo/1.18 sing-box/1.15.0")
 
 	resp, err := client.Do(req)
 	if err != nil {

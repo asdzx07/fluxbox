@@ -381,7 +381,21 @@ func buildDNS(s Settings, nodeServers []string) map[string]any {
 		})
 	}
 
-	// 4. 国内外智能分流与 FakeIP
+	// 4. 国内常用域名无条件直连 DNS 解析（免死金牌，保证离线与规则集未下载时国内全部秒开）
+	cnSuffixes := []string{
+		".cn", ".com.cn", ".net.cn", ".edu.cn", ".gov.cn", ".top",
+		".baidu.com", ".qq.com", ".weixin.qq.com", ".taobao.com", ".jd.com",
+		".bilibili.com", ".aliyun.com", ".alipay.com", ".163.com", ".126.net",
+		".sina.com.cn", ".weibo.com", ".zhihu.com", ".douyin.com", ".bytedance.com",
+		".feishu.cn", ".meituan.com", ".dianping.com", ".sohu.com", ".youku.com",
+		".iqiyi.com", ".apple.com", ".icloud.com", ".microsoft.com",
+	}
+	rules = append(rules, map[string]any{
+		"domain_suffix": cnSuffixes,
+		"server":        "dns-direct",
+	})
+
+	// 5. 国内外智能分流与 FakeIP
 	if s.DNS.Split {
 		rules = append(rules, map[string]any{
 			"rule_set": []string{"geosite-cn"},
@@ -395,10 +409,15 @@ func buildDNS(s Settings, nodeServers []string) map[string]any {
 		})
 	}
 
+	finalDNS := "dns-proxy"
+	if len(nodeServers) == 0 {
+		finalDNS = "dns-direct"
+	}
+
 	return map[string]any{
 		"servers":  servers,
 		"rules":    rules,
-		"final":    "dns-proxy",
+		"final":    finalDNS,
 		"strategy": strategy,
 	}
 }
@@ -514,7 +533,7 @@ func buildRoute(in BuildInput, flipDir string, nodeServers []string) map[string]
 				"type":   "remote",
 				"tag":    rsTag,
 				"format": "binary",
-				"url":    "https://raw.githubusercontent.com/SagerNet/" + repo + "/rule-set/" + rsTag + ".srs",
+				"url":    "https://testingcf.jsdelivr.net/gh/SagerNet/" + repo + "@rule-set/" + rsTag + ".srs",
 				"http_client": map[string]any{
 					"detour": "所有-自动",
 				},
@@ -522,10 +541,15 @@ func buildRoute(in BuildInput, flipDir string, nodeServers []string) map[string]
 		}
 	}
 
+	finalRoute := "所有-自动"
+	if len(in.Nodes) == 0 {
+		finalRoute = "直连"
+	}
+
 	return map[string]any{
 		"rules":                   rules,
 		"rule_set":                ruleSets,
-		"final":                   "所有-自动",
+		"final":                   finalRoute,
 		"auto_detect_interface":   true,
 		"default_domain_resolver": "dns-direct",
 		"default_mark":            FwmarkBypass, // 0x2024：配合 eBPF 实现零损耗防回环
