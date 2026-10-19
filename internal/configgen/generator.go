@@ -135,21 +135,31 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 	strictRoute := in.Settings.Network.Tun.StrictRoute
 	autoRedirect := in.Settings.Network.Tun.AutoRedirect
 
+	addressList := []string{"172.19.0.1/30"}
+	dnsAddressList := []string{"172.19.0.2"}
+	routeExcludeList := []string{
+		"10.0.0.0/8", "100.64.0.0/10", "169.254.0.0/16", "172.16.0.0/12",
+		"192.168.0.0/16", "224.0.0.0/4", "255.255.255.255/32",
+	}
+
+	if in.Settings.Network.IPv6 {
+		addressList = append(addressList, "fdfe:dcba:9876::1/126")
+		dnsAddressList = append(dnsAddressList, "fdfe:dcba:9876::2")
+		routeExcludeList = append(routeExcludeList, "fc00::/7", "fe80::/10")
+	}
+
 	tunInbound := map[string]any{
-		"type":           "tun",
-		"tag":            "tun-in",
-		"interface_name": "fluxbox-tun",
-		"address":        []string{"172.19.0.1/30"},
-		"mtu":            mtu,
-		"auto_route":     true,
-		"strict_route":   strictRoute,
-		"udp_timeout":    "60s",
-		"route_exclude_address": []string{
-			"10.0.0.0/8", "100.64.0.0/10", "169.254.0.0/16", "172.16.0.0/12",
-			"192.168.0.0/16", "224.0.0.0/4", "255.255.255.255/32",
-		},
-		"dns_mode":    "hijack",
-		"dns_address": []string{"172.19.0.2"},
+		"type":                  "tun",
+		"tag":                   "tun-in",
+		"interface_name":        "fluxbox-tun",
+		"address":               addressList,
+		"mtu":                   mtu,
+		"auto_route":            true,
+		"strict_route":          strictRoute,
+		"udp_timeout":           "60s",
+		"route_exclude_address": routeExcludeList,
+		"dns_mode":              "hijack",
+		"dns_address":           dnsAddressList,
 	}
 	if autoRedirect {
 		tunInbound["auto_redirect"] = true
@@ -174,7 +184,7 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 	}
 
 	// 3. 构建 Outbounds (基础出站 + 动态/静态策略组 + 订阅节点)
-	outbounds := buildOutbounds(in.Nodes, in.Groups, allNodeTags)
+	outbounds := buildOutbounds(in.Nodes, in.Groups, allNodeTags, in.Settings.Network.IPv6)
 
 	// 4. 构建 DNS 模块 (含 FakeIP、防污染分流、HTTPS 记录屏蔽、广告拦截)
 	dnsConfig := buildDNS(in.Settings, nodeServerDomains)
@@ -252,7 +262,7 @@ func cleanConfig(v any) any {
 	}
 }
 
-func buildOutbounds(nodes []map[string]any, groups []GroupConfig, allTags []string) []map[string]any {
+func buildOutbounds(nodes []map[string]any, groups []GroupConfig, allTags []string, enableIPv6 bool) []map[string]any {
 	var out []map[string]any
 
 	// 关键修复：当还没有拉取任何订阅节点时，urltest 不能包含空或直连测速，必须回退为 selector 指向直连
@@ -343,14 +353,15 @@ func buildOutbounds(nodes []map[string]any, groups []GroupConfig, allTags []stri
 	}
 
 	// 内置基础出站
-	out = append(out,
-		map[string]any{
-			"type":               "direct",
-			"tag":                "直连",
-			"inet4_bind_address": "0.0.0.0",
-		},
-		map[string]any{"type": "block", "tag": "拒绝"},
-	)
+	directOut := map[string]any{
+		"type":               "direct",
+		"tag":                "直连",
+		"inet4_bind_address": "0.0.0.0",
+	}
+	if enableIPv6 {
+		directOut["inet6_bind_address"] = "::"
+	}
+	out = append(out, directOut, map[string]any{"type": "block", "tag": "拒绝"})
 	return out
 }
 
@@ -393,11 +404,15 @@ func buildDNS(s Settings, nodeServers []string) map[string]any {
 	}
 
 	if s.DNS.FakeIP {
-		servers = append(servers, map[string]any{
+		fakeServer := map[string]any{
 			"tag":         "dns-fakeip",
 			"type":        "fakeip",
 			"inet4_range": "198.19.0.0/16",
-		})
+		}
+		if s.Network.IPv6 {
+			fakeServer["inet6_range"] = "fc00::/18"
+		}
+		servers = append(servers, fakeServer)
 	}
 
 	var rules []map[string]any
