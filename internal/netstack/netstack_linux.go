@@ -15,28 +15,48 @@ import (
 )
 
 const (
-	FwmarkTProxy = 0x2023 // eBPF TC 打标的代理流量
-	FwmarkBypass = 0x2024 // sing-box 自身出站直连标记
-	RouteTableID = 2022   // 专属策略路由表 ID
-	TProxyPort   = 7893   // 对应 configgen.go 中的 sing-box tproxy 监听端口
+	FwmarkTProxy = 0x2023
+	FwmarkBypass = 0x2024
+	RouteTableID = 2022
+	TProxyPort   = 7893
 
-	PrioBypass = 8999 // 优先放行 sing-box 自身流量
-	PrioTProxy = 9001 // 拦截被 eBPF 标记的局域网流量
+	PrioBypass = 8999
+	PrioTProxy = 9001
 )
 
-// Setup 在 FluxBox 启动时自动初始化 Linux 策略路由与 TProxy 交接表
-func Setup() error {
-	// 1. 开启 Linux 内核转发并放宽 rp_filter (防止 TProxy 伪造源地址包被内核丢弃)
-	enableSysctl()
+// AutoDetectLanIface 自动探测软路由主网卡 (优先 br-lan，其次默认路由网卡如 eth0)
+func AutoDetectLanIface() string {
+	if env := os.Getenv("FLUXBOX_IFACE"); env != "" {
+		return env
+	}
+	if _, err := net.InterfaceByName("br-lan"); err == nil {
+		return "br-lan"
+	}
+	routes, err := netlink.RouteList(nil, netlink.FAMILY_V4)
+	if err == nil {
+		for _, r := range routes {
+			if r.Dst == nil || r.Dst.IP.Equal(net.IPv4zero) {
+				if link, err := netlink.LinkByIndex(r.LinkIndex); err == nil {
+					return link.Attrs().Name
+				}
+			}
+		}
+	}
+	return "eth0"
+}
 
-	// 2. 幂等清理可能残留的旧规则
+func Setup() error {
+	enableSysctl()
 	_ = Teardown()
 
-	// 3. 在 table 2022 中添加 local 0.0.0.0/0 dev lo 路由
-	// 作用：欺骗内核将 fwmark 0x2023 的转发包视为发往本机(local)，从而移交上层 Socket
+	// 1. 加载内核 TProxy 必需模块 (部分 OpenWrt 默认未挂载 nft_tproxy)
+	_ = exec.Command("modprobe", "nft_tproxy").Run()
+	_ = exec.Command("modprobe", "xt_TPROXY").Run()
+
+	// 2. 配置 table 2022 local 路由
 	loLink, err := netlink.LinkByName("lo")
 	if err != nil {
-		return fmt.Errorf("找不到回环网卡 lo: %w", err)
+		return fmt.Errorf("find lo: %w", err)
 	}
 	_, defaultDst, _ := net.ParseCIDR("0.0.0.0/0")
 	localRoute := &netlink.Route{
@@ -47,45 +67,37 @@ func Setup() error {
 		Type:      syscall.RTN_LOCAL,
 	}
 	if err := netlink.RouteReplace(localRoute); err != nil {
-		return fmt.Errorf("写入 table %d 路由失败: %w", RouteTableID, err)
+		return fmt.Errorf("route replace table %d: %w", RouteTableID, err)
 	}
 
-	// 4. 添加 ip rule 8999: fwmark 0x2024 lookup main (防回环直连)
+	// 3. 配置 ip rule 8999 (0x2024 直连绕过) 与 9001 (0x2023 进 TProxy)
 	mask := uint32(0xffffffff)
 	ruleBypass := netlink.NewRule()
 	ruleBypass.Priority = PrioBypass
 	ruleBypass.Mark = FwmarkBypass
 	ruleBypass.Mask = &mask
 	ruleBypass.Table = syscall.RT_TABLE_MAIN
-	if err := netlink.RuleAdd(ruleBypass); err != nil {
-		return fmt.Errorf("添加 0x2024 bypass rule 失败: %w", err)
-	}
+	_ = netlink.RuleAdd(ruleBypass)
 
-	// 5. 添加 ip rule 9001: fwmark 0x2023 lookup 2022 (导向 TProxy 表)
 	ruleTProxy := netlink.NewRule()
 	ruleTProxy.Priority = PrioTProxy
 	ruleTProxy.Mark = FwmarkTProxy
 	ruleTProxy.Mask = &mask
 	ruleTProxy.Table = RouteTableID
-	if err := netlink.RuleAdd(ruleTProxy); err != nil {
-		return fmt.Errorf("添加 0x2023 tproxy rule 失败: %w", err)
-	}
+	_ = netlink.RuleAdd(ruleTProxy)
 
-	// 6. 挂载极简 nftables TProxy Socket 映射规则 (仅处理被 eBPF 打上 0x2023 的包)
+	// 4. 挂载完整版 nftables TProxy + DNS 劫持 + 旁路由 SNAT 规则
 	if err := applyTProxyNft(); err != nil {
-		return fmt.Errorf("挂载 TProxy 交接表失败: %w", err)
+		return fmt.Errorf("apply nftables: %w", err)
 	}
 
-	log.Printf("[OK] 策略路由初始化完成 (fwmark 0x%x -> table %d -> TProxy :%d)", FwmarkTProxy, RouteTableID, TProxyPort)
+	log.Printf("[OK] 透明代理网络栈就绪 (TProxy :%d + DNS 劫持 + 旁路由伪装)", TProxyPort)
 	return nil
 }
 
-// Teardown 在 FluxBox 退出或停止内核时彻底还原网络栈（防止软路由断网）
 func Teardown() error {
-	// 1. 删除 nftables 专属表
 	_ = exec.Command("nft", "delete", "table", "inet", "fluxbox_tproxy").Run()
 
-	// 2. 移除我们添加的两条 ip rule
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err == nil {
 		for _, r := range rules {
@@ -96,9 +108,7 @@ func Teardown() error {
 		}
 	}
 
-	// 3. 清空 table 2022 路由表
-	loLink, err := netlink.LinkByName("lo")
-	if err == nil {
+	if loLink, err := netlink.LinkByName("lo"); err == nil {
 		_, defaultDst, _ := net.ParseCIDR("0.0.0.0/0")
 		_ = netlink.RouteDel(&netlink.Route{
 			LinkIndex: loLink.Attrs().Index,
@@ -112,16 +122,43 @@ func Teardown() error {
 }
 
 func applyTProxyNft() error {
-	// 所有的分流判断（内网设备直连、国内 CIDR 旁路、QUIC 阻断）已在 eBPF TC 层完成！
-	// 这里只需一行匹配 meta mark 0x2023 即可零开销移交给 sing-box TProxy 端口
+	// 关键修复：
+	// 1) 放行 0x2024 (sing-box 自身流量与面板拉订阅流量)
+	// 2) 劫持所有 53 端口 DNS 请求进 TProxy (解决客户端指向旁路由后无法解析域名问题)
+	// 3) 放行发往本机私有 IP 的非 DNS 流量 (保护 SSH 22 / 面板 3036 / LuCI 80 不断连)
+	// 4) 将其余所有局域网转发流量与 eBPF 打标 0x2023 的流量送入 sing-box TProxy 7893 端口
 	nftScript := fmt.Sprintf(`
 table inet fluxbox_tproxy {
+	set private_v4 {
+		type ipv4_addr
+		flags interval
+		elements = { 10.0.0.0/8, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16, 224.0.0.0/4, 240.0.0.0/4 }
+	}
+
 	chain prerouting {
 		type filter hook prerouting priority mangle; policy accept;
-		meta mark 0x%x meta l4proto { tcp, udp } tproxy ip to 127.0.0.1:%d accept
+
+		# 1. 放行 sing-box 和面板自身发出的直连流量
+		meta mark 0x%x return
+
+		# 2. 强制接管局域网所有 DNS 请求 (UDP/TCP 53) 送入 sing-box hijack-dns
+		meta l4proto { tcp, udp } th dport 53 tproxy ip to 127.0.0.1:%d meta mark set 0x%x accept
+
+		# 3. 绕过访问内网/软路由管理后台的流量
+		ip daddr @private_v4 return
+
+		# 4. 接管被 eBPF 标记或局域网路由过来的外网流量
+		meta l4proto { tcp, udp } tproxy ip to 127.0.0.1:%d meta mark set 0x%x accept
+	}
+
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		# 5. 旁路由单臂模式必备：为直连放行流量自动做源地址伪装，防止异步路由丢包
+		oifname != "lo" ip saddr 192.168.0.0/16 masquerade
+		oifname != "lo" ip saddr 10.0.0.0/8 masquerade
 	}
 }
-`, FwmarkTProxy, TProxyPort)
+`, FwmarkBypass, TProxyPort, FwmarkTProxy, TProxyPort, FwmarkTProxy)
 
 	cmd := exec.Command("nft", "-f", "-")
 	cmd.Stdin = strings.NewReader(nftScript)
@@ -133,9 +170,11 @@ table inet fluxbox_tproxy {
 
 func enableSysctl() {
 	sysctls := map[string]string{
-		"/proc/sys/net/ipv4/ip_forward":          "1",
-		"/proc/sys/net/ipv4/conf/all/rp_filter":  "0",
-		"/proc/sys/net/ipv4/conf/br-lan/rp_filter": "0",
+		"/proc/sys/net/ipv4/ip_forward":             "1",
+		"/proc/sys/net/ipv4/conf/all/rp_filter":     "0",
+		"/proc/sys/net/ipv4/conf/default/rp_filter": "0",
+		"/proc/sys/net/ipv4/conf/br-lan/rp_filter":  "0",
+		"/proc/sys/net/ipv4/conf/eth0/rp_filter":    "0",
 	}
 	for path, val := range sysctls {
 		_ = os.WriteFile(path, []byte(val), 0644)

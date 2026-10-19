@@ -136,10 +136,9 @@ func (e *Engine) AddDirectCIDR(cidrStr string) error {
 	}
 
 	ones, _ := ipNet.Mask.Size()
-	key := fluxboxIpv4LpmKey{
-		Prefixlen: uint32(ones),
-		Addr:      binary.LittleEndian.Uint32(ipNet.IP.To4()),
-	}
+	var key fluxboxIpv4LpmKey
+	key.Prefixlen = uint32(ones)
+	copy(key.Addr[:], ipNet.IP.To4())
 	val := uint8(1)
 	return e.objs.DirectCidrMap.Update(&key, &val, ebpf.UpdateAny)
 }

@@ -1,7 +1,6 @@
 package subscription
 
 import (
-	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -12,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -37,27 +37,41 @@ func FetchAndParse(subURL string) ([]map[string]any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("拉取订阅失败: %w", err)
 	}
-	content := strings.TrimSpace(string(rawBytes))
+	// 去除可能存在的 UTF-8 BOM 头与首尾空白
+	content := strings.TrimSpace(strings.TrimPrefix(string(rawBytes), "\xef\xbb\xbf"))
 
 	// 1. 尝试作为原生 sing-box JSON 解析
 	if strings.HasPrefix(content, "{") {
-		if nodes, err := parseSingBoxJSON(rawBytes); err == nil && len(nodes) > 0 {
+		if nodes, err := parseSingBoxJSON([]byte(content)); err == nil && len(nodes) > 0 {
 			return deduplicateTags(nodes), nil
 		}
 	}
 
 	// 2. 尝试作为 Clash / Mihomo YAML 解析 (包含 proxies: 字段)
 	if strings.Contains(content, "proxies:") {
-		if nodes, err := parseClashYAML(rawBytes); err == nil && len(nodes) > 0 {
+		if nodes, err := parseClashYAML([]byte(content)); err == nil && len(nodes) > 0 {
 			return deduplicateTags(nodes), nil
 		}
 	}
 
 	// 3. 尝试作为 Base64 或明文 URI 分享链接解析 (vless://, hy2://, trojan://, ss://, vmess://)
 	decoded := tryDecodeBase64(content)
+	// 如果 Base64 解码后实际上是 Clash YAML (部分机场采用此编码)
+	if strings.Contains(decoded, "proxies:") {
+		if nodes, err := parseClashYAML([]byte(decoded)); err == nil && len(nodes) > 0 {
+			return deduplicateTags(nodes), nil
+		}
+	}
+	// 如果 Base64 解码后是 sing-box JSON
+	if strings.HasPrefix(strings.TrimSpace(decoded), "{") {
+		if nodes, err := parseSingBoxJSON([]byte(decoded)); err == nil && len(nodes) > 0 {
+			return deduplicateTags(nodes), nil
+		}
+	}
+
 	nodes := parseURILines(decoded)
 	if len(nodes) == 0 {
-		return nil, fmt.Errorf("未能从订阅内容中解析出有效节点")
+		return nil, fmt.Errorf("未能从订阅内容中解析出有效节点 (响应长度 %d 字节)", len(rawBytes))
 	}
 	return deduplicateTags(nodes), nil
 }
@@ -232,6 +246,53 @@ func parseURILines(text string) []map[string]any {
 }
 
 func parseSingleURI(uriStr string) map[string]any {
+	// 优先处理 vmess://base64(json)
+	if strings.HasPrefix(strings.ToLower(uriStr), "vmess://") {
+		b64 := strings.TrimPrefix(uriStr, "vmess://")
+		b64 = strings.TrimPrefix(b64, "VMESS://")
+		decoded := tryDecodeBase64(b64)
+		var vm map[string]any
+		if err := json.Unmarshal([]byte(decoded), &vm); err == nil {
+			tag := asString(vm["ps"])
+			server := asString(vm["add"])
+			port := asInt(vm["port"])
+			uuid := asString(vm["id"])
+			if server == "" || port == 0 || uuid == "" {
+				return nil
+			}
+			if tag == "" {
+				tag = server
+			}
+			ob := map[string]any{
+				"type":        "vmess",
+				"tag":         tag,
+				"name":        tag,
+				"server":      server,
+				"server_port": port,
+				"uuid":        uuid,
+				"security":    "auto",
+				"alter_id":    asInt(vm["aid"]),
+			}
+			if asString(vm["tls"]) == "tls" {
+				sni := asString(vm["sni"])
+				if sni == "" {
+					sni = asString(vm["host"])
+				}
+				if sni == "" {
+					sni = server
+				}
+				ob["tls"] = map[string]any{"enabled": true, "server_name": sni}
+			}
+			if asString(vm["net"]) == "ws" {
+				ob["transport"] = map[string]any{
+					"type": "ws",
+					"path": asString(vm["path"]),
+				}
+			}
+			return ob
+		}
+	}
+
 	u, err := url.Parse(uriStr)
 	if err != nil || u.Scheme == "" {
 		return nil
@@ -325,11 +386,20 @@ func parseSingleURI(uriStr string) map[string]any {
 }
 
 func tryDecodeBase64(s string) string {
-	cleaned := strings.ReplaceAll(strings.ReplaceAll(s, "-", "+"), "_", "/")
+	if strings.Contains(s, "://") {
+		return s
+	}
+	cleaned := strings.Map(func(r rune) rune {
+		if r == '\r' || r == '\n' || r == ' ' || r == '\t' {
+			return -1
+		}
+		return r
+	}, s)
+	cleaned = strings.ReplaceAll(strings.ReplaceAll(cleaned, "-", "+"), "_", "/")
 	if pad := len(cleaned) % 4; pad != 0 {
 		cleaned += strings.Repeat("=", 4-pad)
 	}
-	if b, err := base64.StdEncoding.DecodeString(cleaned); err == nil {
+	if b, err := base64.StdEncoding.DecodeString(cleaned); err == nil && len(b) > 0 {
 		return string(b)
 	}
 	return s
@@ -381,7 +451,7 @@ func asBool(v any) bool {
 }
 
 func fetchRawBytes(subURL string) ([]byte, error) {
-	// 优先尝试直连公共 DNS 拉取
+	// 优先尝试直连公共 DNS 拉取 (自带 0x2024 直连标记)
 	data, err := doFetch(subURL, nil)
 	if err == nil {
 		return data, nil
@@ -403,21 +473,19 @@ func fetchRawBytes(subURL string) ([]byte, error) {
 }
 
 func doFetch(subURL string, proxyFunc func(*http.Request) (*url.URL, error)) ([]byte, error) {
-	resolver := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			d := net.Dialer{Timeout: 3 * time.Second}
-			return d.DialContext(ctx, "udp", "223.5.5.5:53")
+	dialer := &net.Dialer{
+		Timeout:   12 * time.Second,
+		KeepAlive: 30 * time.Second,
+		Control: func(network, address string, c syscall.RawConn) error {
+			return c.Control(func(fd uintptr) {
+				_ = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_MARK, 0x2024)
+			})
 		},
 	}
 	tr := &http.Transport{
 		Proxy:           proxyFunc,
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		DialContext: (&net.Dialer{
-			Timeout:   10 * time.Second,
-			KeepAlive: 30 * time.Second,
-			Resolver:  resolver,
-		}).DialContext,
+		DialContext:     dialer.DialContext,
 	}
 	client := &http.Client{
 		Transport: tr,

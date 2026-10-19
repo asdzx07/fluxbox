@@ -95,7 +95,7 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 		}
 	}
 
-	// 2. 构建 Inbounds (集成 TUN 自动透明重定向 + 本地 Mixed 端口 + DNS 劫持接收端口)
+	// 2. 构建 Inbounds (标准的 TProxy 7893 + 本地 Mixed 7891 + DNS 劫持接收端口)
 	dnsPort := in.Settings.DNS.HijackPort
 	if dnsPort == 0 {
 		dnsPort = 36053
@@ -103,19 +103,15 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 
 	inbounds := []map[string]any{
 		{
-			"type":           "tun",
-			"tag":            "tun-in",
-			"interface_name": "fluxbox-tun",
-			"address":        []string{"172.19.0.1/30"},
-			"auto_route":     true,
-			"strict_route":   false,
-			"auto_redirect":  true,
-			"stack":          "mixed",
+			"type":        "tproxy",
+			"tag":         "tproxy-in",
+			"listen":      "::",
+			"listen_port": 7893,
 		},
 		{
 			"type":        "mixed",
 			"tag":         "mixed-in",
-			"listen":      "0.0.0.0",
+			"listen":      "::",
 			"listen_port": 7891,
 		},
 		{
@@ -208,29 +204,40 @@ func cleanConfig(v any) any {
 func buildOutbounds(nodes []map[string]any, groups []GroupConfig, allTags []string) []map[string]any {
 	var out []map[string]any
 
-	// 兜底防空：若当前没有可用节点，放入直连占位防止 sing-box 启动报错
-	fallbackMembers := allTags
-	if len(fallbackMembers) == 0 {
-		fallbackMembers = []string{"直连"}
+	// 关键修复：当还没有拉取任何订阅节点时，urltest 不能包含空或直连测速，必须回退为 selector 指向直连
+	if len(allTags) == 0 {
+		out = append(out,
+			map[string]any{
+				"type":      "selector",
+				"tag":       "所有-自动",
+				"outbounds": []string{"直连"},
+				"default":   "直连",
+			},
+			map[string]any{
+				"type":      "selector",
+				"tag":       "所有-手动",
+				"outbounds": []string{"直连"},
+				"default":   "直连",
+			},
+		)
+	} else {
+		out = append(out,
+			map[string]any{
+				"type":      "urltest",
+				"tag":       "所有-自动",
+				"outbounds": allTags,
+				"url":       "http://www.gstatic.com/generate_204",
+				"interval":  "3m",
+				"tolerance": 80,
+			},
+			map[string]any{
+				"type":      "selector",
+				"tag":       "所有-手动",
+				"outbounds": append([]string{"所有-自动"}, allTags...),
+				"default":   "所有-自动",
+			},
+		)
 	}
-
-	// 内置核心分组：所有-自动 (urltest) 与 所有-手动 (selector)
-	out = append(out,
-		map[string]any{
-			"type":      "urltest",
-			"tag":       "所有-自动",
-			"outbounds": fallbackMembers,
-			"url":       "http://www.gstatic.com/generate_204",
-			"interval":  "5m",
-			"tolerance": 100,
-		},
-		map[string]any{
-			"type":      "selector",
-			"tag":       "所有-手动",
-			"outbounds": append([]string{"所有-自动"}, fallbackMembers...),
-			"default":   "所有-自动",
-		},
-	)
 
 	// 用户自定义分组（支持按关键词自动收编节点）
 	for _, g := range groups {
@@ -400,7 +407,12 @@ func buildRoute(in BuildInput, flipDir string, nodeServers []string) map[string]
 	rules := []map[string]any{
 		{"action": "sniff"},
 		{"protocol": "dns", "action": "hijack-dns"},
+		{"port": []int{53}, "action": "hijack-dns"},
 		{"ip_is_private": true, "outbound": "直连"},
+		{
+			"domain_suffix": []string{".cn", ".baidu.com", ".qq.com", ".weixin.qq.com", ".taobao.com", ".jd.com", ".bilibili.com", ".aliyun.com", ".apple.com", ".icloud.com"},
+			"outbound":      "直连",
+		},
 	}
 
 	// 节点服务器强制直连

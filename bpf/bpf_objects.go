@@ -46,7 +46,7 @@ func (o *fluxboxObjects) Close() error {
 
 type fluxboxIpv4LpmKey struct {
 	Prefixlen uint32
-	Addr      uint32
+	Addr      [4]byte
 }
 
 func closeClosers(closers ...io.Closer) error {
