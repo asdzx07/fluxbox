@@ -3,9 +3,14 @@
 package bpf
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
+	"os"
+	"strings"
 	"sync"
 
 	"github.com/cilium/ebpf"
@@ -36,8 +41,9 @@ func NewEngine(ifaceName string) (*Engine, error) {
 		objs:  objs,
 		iface: ifaceName,
 	}
-	// 默认写入局域网保留网段到直连 LPM 表，防止内网互访进代理
+	// 默认写入局域网保留网段与中国大陆 8,000+ CIDR 到直连 LPM 表，防止内网与国内流量误进代理
 	eng.initPrivateCIDRs()
+	_ = eng.InitChinaCIDRs("")
 	return eng, nil
 }
 
@@ -199,6 +205,75 @@ func (e *Engine) GetStats() (Stats, error) {
 		}
 	}
 	return s, nil
+}
+
+// AddLearnedDirectIP 将 sing-box 规则引擎判定的直连 IP 动态刻入 eBPF LRU 哈希表
+func (e *Engine) AddLearnedDirectIP(ipStr string) error {
+	parsed := net.ParseIP(strings.TrimSpace(ipStr)).To4()
+	if parsed == nil {
+		return fmt.Errorf("invalid ipv4: %s", ipStr)
+	}
+	ipKey := binary.LittleEndian.Uint32(parsed)
+	val := uint8(1)
+	if e.objs.LearnedIpMap == nil {
+		return nil
+	}
+	return e.objs.LearnedIpMap.Put(&ipKey, &val)
+}
+
+// InitChinaCIDRs 将内置的 8,000+ 条中国大陆 IPv4 CIDR 列表高速注入内核 LPM Trie 树
+func (e *Engine) InitChinaCIDRs(customPath string) int {
+	var r io.Reader
+	if customPath != "" {
+		if f, err := os.Open(customPath); err == nil {
+			defer f.Close()
+			r = f
+		}
+	}
+	if r == nil {
+		if len(defaultChinaIPv4Bytes) == 0 {
+			return 0
+		}
+		r = bytes.NewReader(defaultChinaIPv4Bytes)
+	}
+
+	scanner := bufio.NewScanner(r)
+	count := 0
+	val := uint8(1)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || line[0] == '#' {
+			continue
+		}
+		slash := strings.IndexByte(line, '/')
+		if slash == -1 {
+			continue
+		}
+		ipStr := line[:slash]
+		maskStr := line[slash+1:]
+		ip := net.ParseIP(ipStr).To4()
+		if ip == nil {
+			continue
+		}
+		var mask uint32
+		for i := 0; i < len(maskStr); i++ {
+			if maskStr[i] >= '0' && maskStr[i] <= '9' {
+				mask = mask*10 + uint32(maskStr[i]-'0')
+			}
+		}
+		if mask > 32 {
+			continue
+		}
+
+		key := fluxboxIpv4LpmKey{
+			Prefixlen: mask,
+			Addr:      [4]byte{ip[0], ip[1], ip[2], ip[3]},
+		}
+		if err := e.objs.DirectCidrMap.Update(&key, &val, ebpf.UpdateAny); err == nil {
+			count++
+		}
+	}
+	return count
 }
 
 func (e *Engine) Close() error {

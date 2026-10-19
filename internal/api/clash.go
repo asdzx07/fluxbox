@@ -251,3 +251,38 @@ func (s *Server) handleControllerProxy() http.Handler {
 		proxy.ServeHTTP(w, r)
 	})
 }
+
+// StartDirectIPLearner 自动从 sing-box 活动连接中收割被规则判定为「直连」的目标 IP 注入 eBPF 硬件旁路表
+func (s *Server) StartDirectIPLearner() {
+	go func() {
+		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if s.bpfEngine == nil {
+				continue
+			}
+			raw, _, err := s.clashRequest(http.MethodGet, "/connections", nil)
+			if err != nil {
+				continue
+			}
+			var data struct {
+				Connections []struct {
+					Chains   []string `json:"chains"`
+					Metadata struct {
+						DestinationIP string `json:"destinationIP"`
+					} `json:"metadata"`
+				} `json:"connections"`
+			}
+			if json.Unmarshal(raw, &data) != nil {
+				continue
+			}
+			for _, c := range data.Connections {
+				// 只要 sing-box 的规则引擎判定该连接最终出口是「直连」
+				if len(c.Chains) > 0 && c.Chains[0] == "直连" && c.Metadata.DestinationIP != "" {
+					// 立即将该目标 IP 写入 eBPF 内核旁路表，后续流量直接走网卡硬件直出！
+					_ = s.bpfEngine.AddLearnedDirectIP(c.Metadata.DestinationIP)
+				}
+			}
+		}
+	}()
+}

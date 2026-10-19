@@ -39,6 +39,16 @@ func (e *Engine) GetStats() (Stats, error) {
 	return Stats{}, nil
 }
 
+func (e *Engine) AddLearnedDirectIP(ipStr string) error {
+	log.Printf("[BPF-STUB] 模拟学习直连 IP: %s", ipStr)
+	return nil
+}
+
+func (e *Engine) InitChinaCIDRs(customPath string) int {
+	log.Printf("[BPF-STUB] 模拟加载中国大陆 CIDR 列表")
+	return 8796
+}
+
 func (e *Engine) Close() error {
 	log.Printf("[BPF-STUB] 模拟关闭 eBPF 引擎")
 	return nil

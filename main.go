@@ -88,6 +88,7 @@ func main() {
 
 	// 5. 初始化 HTTP API 服务
 	apiServer := api.NewServer(st, bpfEngine, sup)
+	apiServer.StartDirectIPLearner()
 
 	// 6. 若配置了自动启动且存在节点配置，在启动时自动执行一次配置下发
 	go func() {
