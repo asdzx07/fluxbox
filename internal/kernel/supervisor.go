@@ -73,7 +73,10 @@ func (s *Supervisor) CheckConfig(cfgPath string) error {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, s.binPath, "check", "-c", cfgPath)
-	cmd.Env = append(os.Environ(), "ENABLE_DEPRECATED_MISSING_DOMAIN_RESOLVER=true")
+	cmd.Env = append(os.Environ(),
+		"ENABLE_DEPRECATED_MISSING_DOMAIN_RESOLVER=true",
+		"ENABLE_DEPRECATED_LEGACY_RULE_SET_DOWNLOAD_DETOUR=true",
+	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("config check failed: %v, output: %s", err, string(out))
@@ -104,7 +107,10 @@ func (s *Supervisor) Start() error {
 	}
 
 	cmd := exec.Command(s.binPath, "run", "-c", s.configPath)
-	cmd.Env = append(os.Environ(), "ENABLE_DEPRECATED_MISSING_DOMAIN_RESOLVER=true")
+	cmd.Env = append(os.Environ(),
+		"ENABLE_DEPRECATED_MISSING_DOMAIN_RESOLVER=true",
+		"ENABLE_DEPRECATED_LEGACY_RULE_SET_DOWNLOAD_DETOUR=true",
+	)
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {

@@ -474,11 +474,13 @@ func buildRoute(in BuildInput, flipDir string, nodeServers []string) map[string]
 		}
 		if custom, ok := customSubMap[rsTag]; ok {
 			ruleSets = append(ruleSets, map[string]any{
-				"type":            "remote",
-				"tag":             custom.Tag,
-				"format":          custom.Format,
-				"url":             custom.URL,
-				"download_detour": "所有-自动",
+				"type":   "remote",
+				"tag":    custom.Tag,
+				"format": custom.Format,
+				"url":    custom.URL,
+				"http_client": map[string]any{
+					"detour": "所有-自动",
+				},
 			})
 		} else {
 			// 默认映射至 SagerNet 官方 sing-geosite / sing-geoip 二进制源
@@ -487,11 +489,13 @@ func buildRoute(in BuildInput, flipDir string, nodeServers []string) map[string]
 				repo = "sing-geoip"
 			}
 			ruleSets = append(ruleSets, map[string]any{
-				"type":            "remote",
-				"tag":             rsTag,
-				"format":          "binary",
-				"url":             "https://raw.githubusercontent.com/SagerNet/" + repo + "/rule-set/" + rsTag + ".srs",
-				"download_detour": "所有-自动",
+				"type":   "remote",
+				"tag":    rsTag,
+				"format": "binary",
+				"url":    "https://raw.githubusercontent.com/SagerNet/" + repo + "/rule-set/" + rsTag + ".srs",
+				"http_client": map[string]any{
+					"detour": "所有-自动",
+				},
 			})
 		}
 	}
@@ -502,6 +506,9 @@ func buildRoute(in BuildInput, flipDir string, nodeServers []string) map[string]
 		"final":                   "所有-自动",
 		"auto_detect_interface":   true,
 		"default_domain_resolver": "dns-direct",
+		"default_http_client": map[string]any{
+			"detour": "所有-自动",
+		},
 		"default_mark":            FwmarkBypass, // 0x2024：配合 eBPF 实现零损耗防回环
 	}
 }
