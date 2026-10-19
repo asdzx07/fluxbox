@@ -110,7 +110,10 @@ func (s *Supervisor) Start() error {
 	if err != nil {
 		return err
 	}
-	cmd.Stderr = cmd.Stdout // 合并 stderr
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start sing-box: %w", err)
@@ -119,8 +122,19 @@ func (s *Supervisor) Start() error {
 	s.cmd = cmd
 	s.startedAt = time.Now()
 
-	// 异步读取日志存入环形缓冲区
-	go s.captureLogs(stdoutPipe)
+	// 异步读取日志存入环形缓冲区 (合并 stdout 与 stderr)
+	go s.captureLogs(io.MultiReader(stdoutPipe, stderrPipe))
+
+	// 监听进程退出，回收子进程，避免产生僵尸进程
+	go func() {
+		_ = cmd.Wait()
+		s.mu.Lock()
+		if s.cmd == cmd {
+			s.cmd = nil
+			s.startedAt = time.Time{}
+		}
+		s.mu.Unlock()
+	}()
 
 	log.Printf("[KERNEL] sing-box 已启动 (PID: %d, 配置: %s)", cmd.Process.Pid, s.configPath)
 	return nil

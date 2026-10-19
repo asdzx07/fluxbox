@@ -309,7 +309,6 @@ func buildDNS(s Settings, nodeServers []string) map[string]any {
 			"type":        "udp",
 			"server":      directDNS,
 			"server_port": 53,
-			"detour":      "直连",
 		},
 		{
 			"tag":         "dns-proxy",
