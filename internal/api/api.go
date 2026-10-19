@@ -15,23 +15,26 @@ import (
 	"fluxbox/internal/kernel"
 	"fluxbox/internal/netstack"
 	"fluxbox/internal/store"
+	"fluxbox/internal/traffic"
 )
 
 type Server struct {
-	store      *store.Store
-	bpfEngine  *bpf.Engine
-	supervisor *kernel.Supervisor
-	startTime  time.Time
-	deployMu   sync.Mutex
-	loginFails sync.Map
+	store          *store.Store
+	bpfEngine      *bpf.Engine
+	supervisor     *kernel.Supervisor
+	trafficTracker *traffic.Tracker
+	startTime      time.Time
+	deployMu       sync.Mutex
+	loginFails     sync.Map
 }
 
 func NewServer(st *store.Store, bpfEng *bpf.Engine, sup *kernel.Supervisor) *Server {
 	return &Server{
-		store:      st,
-		bpfEngine:  bpfEng,
-		supervisor: sup,
-		startTime:  time.Now(),
+		store:          st,
+		bpfEngine:      bpfEng,
+		supervisor:     sup,
+		trafficTracker: traffic.NewTracker(9095),
+		startTime:      time.Now(),
 	}
 }
 

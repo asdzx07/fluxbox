@@ -209,7 +209,16 @@ func (s *Supervisor) Status() Status {
 			pid = extPid
 		} else if isPortListening("127.0.0.1:9095") {
 			running = true
+			pid = findExternalSingBoxPid()
 		}
+	}
+
+	// 若进程运行中但 uptime 尚未设定，从系统 /proc/<pid> 获取精确存活秒数
+	if running && pid > 0 && uptime <= 0 {
+		uptime = getProcessUptime(pid)
+	}
+	if running && uptime <= 0 {
+		uptime = 1
 	}
 
 	ver := s.Version()
@@ -219,6 +228,17 @@ func (s *Supervisor) Status() Status {
 		Uptime:  uptime,
 		Version: ver,
 	}
+}
+
+func getProcessUptime(pid int) int64 {
+	procPath := fmt.Sprintf("/proc/%d", pid)
+	if fi, err := os.Stat(procPath); err == nil {
+		sec := int64(time.Since(fi.ModTime()).Seconds())
+		if sec > 0 {
+			return sec
+		}
+	}
+	return 0
 }
 
 func findExternalSingBoxPid() int {

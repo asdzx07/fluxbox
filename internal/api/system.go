@@ -38,7 +38,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 			"pid":           kStatus.Pid,
 			"version":       kStatus.Version,
 			"versionOutput": kStatus.Version,
-			"uptime":        time.Duration(kStatus.Uptime * int64(time.Second)).Round(time.Second).String(),
+			"uptime":        formatUptime(kStatus.Uptime),
 		},
 		"dnsmasq": dnsmasq.Status(),
 		"platform": map[string]any{
@@ -105,18 +105,37 @@ func (s *Server) handleSystemVersion(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleTraffic(w http.ResponseWriter, r *http.Request) {
+	st := s.trafficTracker.GetStats()
 	s.writeJSON(w, map[string]any{
 		"ok":         true,
-		"upSpeed":    0,
-		"downSpeed":  0,
-		"upload":     0,
-		"download":   0,
+		"up":         st.Up,
+		"down":       st.Down,
+		"totalUp":    st.TotalUp,
+		"totalDown":  st.TotalDown,
+		"upSpeed":    st.Up,
+		"downSpeed":  st.Down,
+		"upload":     st.TotalUp,
+		"download":   st.TotalDown,
 		"lastSample": time.Now().UnixMilli(),
 	})
 }
 
 func (s *Server) handleTrafficReset(w http.ResponseWriter, r *http.Request) {
+	s.trafficTracker.Reset()
 	s.writeJSON(w, map[string]any{"ok": true})
+}
+
+func formatUptime(sec int64) string {
+	if sec <= 0 {
+		return "0s"
+	}
+	if sec < 60 {
+		return fmt.Sprintf("%ds", sec)
+	}
+	if sec < 3600 {
+		return fmt.Sprintf("%dm%ds", sec/60, sec%60)
+	}
+	return fmt.Sprintf("%dh%dm", sec/3600, (sec%3600)/60)
 }
 
 func (s *Server) handleSystemUpdate(w http.ResponseWriter, r *http.Request) {
