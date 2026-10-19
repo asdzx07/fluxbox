@@ -498,11 +498,12 @@ func buildRoute(in BuildInput, flipDir string, nodeServers []string) map[string]
 	}
 
 	return map[string]any{
-		"rules":                 rules,
-		"rule_set":              ruleSets,
-		"final":                 "所有-自动",
-		"auto_detect_interface": true,
-		"default_mark":          FwmarkBypass, // 0x2024：配合 eBPF 实现零损耗防回环
+		"rules":                   rules,
+		"rule_set":                ruleSets,
+		"final":                   "所有-自动",
+		"auto_detect_interface":   true,
+		"default_domain_resolver": "dns-direct",
+		"default_mark":            FwmarkBypass, // 0x2024：配合 eBPF 实现零损耗防回环
 	}
 }
 
