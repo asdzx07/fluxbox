@@ -32,6 +32,17 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 				if v, ok := netMap["sniff"].(bool); ok {
 					st.Network.Sniff = v
 				}
+				if tunMap, ok := netMap["tun"].(map[string]any); ok {
+					if v, ok := tunMap["autoRedirect"].(bool); ok {
+						st.Network.Tun.AutoRedirect = v
+					}
+					if v, ok := tunMap["aggressive"].(bool); ok {
+						st.Network.Tun.Aggressive = v
+					}
+					if v, ok := tunMap["strictRoute"].(bool); ok {
+						st.Network.Tun.StrictRoute = v
+					}
+				}
 			}
 
 			if dnsMap, ok := incoming["dns"].(map[string]any); ok {
@@ -65,6 +76,9 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 				if v, ok := kMap["logLevel"].(string); ok {
 					st.Kernel.LogLevel = v
 				}
+				if v, ok := kMap["autoStart"].(bool); ok {
+					st.Kernel.AutoStart = v
+				}
 			}
 		})
 
@@ -74,8 +88,14 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			_ = s.bpfEngine.SetGlobalFlags(cur.Network.DirectBypass, cur.Network.RejectQuic)
 		}
 
+		// 触发配置热重载使 strict_route 等新设置即刻生效
+		go func() {
+			_ = s.DeployCore(true)
+		}()
+
 		s.writeJSON(w, s.sanitizeSettings(s.store.GetSettings()))
 		return
+
 	}
 
 	s.writeJSON(w, s.sanitizeSettings(s.store.GetSettings()))

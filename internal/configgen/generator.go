@@ -20,7 +20,14 @@ type Settings struct {
 		RejectQuic     bool `json:"rejectQuic"`
 		DirectBypass   bool `json:"directBypass"`
 		DirectForNodes bool `json:"directForNodes"`
+		Sniff          bool `json:"sniff"`
+		Tun            struct {
+			AutoRedirect bool `json:"autoRedirect"`
+			Aggressive   bool `json:"aggressive"`
+			StrictRoute  bool `json:"strictRoute"`
+		} `json:"tun"`
 	} `json:"network"`
+
 	DNS struct {
 		Mode          string   `json:"mode"`
 		Direct        string   `json:"direct"`
@@ -121,25 +128,37 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 		dnsPort = 36053
 	}
 
-	inbounds := []map[string]any{
-		{
-			"type":                      "tun",
-			"tag":                       "tun-in",
-			"interface_name":            "fluxbox-tun",
-			"address":                   []string{"172.19.0.1/30"},
-			"mtu":                       1500,
-			"auto_route":                true,
-			"strict_route":              true,
-			"udp_timeout":               "60s",
-			"route_exclude_address": []string{
-				"10.0.0.0/8", "100.64.0.0/10", "169.254.0.0/16", "172.16.0.0/12",
-				"192.168.0.0/16", "224.0.0.0/4", "255.255.255.255/32",
-			},
-			"dns_mode":                  "hijack",
-			"dns_address":               []string{"172.19.0.2"},
-			"auto_redirect":             true,
-			"auto_redirect_output_mark": FwmarkBypass, // 8228 (0x2024)
+	mtu := 1500
+	if in.Settings.Network.Tun.Aggressive {
+		mtu = 9000
+	}
+	strictRoute := in.Settings.Network.Tun.StrictRoute
+	autoRedirect := in.Settings.Network.Tun.AutoRedirect
+
+	tunInbound := map[string]any{
+		"type":           "tun",
+		"tag":            "tun-in",
+		"interface_name": "fluxbox-tun",
+		"address":        []string{"172.19.0.1/30"},
+		"mtu":            mtu,
+		"auto_route":     true,
+		"strict_route":   strictRoute,
+		"udp_timeout":    "60s",
+		"route_exclude_address": []string{
+			"10.0.0.0/8", "100.64.0.0/10", "169.254.0.0/16", "172.16.0.0/12",
+			"192.168.0.0/16", "224.0.0.0/4", "255.255.255.255/32",
 		},
+		"dns_mode":    "hijack",
+		"dns_address": []string{"172.19.0.2"},
+	}
+	if autoRedirect {
+		tunInbound["auto_redirect"] = true
+		tunInbound["auto_redirect_output_mark"] = FwmarkBypass
+	}
+
+	inbounds := []map[string]any{
+		tunInbound,
+
 		{
 			"type":        "mixed",
 			"tag":         "mixed-in",

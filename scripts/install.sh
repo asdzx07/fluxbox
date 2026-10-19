@@ -11,7 +11,7 @@ set -eu
 REPO="${REPO:-asdzx07/fluxbox}"
 BRANCH="main"
 ROOT=/opt/fluxbox
-PORT="${PORT:-3036}"
+PORT="${PORT:-52155}"
 USE_MIRROR=0
 MIRRORS="https://ghfast.top https://gh-proxy.com"
 

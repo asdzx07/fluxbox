@@ -107,8 +107,9 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "3036"
+		port = "52155"
 	}
+
 	server := &http.Server{
 		Addr:    ":" + port,
 		Handler: router,

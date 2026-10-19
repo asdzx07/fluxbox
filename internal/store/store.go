@@ -23,14 +23,22 @@ type PanelAuth struct {
 	SessionSecret string `json:"sessionSecret"`
 }
 
-type NetworkConfig struct {
-	IPv6           bool   `json:"ipv6"`
-	RejectQuic     bool   `json:"rejectQuic"`
-	DirectBypass   bool   `json:"directBypass"`
-	DirectForNodes bool   `json:"directForNodes"`
-	Sniff          bool   `json:"sniff"`
-	BypassPorts    string `json:"bypassPorts"`
+type TunConfig struct {
+	AutoRedirect bool `json:"autoRedirect"`
+	Aggressive   bool `json:"aggressive"`
+	StrictRoute  bool `json:"strictRoute"`
 }
+
+type NetworkConfig struct {
+	IPv6           bool      `json:"ipv6"`
+	RejectQuic     bool      `json:"rejectQuic"`
+	DirectBypass   bool      `json:"directBypass"`
+	DirectForNodes bool      `json:"directForNodes"`
+	Sniff          bool      `json:"sniff"`
+	BypassPorts    string    `json:"bypassPorts"`
+	Tun            TunConfig `json:"tun"`
+}
+
 
 type DNSConfig struct {
 	Mode          string   `json:"mode"`
@@ -141,7 +149,13 @@ func DefaultSettings() FullSettings {
 			DirectBypass:   true,
 			DirectForNodes: true,
 			Sniff:          true,
+			Tun: TunConfig{
+				AutoRedirect: true,
+				Aggressive:   false,
+				StrictRoute:  true,
+			},
 		},
+
 		DNS: DNSConfig{
 			Mode:          "dnsmasq",
 			Split:         true,
@@ -269,9 +283,15 @@ func (s *Store) ToConfiggenSettings() configgen.Settings {
 
 	var cfg configgen.Settings
 	cfg.Network.IPv6 = s.settings.Network.IPv6
+
 	cfg.Network.RejectQuic = s.settings.Network.RejectQuic
 	cfg.Network.DirectBypass = s.settings.Network.DirectBypass
 	cfg.Network.DirectForNodes = s.settings.Network.DirectForNodes
+	cfg.Network.Sniff = s.settings.Network.Sniff
+	cfg.Network.Tun.AutoRedirect = s.settings.Network.Tun.AutoRedirect
+	cfg.Network.Tun.Aggressive = s.settings.Network.Tun.Aggressive
+	cfg.Network.Tun.StrictRoute = s.settings.Network.Tun.StrictRoute
+
 
 	cfg.DNS.Mode = s.settings.DNS.Mode
 	cfg.DNS.Direct = s.settings.DNS.Direct

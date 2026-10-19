@@ -438,7 +438,7 @@
             </div>
             <div class="setting-list">
               <div class="setting-item">
-                <div class="title">国内直连不进内核 (零损耗 Bypass)</div>
+                <div class="title">国内流量直连绕过 (eBPF 硬件级加速)</div>
                 <label class="switch">
                   <input type="checkbox" id="setDirectBypass">
                   <span></span>
@@ -446,7 +446,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="title">nftables 自动硬件级转发 (auto_redirect)</div>
+                <div class="title">局域网流量自动接管 (TUN 自动重定向)</div>
                 <label class="switch">
                   <input type="checkbox" id="setAutoRedirect">
                   <span></span>
@@ -454,7 +454,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="title">TUN 激进吞吐模式 (MTU 65535 大包加速)</div>
+                <div class="title">TUN 巨帧吞吐加速 (MTU 65535 大包)</div>
                 <label class="switch">
                   <input type="checkbox" id="setTunAggressive">
                   <span></span>
@@ -462,7 +462,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="title">代理节点服务器 IP 强制直连</div>
+                <div class="title">节点服务器 IP 强制直连 (防回环死锁)</div>
                 <label class="switch">
                   <input type="checkbox" id="setDirectForNodes">
                   <span></span>
@@ -470,7 +470,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="title">屏蔽 QUIC 协议 (UDP 443)</div>
+                <div class="title">拦截 QUIC 协议 (UDP 443 降级 TCP)</div>
                 <label class="switch">
                   <input type="checkbox" id="setRejectQuic">
                   <span></span>
@@ -478,7 +478,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="title">严格路由保护 (strict_route)</div>
+                <div class="title">严格路由保护 (strict_route 防漏网)</div>
                 <label class="switch">
                   <input type="checkbox" id="setStrictRoute">
                   <span></span>
@@ -486,7 +486,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="title">流量协议嗅探 (SNI / Host)</div>
+                <div class="title">域名协议深度嗅探 (TLS SNI / HTTP Host)</div>
                 <label class="switch">
                   <input type="checkbox" id="setSniff">
                   <span></span>
@@ -494,7 +494,7 @@
               </div>
 
               <div class="setting-item">
-                <div class="title">启用 IPv6 流量接管</div>
+                <div class="title">接管 IPv6 流量 (关闭可规避 IPv6 泄漏)</div>
                 <label class="switch">
                   <input type="checkbox" id="setIpv6">
                   <span></span>
@@ -502,13 +502,14 @@
               </div>
 
               <div class="setting-item">
-                <div class="title">内核开机自启与进程守护</div>
+                <div class="title">内核开机自启与守护保活 (Supervisor)</div>
                 <label class="switch">
                   <input type="checkbox" id="setAutoStart">
                   <span></span>
                 </label>
               </div>
             </div>
+
           </div>
 
           <div class="card">
