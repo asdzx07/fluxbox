@@ -52,13 +52,7 @@ func (s *Server) handleAuthSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := s.store.IssueToken()
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   7 * 86400,
-	})
+	setAuthCookies(w, token)
 	s.writeJSON(w, map[string]any{"ok": true})
 }
 
@@ -95,24 +89,12 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 
 	s.loginFails.Delete(clientIP)
 	token := s.store.IssueToken()
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   7 * 86400,
-	})
+	setAuthCookies(w, token)
 	s.writeJSON(w, map[string]any{"ok": true})
 }
 
 func (s *Server) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   -1,
-	})
+	clearAuthCookies(w)
 	s.writeJSON(w, map[string]any{"ok": true})
 }
 
@@ -137,6 +119,11 @@ func (s *Server) handleAuthChangePassword(w http.ResponseWriter, r *http.Request
 	}
 
 	token := s.store.IssueToken()
+	setAuthCookies(w, token)
+	s.writeJSON(w, map[string]any{"ok": true})
+}
+
+func setAuthCookies(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
 		Value:    token,
@@ -144,5 +131,29 @@ func (s *Server) handleAuthChangePassword(w http.ResponseWriter, r *http.Request
 		HttpOnly: true,
 		MaxAge:   7 * 86400,
 	})
-	s.writeJSON(w, map[string]any{"ok": true})
+	http.SetCookie(w, &http.Cookie{
+		Name:     "mybox_session",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   7 * 86400,
+	})
 }
+
+func clearAuthCookies(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     "mybox_session",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+	})
+}
+

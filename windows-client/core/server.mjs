@@ -54,7 +54,7 @@ async function loginRemoteGateway(password = config.password, gatewayIp = config
         if (res.statusCode === 200) {
           const setCookies = res.headers['set-cookie'];
           if (setCookies) {
-            const found = setCookies.find(c => c.includes('mybox_session='));
+            const found = setCookies.find(c => /(session|mybox_session|fluxbox_session)=/i.test(c));
             if (found) {
               const cookieVal = found.split(';')[0].trim();
               config.sessionCookie = cookieVal;
@@ -65,6 +65,7 @@ async function loginRemoteGateway(password = config.password, gatewayIp = config
               return;
             }
           }
+
           resolve({ ok: true });
         } else if (res.statusCode === 401) {
           resolve({ ok: false, error: '密码错误，请检查旁路由管理密码' });
@@ -256,7 +257,13 @@ const server = http.createServer(async (req, res) => {
 
     // 关键修复：强制注入已保存的旁路由 Session Cookie，不受浏览器本地 Cookie 干扰
     if (config.sessionCookie) {
-      proxyHeaders['cookie'] = config.sessionCookie;
+      let cookieHeader = config.sessionCookie;
+      if (cookieHeader.startsWith('session=')) {
+        cookieHeader += '; mybox_session=' + cookieHeader.substring(8);
+      } else if (cookieHeader.startsWith('mybox_session=')) {
+        cookieHeader += '; session=' + cookieHeader.substring(14);
+      }
+      proxyHeaders['cookie'] = cookieHeader;
     }
 
     const proxyReq = http.request(targetUrl, {
@@ -267,12 +274,13 @@ const server = http.createServer(async (req, res) => {
       // 记录旁路由返回的 Session Cookie
       const setCookies = proxyRes.headers['set-cookie'];
       if (setCookies) {
-        const found = setCookies.find(c => c.includes('mybox_session='));
+        const found = setCookies.find(c => /(session|mybox_session|fluxbox_session)=/i.test(c));
         if (found) {
           config.sessionCookie = found.split(';')[0].trim();
           saveConfig({ sessionCookie: config.sessionCookie });
         }
       }
+
 
       res.writeHead(proxyRes.statusCode, proxyRes.headers);
       proxyRes.pipe(res);

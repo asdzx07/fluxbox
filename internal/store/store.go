@@ -15,6 +15,9 @@ import (
 
 	"fluxbox/internal/configgen"
 	"fluxbox/internal/subscription"
+
+	"golang.org/x/crypto/scrypt"
+
 )
 
 type PanelAuth struct {
@@ -330,8 +333,12 @@ func (s *Store) SetPassword(password string) error {
 	_, _ = rand.Read(saltBytes)
 	saltHex := hex.EncodeToString(saltBytes)
 
-	hash := sha256.Sum256([]byte(password + ":" + saltHex))
-	hashHex := hex.EncodeToString(hash[:])
+	// 使用与 Node.js 历史完全一致的 scrypt 算法 (N=16384, r=8, p=1, keyLen=64)，生成 128 位十六进制哈希
+	key, err := scrypt.Key([]byte(password), []byte(saltHex), 16384, 8, 1, 64)
+	if err != nil {
+		return fmt.Errorf("计算密码哈希失败: %w", err)
+	}
+	hashHex := hex.EncodeToString(key)
 
 	return s.MutateSettings(func(st *FullSettings) {
 		st.Panel.PasswordSalt = saltHex
@@ -345,10 +352,40 @@ func (s *Store) VerifyPassword(password string) bool {
 	if s.settings.Panel.PasswordHash == "" {
 		return true // 未设密码直接放行
 	}
-	hash := sha256.Sum256([]byte(password + ":" + s.settings.Panel.PasswordSalt))
-	computed := hex.EncodeToString(hash[:])
-	return subtle.ConstantTimeCompare([]byte(computed), []byte(s.settings.Panel.PasswordHash)) == 1
+
+	storedHash := s.settings.Panel.PasswordHash
+	salt := s.settings.Panel.PasswordSalt
+
+	// 1. 优先尝试 Node.js 历史遗留的标准 scrypt 算法 (N=16384, r=8, p=1, keyLen=64, 对应 128 hex 字符)
+	if len(storedHash) == 128 {
+		key, err := scrypt.Key([]byte(password), []byte(salt), 16384, 8, 1, 64)
+		if err == nil {
+			computed := hex.EncodeToString(key)
+			if subtle.ConstantTimeCompare([]byte(computed), []byte(storedHash)) == 1 {
+				return true
+			}
+		}
+	}
+
+	// 2. 尝试 sha256 算法 (64 hex 字符)
+	hash := sha256.Sum256([]byte(password + ":" + salt))
+	computedSha := hex.EncodeToString(hash[:])
+	if subtle.ConstantTimeCompare([]byte(computedSha), []byte(storedHash)) == 1 {
+		return true
+	}
+
+	// 3. 兜底尝试 scrypt
+	key, err := scrypt.Key([]byte(password), []byte(salt), 16384, 8, 1, 64)
+	if err == nil {
+		computed := hex.EncodeToString(key)
+		if subtle.ConstantTimeCompare([]byte(computed), []byte(storedHash)) == 1 {
+			return true
+		}
+	}
+
+	return false
 }
+
 
 func (s *Store) IssueToken() string {
 	s.mu.RLock()

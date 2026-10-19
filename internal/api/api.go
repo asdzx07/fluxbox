@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
+
 
 	"fluxbox/bpf"
 	"fluxbox/internal/configgen"
@@ -69,11 +71,22 @@ func (s *Server) AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		cookie, err := r.Cookie("session")
-		if err != nil || !s.store.VerifyToken(cookie.Value) {
+		var token string
+		if c, err := r.Cookie("session"); err == nil && c.Value != "" {
+			token = c.Value
+		} else if c, err := r.Cookie("mybox_session"); err == nil && c.Value != "" {
+			token = c.Value
+		} else if c, err := r.Cookie("fluxbox_session"); err == nil && c.Value != "" {
+			token = c.Value
+		} else if authHdr := r.Header.Get("Authorization"); strings.HasPrefix(authHdr, "Bearer ") {
+			token = strings.TrimPrefix(authHdr, "Bearer ")
+		}
+
+		if token == "" || !s.store.VerifyToken(token) {
 			s.writeError(w, http.StatusUnauthorized, "未授权或登录已过期")
 			return
 		}
+
 
 		next.ServeHTTP(w, r)
 	})
