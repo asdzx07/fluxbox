@@ -128,8 +128,9 @@ func (s *Supervisor) Start() error {
 	s.cmd = cmd
 	s.startedAt = time.Now()
 
-	// 异步读取日志存入环形缓冲区 (合并 stdout 与 stderr)
-	go s.captureLogs(io.MultiReader(stdoutPipe, stderrPipe))
+	// 异步读取日志存入环形缓冲区 (并发读取 stdout 与 stderr)
+	go s.captureLogs(stdoutPipe)
+	go s.captureLogs(stderrPipe)
 
 	// 监听进程退出，回收子进程，避免产生僵尸进程
 	go func() {
@@ -273,6 +274,7 @@ func (s *Supervisor) captureLogs(r io.Reader) {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
+		log.Printf("[SING-BOX] %s", line)
 		s.mu.Lock()
 		if len(s.logRing) >= s.maxLogs {
 			s.logRing = s.logRing[1:]

@@ -2,6 +2,7 @@ package configgen
 
 import (
 	"encoding/json"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,19 +84,38 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 	flipDir := filepath.Join(in.DataDir, "flip")
 	_ = os.MkdirAll(flipDir, 0755)
 
-	// 1. 收集所有节点 Tag 与节点服务器域名/IP（供 eBPF 旁路与 DNS 直连使用）
+	// 1. 收集所有节点 Tag 与节点服务器域名/IP（供 eBPF 旁路、DNS 解析与直连放行使用）
 	var allNodeTags []string
 	var nodeServerDomains []string
+	var nodeServerIPs []string
+	domainSeen := make(map[string]bool)
+	ipSeen := make(map[string]bool)
+
 	for _, n := range in.Nodes {
 		if tag, ok := n["tag"].(string); ok && tag != "" {
 			allNodeTags = append(allNodeTags, tag)
 		}
 		if srv, ok := n["server"].(string); ok && srv != "" {
-			nodeServerDomains = append(nodeServerDomains, srv)
+			srv = strings.TrimSpace(srv)
+			if parsedIP := net.ParseIP(srv); parsedIP != nil {
+				cidr := srv + "/32"
+				if parsedIP.To4() == nil {
+					cidr = srv + "/128"
+				}
+				if !ipSeen[cidr] {
+					ipSeen[cidr] = true
+					nodeServerIPs = append(nodeServerIPs, cidr)
+				}
+			} else {
+				if !domainSeen[srv] {
+					domainSeen[srv] = true
+					nodeServerDomains = append(nodeServerDomains, srv)
+				}
+			}
 		}
 	}
 
-	// 2. 构建 Inbounds (标准的 TProxy 7893 + 本地 Mixed 7891 + DNS 劫持接收端口)
+	// 2. 构建 Inbounds (经旧项目实测验证的 sing-box 官方 TUN 内核级透明重定向架构)
 	dnsPort := in.Settings.DNS.HijackPort
 	if dnsPort == 0 {
 		dnsPort = 36053
@@ -103,10 +123,22 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 
 	inbounds := []map[string]any{
 		{
-			"type":        "tproxy",
-			"tag":         "tproxy-in",
-			"listen":      "::",
-			"listen_port": 7893,
+			"type":                      "tun",
+			"tag":                       "tun-in",
+			"interface_name":            "fluxbox-tun",
+			"address":                   []string{"172.19.0.1/30"},
+			"mtu":                       1500,
+			"auto_route":                true,
+			"strict_route":              true,
+			"udp_timeout":               "60s",
+			"route_exclude_address": []string{
+				"10.0.0.0/8", "100.64.0.0/10", "169.254.0.0/16", "172.16.0.0/12",
+				"192.168.0.0/16", "224.0.0.0/4", "255.255.255.255/32",
+			},
+			"dns_mode":                  "hijack",
+			"dns_address":               []string{"172.19.0.2"},
+			"auto_redirect":             true,
+			"auto_redirect_output_mark": FwmarkBypass, // 8228 (0x2024)
 		},
 		{
 			"type":        "mixed",
@@ -128,13 +160,13 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 	// 4. 构建 DNS 模块 (含 FakeIP、防污染分流、HTTPS 记录屏蔽、广告拦截)
 	dnsConfig := buildDNS(in.Settings, nodeServerDomains)
 
-	// 5. 构建 Route 路由模块与 Rule-Set (结合 Flip 50字节热切换机制)
-	routeConfig := buildRoute(in, flipDir, nodeServerDomains)
+	// 5. 构建 Route 路由规则 (分流策略、Flip 热重载规则集映射)
+	routeConfig := buildRoute(in, flipDir, nodeServerDomains, nodeServerIPs)
 
 	// 6. 组装完整 sing-box 配置
 	logLevel := in.Settings.Kernel.LogLevel
 	if logLevel == "" {
-		logLevel = "warn"
+		logLevel = "info"
 	}
 	fullConfig := map[string]any{
 		"log": map[string]any{
@@ -293,7 +325,11 @@ func buildOutbounds(nodes []map[string]any, groups []GroupConfig, allTags []stri
 
 	// 内置基础出站
 	out = append(out,
-		map[string]any{"type": "direct", "tag": "直连"},
+		map[string]any{
+			"type":               "direct",
+			"tag":                "直连",
+			"inet4_bind_address": "0.0.0.0",
+		},
 		map[string]any{"type": "block", "tag": "拒绝"},
 	)
 	return out
@@ -326,6 +362,7 @@ func buildDNS(s Settings, nodeServers []string) map[string]any {
 			"type":        "udp",
 			"server":      directDNS,
 			"server_port": 53,
+			"detour":      "直连",
 		},
 		{
 			"tag":         "dns-proxy",
@@ -422,9 +459,10 @@ func buildDNS(s Settings, nodeServers []string) map[string]any {
 	}
 }
 
-func buildRoute(in BuildInput, flipDir string, nodeServers []string) map[string]any {
+func buildRoute(in BuildInput, flipDir string, nodeServerDomains, nodeServerIPs []string) map[string]any {
 	rules := []map[string]any{
 		{"action": "sniff"},
+		{"inbound": []string{"dns-in"}, "action": "hijack-dns"},
 		{"protocol": "dns", "action": "hijack-dns"},
 		{"port": []int{53}, "action": "hijack-dns"},
 		{"ip_is_private": true, "outbound": "直连"},
@@ -434,12 +472,20 @@ func buildRoute(in BuildInput, flipDir string, nodeServers []string) map[string]
 		},
 	}
 
-	// 节点服务器强制直连
-	if in.Settings.Network.DirectForNodes && len(nodeServers) > 0 {
-		rules = append(rules, map[string]any{
-			"domain":   nodeServers,
-			"outbound": "直连",
-		})
+	// 节点服务器强制直连 (域名走 domain，纯 IP 走 ip_cidr)
+	if in.Settings.Network.DirectForNodes {
+		if len(nodeServerDomains) > 0 {
+			rules = append(rules, map[string]any{
+				"domain":   nodeServerDomains,
+				"outbound": "直连",
+			})
+		}
+		if len(nodeServerIPs) > 0 {
+			rules = append(rules, map[string]any{
+				"ip_cidr":  nodeServerIPs,
+				"outbound": "直连",
+			})
+		}
 	}
 
 	referencedRulesets := map[string]bool{
@@ -551,8 +597,9 @@ func buildRoute(in BuildInput, flipDir string, nodeServers []string) map[string]
 		"rule_set":                ruleSets,
 		"final":                   finalRoute,
 		"auto_detect_interface":   true,
-		"default_domain_resolver": "dns-direct",
-		"default_mark":            FwmarkBypass, // 0x2024：配合 eBPF 实现零损耗防回环
+		"default_domain_resolver": map[string]any{
+			"server": "dns-direct",
+		},
 	}
 }
 

@@ -479,7 +479,7 @@ func doFetch(subURL string, proxyFunc func(*http.Request) (*url.URL, error), tim
 		KeepAlive: 30 * time.Second,
 		Control: func(network, address string, c syscall.RawConn) error {
 			return c.Control(func(fd uintptr) {
-				_ = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_MARK, 0x2024)
+				setSocketMark(fd, 0x2024)
 			})
 		},
 	}
@@ -493,7 +493,7 @@ func doFetch(subURL string, proxyFunc func(*http.Request) (*url.URL, error), tim
 					Timeout: 3 * time.Second,
 					Control: func(network, address string, c syscall.RawConn) error {
 						return c.Control(func(fd uintptr) {
-							_ = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_MARK, 0x2024)
+							setSocketMark(fd, 0x2024)
 						})
 					},
 				}
