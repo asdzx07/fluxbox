@@ -16,6 +16,7 @@ namespace FluxBox.Client
     {
         public static Process AgentProcess = null;
         public static Process NodeProcess = null;
+        public static Process BrowserAppProcess = null;
         public static string AppDir = "";
         public static Mutex AppMutex = null;
         public static string BrowserExe = "";
@@ -180,17 +181,17 @@ namespace FluxBox.Client
 
         public static string FindBrowserExecutable()
         {
-            string edge1 = @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe";
-            if (File.Exists(edge1)) return edge1;
-
-            string edge2 = @"C:\Program Files\Microsoft\Edge\Application\msedge.exe";
-            if (File.Exists(edge2)) return edge2;
-
             string chrome1 = @"C:\Program Files\Google\Chrome\Application\chrome.exe";
             if (File.Exists(chrome1)) return chrome1;
 
             string chrome2 = @"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe";
             if (File.Exists(chrome2)) return chrome2;
+
+            string edge1 = @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe";
+            if (File.Exists(edge1)) return edge1;
+
+            string edge2 = @"C:\Program Files\Microsoft\Edge\Application\msedge.exe";
+            if (File.Exists(edge2)) return edge2;
 
             return null;
         }
@@ -345,6 +346,20 @@ namespace FluxBox.Client
         /// </summary>
         public static IntPtr EnsureSingleWindow()
         {
+            if (BrowserAppProcess != null && !BrowserAppProcess.HasExited)
+            {
+                try
+                {
+                    IntPtr h = BrowserAppProcess.MainWindowHandle;
+                    if (h != IntPtr.Zero)
+                    {
+                        BringWindowToFront(h);
+                        return h;
+                    }
+                }
+                catch { }
+            }
+
             List<IntPtr> list = new List<IntPtr>();
             EnumWindows((hWnd, lParam) =>
             {
@@ -355,9 +370,11 @@ namespace FluxBox.Client
                 string title = titleSb.ToString().Trim();
                 if (string.IsNullOrEmpty(title)) return true;
 
-                if (title == "FluxBox" || title.StartsWith("FluxBox ") || title.StartsWith("FluxBox -") ||
-                    title == "MyBox" || title.StartsWith("MyBox ") || title.StartsWith("MyBox -") ||
-                    title.Contains("127.0.0.1:3038"))
+                // 仅识别精确匹配的独立 App 窗口，严禁匹配带有日常浏览器后缀的窗口
+                if ((title == "FluxBox" || title == "MyBox") &&
+                    !title.Contains("Google Chrome") &&
+                    !title.Contains("Microsoft Edge") &&
+                    !title.Contains("个人 -"))
                 {
                     StringBuilder clsSb = new StringBuilder(256);
                     GetClassName(hWnd, clsSb, 256);
@@ -373,11 +390,9 @@ namespace FluxBox.Client
 
             if (list.Count == 0) return IntPtr.Zero;
 
-            // 激活第一个窗口至最前台
             IntPtr primary = list[0];
             BringWindowToFront(primary);
 
-            // 若存在多开的重复窗口，异步关闭其余窗口，保证全局唯一
             for (int i = 1; i < list.Count; i++)
             {
                 try { PostMessage(list[i], WM_CLOSE, IntPtr.Zero, IntPtr.Zero); } catch { }
@@ -420,34 +435,23 @@ namespace FluxBox.Client
         }
 
         /// <summary>
-        /// 关闭桌面上所有属于 FluxBox 的网页应用窗口
+        /// 关闭 FluxBox 客户端自身的独立窗口（仅关闭本客户端启动的进程，严禁伤害用户的日常浏览器！）
         /// </summary>
         public static void CloseAllFluxBoxWindows()
         {
-            EnumWindows((hWnd, lParam) =>
+            if (BrowserAppProcess != null && !BrowserAppProcess.HasExited)
             {
-                if (!IsWindowVisible(hWnd)) return true;
-
-                StringBuilder titleSb = new StringBuilder(512);
-                GetWindowText(hWnd, titleSb, 512);
-                string title = titleSb.ToString().Trim();
-                if (string.IsNullOrEmpty(title)) return true;
-
-                if (title == "FluxBox" || title.StartsWith("FluxBox ") || title.StartsWith("FluxBox -") ||
-                    title == "MyBox" || title.StartsWith("MyBox ") || title.StartsWith("MyBox -") ||
-                    title.Contains("127.0.0.1:3038"))
+                try
                 {
-                    StringBuilder clsSb = new StringBuilder(256);
-                    GetClassName(hWnd, clsSb, 256);
-                    string cls = clsSb.ToString();
-
-                    if (cls.IndexOf("Chrome_WidgetWin", StringComparison.OrdinalIgnoreCase) >= 0)
+                    BrowserAppProcess.CloseMainWindow();
+                    if (!BrowserAppProcess.WaitForExit(600))
                     {
-                        try { PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero); } catch { }
+                        BrowserAppProcess.Kill();
                     }
                 }
-                return true;
-            }, IntPtr.Zero);
+                catch { }
+                BrowserAppProcess = null;
+            }
         }
 
         public static void CloseAllMyBoxWindows()
@@ -459,7 +463,7 @@ namespace FluxBox.Client
 
         public static void LaunchAppWindow(string browserExe)
         {
-            // 启动前再次检测：若已有窗口，直接激活，绝不产生多余新窗口
+            // 启动前再次检测：若已有独立窗口，直接激活，绝不产生多余新窗口
             IntPtr existing = EnsureSingleWindow();
             if (existing != IntPtr.Zero)
             {
@@ -468,14 +472,16 @@ namespace FluxBox.Client
 
             LastLaunchTime = DateTime.Now;
 
-            string profileDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FluxBoxClient", "cache");
+            string profileDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FluxBoxClient", "profile");
+            try { if (!Directory.Exists(profileDir)) Directory.CreateDirectory(profileDir); } catch { }
+
             string appUrl = "http://127.0.0.1:3038";
+            // 标准 Chromium 独立 App 模式参数：
+            // 1. --app=http://... 不带内部双引号，让浏览器作为独立应用窗口呈现（无地址栏、无标签页、无书签）
+            // 2. --user-data-dir 独立隔离目录，彻底阻止与用户现有浏览器的 IPC 进程合并
+            // 3. --no-first-run --no-default-browser-check 禁用任何浏览器新手向导或设置主页
             string args = string.Format(
-                "--app=\"{0}\" --window-size=1120,760 --user-data-dir=\"{1}\" " +
-                "--no-first-run --no-default-browser-check " +
-                "--disable-features=EdgeEntityExtraction,EdgeVisualSearch,ComponentUpdate,TranslateUI,OptimizationHints " +
-                "--disable-component-update --disable-background-networking --disable-sync --disable-extensions " +
-                "--disk-cache-size=10485760 --media-cache-size=5242880",
+                "--app={0} --new-window --user-data-dir=\"{1}\" --window-size=1120,760 --no-first-run --no-default-browser-check",
                 appUrl, profileDir);
 
             ProcessStartInfo psi = new ProcessStartInfo
@@ -486,7 +492,14 @@ namespace FluxBox.Client
                 UseShellExecute = false
             };
 
-            Process.Start(psi);
+            try
+            {
+                BrowserAppProcess = Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("启动客户端独立窗口失败: " + ex.Message, "FluxBox", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         private static void OnProcessExit(object sender, EventArgs e)
