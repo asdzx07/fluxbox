@@ -33,47 +33,9 @@ type Subscription struct {
 
 // FetchAndParse 拉取远程订阅并自动识别 sing-box JSON / Clash YAML / Base64 URI
 func FetchAndParse(subURL string) ([]map[string]any, error) {
-	// 直连公共 DNS 解析器，彻底避开软路由本地未就绪的 [::1]:53 超时问题
-	resolver := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			d := net.Dialer{Timeout: 3 * time.Second}
-			return d.DialContext(ctx, "udp", "223.5.5.5:53")
-		},
-	}
-	tr := &http.Transport{
-		Proxy:           nil, // 显式禁用环境变量中死锁的本地 127.0.0.1:7891 代理，直连拉取
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		DialContext: (&net.Dialer{
-			Timeout:   10 * time.Second,
-			KeepAlive: 30 * time.Second,
-			Resolver:  resolver,
-		}).DialContext,
-	}
-	client := &http.Client{
-		Transport: tr,
-		Timeout:   25 * time.Second,
-	}
-	req, err := http.NewRequest("GET", subURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	// 使用通用代理客户端 UA，确保机场返回包含 Hysteria2 / VLESS REALITY 的完整节点
-	req.Header.Set("User-Agent", "sing-box/1.15.0 Clash.Meta/v1.18.0 Mihomo/1.18")
-
-	resp, err := client.Do(req)
+	rawBytes, err := fetchRawBytes(subURL)
 	if err != nil {
 		return nil, fmt.Errorf("拉取订阅失败: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("订阅返回 HTTP %d", resp.StatusCode)
-	}
-
-	rawBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
 	}
 	content := strings.TrimSpace(string(rawBytes))
 
@@ -416,4 +378,66 @@ func asBool(v any) bool {
 		return b
 	}
 	return false
+}
+
+func fetchRawBytes(subURL string) ([]byte, error) {
+	// 优先尝试直连公共 DNS 拉取
+	data, err := doFetch(subURL, nil)
+	if err == nil {
+		return data, nil
+	}
+
+	// 若直连失败，探测本地 7891 代理端口是否存活，若存活则自动通过代理拉取（避免海外机场被墙）
+	proxyURL, pErr := url.Parse("http://127.0.0.1:7891")
+	if pErr == nil {
+		conn, cErr := net.DialTimeout("tcp", "127.0.0.1:7891", 200*time.Millisecond)
+		if cErr == nil {
+			_ = conn.Close()
+			if proxyData, proxyErr := doFetch(subURL, http.ProxyURL(proxyURL)); proxyErr == nil {
+				return proxyData, nil
+			}
+		}
+	}
+
+	return nil, err
+}
+
+func doFetch(subURL string, proxyFunc func(*http.Request) (*url.URL, error)) ([]byte, error) {
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{Timeout: 3 * time.Second}
+			return d.DialContext(ctx, "udp", "223.5.5.5:53")
+		},
+	}
+	tr := &http.Transport{
+		Proxy:           proxyFunc,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+			Resolver:  resolver,
+		}).DialContext,
+	}
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   25 * time.Second,
+	}
+	req, err := http.NewRequest("GET", subURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "sing-box/1.15.0 Clash.Meta/v1.18.0 Mihomo/1.18")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("订阅返回 HTTP %d", resp.StatusCode)
+	}
+
+	return io.ReadAll(resp.Body)
 }
