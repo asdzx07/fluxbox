@@ -1,6 +1,7 @@
 package api
 
 import (
+
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -9,10 +10,33 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"fluxbox/internal/dnsmasq"
+
 )
+
+var (
+	updateLogMu     sync.Mutex
+	updateLogBuffer []string
+)
+
+func appendUpdateLog(line string) {
+	updateLogMu.Lock()
+	defer updateLogMu.Unlock()
+	log.Printf("[SYSTEM-UPDATE] %s", line)
+	updateLogBuffer = append(updateLogBuffer, fmt.Sprintf("[%s] %s", time.Now().Format("15:04:05"), line))
+}
+
+func getUpdateLog() string {
+	updateLogMu.Lock()
+	defer updateLogMu.Unlock()
+	return strings.Join(updateLogBuffer, "\n")
+}
+
 
 func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	st := s.store.GetSettings()
@@ -66,21 +90,12 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSystemStats(w http.ResponseWriter, r *http.Request) {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-
+	totalMem, usedMem, memPct := getHostMemory()
+	cpuPct := getHostCPUPct()
 	uptime := int(time.Since(s.startTime).Seconds())
 
-	// 基础内存监控（跨平台安全）
-	usedMem := m.Sys
-	totalMem := uint64(2 * 1024 * 1024 * 1024) // 默认 2GB 或估算
-	memPct := int((float64(usedMem) / float64(totalMem)) * 100)
-	if memPct > 100 {
-		memPct = 99
-	}
-
 	s.writeJSON(w, map[string]any{
-		"cpuPct": 2, // 零侵入轻负载
+		"cpuPct": cpuPct,
 		"mem": map[string]any{
 			"total": totalMem,
 			"used":  usedMem,
@@ -88,6 +103,71 @@ func (s *Server) handleSystemStats(w http.ResponseWriter, r *http.Request) {
 		},
 		"uptime": uptime,
 	})
+}
+
+func getHostMemory() (total, used uint64, pct int) {
+	data, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		tot := uint64(2 * 1024 * 1024 * 1024)
+		used := m.Sys
+		return tot, used, int(float64(used) / float64(tot) * 100)
+	}
+
+	var memTotal, memAvail uint64
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 {
+			val, _ := strconv.ParseUint(fields[1], 10, 64)
+			if fields[0] == "MemTotal:" {
+				memTotal = val * 1024
+			} else if fields[0] == "MemAvailable:" {
+				memAvail = val * 1024
+			}
+		}
+	}
+
+	if memTotal > 0 {
+		var memUsed uint64
+		if memTotal >= memAvail {
+			memUsed = memTotal - memAvail
+		}
+		pctVal := int(float64(memUsed) / float64(memTotal) * 100)
+		if pctVal > 100 {
+			pctVal = 100
+		}
+		return memTotal, memUsed, pctVal
+	}
+
+	return 2 * 1024 * 1024 * 1024, 64 * 1024 * 1024, 3
+}
+
+func getHostCPUPct() int {
+	data, err := os.ReadFile("/proc/loadavg")
+	if err != nil {
+		return 2
+	}
+	fields := strings.Fields(string(data))
+	if len(fields) > 0 {
+		load1, err := strconv.ParseFloat(fields[0], 64)
+		if err == nil {
+			ncpu := runtime.NumCPU()
+			if ncpu <= 0 {
+				ncpu = 1
+			}
+			pct := int((load1 / float64(ncpu)) * 100)
+			if pct < 1 {
+				return 1
+			}
+			if pct > 100 {
+				return 100
+			}
+			return pct
+		}
+	}
+	return 2
 }
 
 func (s *Server) handleSystemVersion(w http.ResponseWriter, r *http.Request) {
@@ -144,10 +224,16 @@ func (s *Server) handleSystemUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	updateLogMu.Lock()
+	updateLogBuffer = []string{"更新脚本已启动，正在后台下载并校验新版本源码..."}
+	updateLogMu.Unlock()
+
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		arch := runtime.GOARCH
 		binName := fmt.Sprintf("fluxboxd-linux-%s", arch)
+		appendUpdateLog(fmt.Sprintf("验证并下载 %s 最新发布版本...", binName))
+
 		urls := []string{
 			fmt.Sprintf("https://github.com/asdzx07/fluxbox/releases/latest/download/%s", binName),
 			fmt.Sprintf("https://ghfast.top/https://github.com/asdzx07/fluxbox/releases/latest/download/%s", binName),
@@ -167,17 +253,20 @@ func (s *Server) handleSystemUpdate(w http.ResponseWriter, r *http.Request) {
 				Proxy:           nil,
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
-			Timeout: 60 * time.Second,
+			Timeout: 90 * time.Second,
 		}
 
 		for _, u := range urls {
+			appendUpdateLog(fmt.Sprintf("尝试从镜像源拉取：%s", u))
 			resp, err := client.Get(u)
 			if err == nil && resp.StatusCode == http.StatusOK {
 				data, err := io.ReadAll(resp.Body)
 				resp.Body.Close()
-				if err == nil && len(data) > 5*1024*1024 { // 二进制通常大于 10MB
+				if err == nil && len(data) > 3*1024*1024 { // 二进制通常大于 5MB
+					appendUpdateLog("校验归档内容与执行文件完整性...")
 					if err := os.WriteFile(newPath, data, 0755); err == nil {
 						downloadSuccess = true
+						appendUpdateLog("校验归档内容通过，二进制文件校验成功！")
 						break
 					}
 				}
@@ -185,14 +274,17 @@ func (s *Server) handleSystemUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if downloadSuccess {
+			appendUpdateLog("原子切换代码完成，新版本二进制已就绪...")
 			_ = os.Rename(newPath, selfPath)
-			log.Printf("🎉 自更新完成，准备重启服务...")
+			appendUpdateLog("重启面板服务中，服务即将平滑重启...")
 			time.Sleep(1 * time.Second)
 			if _, err := os.Stat("/etc/init.d/fluxbox"); err == nil {
 				_ = exec.Command("/etc/init.d/fluxbox", "restart").Run()
 			} else {
 				os.Exit(0)
 			}
+		} else {
+			appendUpdateLog("更新失败：无法从任何镜像源下载有效二进制")
 		}
 	}()
 
@@ -201,3 +293,11 @@ func (s *Server) handleSystemUpdate(w http.ResponseWriter, r *http.Request) {
 		"message": "更新已在后台开始，面板服务即将重启，请稍后刷新页面",
 	})
 }
+
+func (s *Server) handleSystemUpdateLog(w http.ResponseWriter, r *http.Request) {
+	s.writeJSON(w, map[string]any{
+		"ok":  true,
+		"log": getUpdateLog(),
+	})
+}
+

@@ -1,16 +1,25 @@
 package api
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"encoding/json"
+	"fmt"
+	"io"
+	"log"
 	"net/http"
+	"os"
+	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"fluxbox/internal/configgen"
 	"fluxbox/internal/dnsmasq"
 	"fluxbox/internal/netstack"
 	"fluxbox/internal/store"
 )
+
 
 func (s *Server) handleDeploy(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -60,6 +69,10 @@ func (s *Server) handleKernelAction(w http.ResponseWriter, r *http.Request) {
 		_ = dnsmasq.Hijack(s.store.GetSettings().DNS.HijackPort)
 		s.writeJSON(w, map[string]any{"ok": true, "running": true})
 
+	case "install":
+		s.handleKernelInstall(w, r)
+		return
+
 	default:
 		s.writeError(w, http.StatusBadRequest, "未知内核操作")
 	}
@@ -77,13 +90,189 @@ func (s *Server) handleKernelLog(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleKernelLatest(w http.ResponseWriter, r *http.Request) {
 	cur := s.supervisor.Version()
+	latest := queryLatestSingBoxTag()
+	if latest == "" {
+		latest = cur
+	}
+
+	hasUpdate := false
+	if latest != "" && cur != "" {
+		cleanCur := strings.TrimPrefix(cur, "v")
+		cleanLat := strings.TrimPrefix(latest, "v")
+		if cleanCur != cleanLat {
+			hasUpdate = true
+		}
+	}
+
 	s.writeJSON(w, map[string]any{
 		"ok":        true,
 		"current":   cur,
-		"latest":    cur,
-		"hasUpdate": false,
+		"latest":    latest,
+		"hasUpdate": hasUpdate,
 	})
 }
+
+func (s *Server) handleKernelInstall(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Version string `json:"version"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	version := strings.TrimSpace(req.Version)
+	if version == "" || version == "latest" {
+		version = queryLatestSingBoxTag()
+		if version == "" {
+			version = s.supervisor.Version()
+		}
+	}
+	if version == "" {
+		s.writeError(w, http.StatusBadRequest, "未能获取到有效的目标版本号")
+		return
+	}
+
+	binPath := s.supervisor.GetBinPath()
+	if binPath == "" {
+		binPath = "/opt/fluxbox/bin/sing-box"
+	}
+
+	if err := installSingBoxBinary(version, binPath); err != nil {
+		s.writeError(w, http.StatusInternalServerError, fmt.Sprintf("内核更新失败: %v", err))
+		return
+	}
+
+	_ = s.supervisor.Restart()
+	newVer := s.supervisor.Version()
+
+	s.writeJSON(w, map[string]any{
+		"ok":        true,
+		"version":   newVer,
+		"restarted": true,
+	})
+}
+
+func queryLatestSingBoxTag() string {
+	client := &http.Client{Timeout: 4 * time.Second}
+	urls := []string{
+		"https://api.github.com/repos/SagerNet/sing-box/releases/latest",
+		"https://ghfast.top/https://api.github.com/repos/SagerNet/sing-box/releases/latest",
+	}
+
+	for _, u := range urls {
+		req, err := http.NewRequest(http.MethodGet, u, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Set("User-Agent", "FluxBox")
+		resp, err := client.Do(req)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			var rel struct {
+				TagName string `json:"tag_name"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&rel); err == nil && rel.TagName != "" {
+				resp.Body.Close()
+				return rel.TagName
+			}
+			resp.Body.Close()
+		}
+	}
+	return ""
+}
+
+func installSingBoxBinary(tag, targetBinPath string) error {
+	rawVer := strings.TrimPrefix(tag, "v")
+	arch := runtime.GOARCH
+	archMap := map[string]string{
+		"amd64": "amd64",
+		"arm64": "arm64",
+		"arm":   "armv7",
+		"386":   "386",
+	}
+	a, ok := archMap[arch]
+	if !ok {
+		a = "amd64"
+	}
+
+	archiveName := fmt.Sprintf("sing-box-%s-linux-%s.tar.gz", rawVer, a)
+	urls := []string{
+		fmt.Sprintf("https://github.com/SagerNet/sing-box/releases/download/%s/%s", tag, archiveName),
+		fmt.Sprintf("https://ghfast.top/https://github.com/SagerNet/sing-box/releases/download/%s/%s", tag, archiveName),
+	}
+
+	client := &http.Client{Timeout: 90 * time.Second}
+	var resp *http.Response
+	var err error
+
+	for _, u := range urls {
+		resp, err = client.Get(u)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+	}
+
+	if resp == nil || resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("下载内核归档包失败 (HTTP %v)", err)
+	}
+	defer resp.Body.Close()
+
+	gzReader, err := gzip.NewReader(resp.Body)
+	if err != nil {
+		return fmt.Errorf("解压 gzip 失败: %v", err)
+	}
+	defer gzReader.Close()
+
+	tarReader := tar.NewReader(gzReader)
+	var found bool
+	tmpTarget := targetBinPath + ".new"
+
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("读取 tar 失败: %v", err)
+		}
+
+		if !header.FileInfo().IsDir() && (header.Name == "sing-box" || strings.HasSuffix(header.Name, "/sing-box")) {
+			outFile, err := os.OpenFile(tmpTarget, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+			if err != nil {
+				return fmt.Errorf("写入临时文件失败: %v", err)
+			}
+			_, copyErr := io.Copy(outFile, tarReader)
+			outFile.Close()
+			if copyErr != nil {
+				_ = os.Remove(tmpTarget)
+				return fmt.Errorf("解压提取 sing-box 失败: %v", copyErr)
+			}
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		_ = os.Remove(tmpTarget)
+		return fmt.Errorf("在下载的归档包中未找到 sing-box 可执行文件")
+	}
+
+	if err := os.Rename(tmpTarget, targetBinPath); err != nil {
+		// 跨分区 fallback
+		data, err := os.ReadFile(tmpTarget)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(targetBinPath, data, 0755); err != nil {
+			return err
+		}
+		_ = os.Remove(tmpTarget)
+	}
+
+	log.Printf("🎉 sing-box %s 已成功安装至 %s", tag, targetBinPath)
+	return nil
+}
+
 
 func (s *Server) handleRulesetSubs(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -169,13 +358,31 @@ func (s *Server) handleRulesetSubAction(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleRulesetsStatus(w http.ResponseWriter, r *http.Request) {
-	s.writeJSON(w, map[string]any{"ok": true, "items": map[string]any{}})
+	st := s.store.GetSettings()
+	var items []map[string]any
+	for _, sub := range st.RulesetSubs {
+		items = append(items, map[string]any{
+			"id":      sub.ID,
+			"tag":     sub.Tag,
+			"url":     sub.URL,
+			"format":  sub.Format,
+			"enabled": sub.Enabled,
+			"status":  "active",
+		})
+	}
+	s.writeJSON(w, map[string]any{"ok": true, "items": items})
 }
 
 func (s *Server) handleRulesetsRefresh(w http.ResponseWriter, r *http.Request) {
-	s.writeJSON(w, map[string]any{"ok": true, "message": "规则集刷新已触发"})
+	go func() {
+		_ = s.DeployCore(true)
+	}()
+	s.writeJSON(w, map[string]any{"ok": true, "message": "规则集刷新已触发，内核正在重新拉取并热部署"})
 }
 
 func (s *Server) handleAdblockRefresh(w http.ResponseWriter, r *http.Request) {
-	s.writeJSON(w, map[string]any{"ok": true, "message": "广告拦截规则集刷新已触发"})
+	go func() {
+		_ = s.DeployCore(true)
+	}()
+	s.writeJSON(w, map[string]any{"ok": true, "message": "广告拦截规则集刷新已触发，正在重新拉取并热部署"})
 }

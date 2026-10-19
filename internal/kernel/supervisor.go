@@ -313,3 +313,10 @@ func (s *Supervisor) SetConfigPath(path string) {
 	defer s.mu.Unlock()
 	s.configPath = path
 }
+
+func (s *Supervisor) GetBinPath() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.binPath
+}
+
