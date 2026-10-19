@@ -32,6 +32,7 @@ type Settings struct {
 		Adblock       bool     `json:"adblock"`
 		AdblockAllow  []string `json:"adblockAllow"`
 		AdblockCustom []string `json:"adblockCustom"`
+		HijackPort    int      `json:"hijackPort"`
 	} `json:"dns"`
 	Kernel struct {
 		LogLevel string `json:"logLevel"`
@@ -94,13 +95,22 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 		}
 	}
 
-	// 2. 构建 Inbounds (使用 eBPF 配套的 TProxy 入站替代传统高开销 TUN 入站)
+	// 2. 构建 Inbounds (集成 TUN 自动透明重定向 + 本地 Mixed 端口 + DNS 劫持接收端口)
+	dnsPort := in.Settings.DNS.HijackPort
+	if dnsPort == 0 {
+		dnsPort = 36053
+	}
+
 	inbounds := []map[string]any{
 		{
-			"type":        "tproxy",
-			"tag":         "ebpf-tproxy-in",
-			"listen":      "::",
-			"listen_port": 7893,
+			"type":           "tun",
+			"tag":            "tun-in",
+			"interface_name": "fluxbox-tun",
+			"address":        []string{"172.19.0.1/30"},
+			"auto_route":     true,
+			"strict_route":   false,
+			"auto_redirect":  true,
+			"stack":          "mixed",
 		},
 		{
 			"type":        "mixed",
@@ -112,7 +122,7 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 			"type":        "direct",
 			"tag":         "dns-in",
 			"listen":      "::",
-			"listen_port": 7853,
+			"listen_port": dnsPort,
 		},
 	}
 
@@ -506,9 +516,6 @@ func buildRoute(in BuildInput, flipDir string, nodeServers []string) map[string]
 		"final":                   "所有-自动",
 		"auto_detect_interface":   true,
 		"default_domain_resolver": "dns-direct",
-		"default_http_client": map[string]any{
-			"detour": "所有-自动",
-		},
 		"default_mark":            FwmarkBypass, // 0x2024：配合 eBPF 实现零损耗防回环
 	}
 }

@@ -284,6 +284,7 @@ func (s *Store) ToConfiggenSettings() configgen.Settings {
 	cfg.DNS.Adblock = s.settings.DNS.Adblock
 	cfg.DNS.AdblockAllow = s.settings.DNS.AdblockAllow
 	cfg.DNS.AdblockCustom = s.settings.DNS.AdblockCustom
+	cfg.DNS.HijackPort = s.settings.DNS.HijackPort
 
 	cfg.Kernel.LogLevel = s.settings.Kernel.LogLevel
 	return cfg
