@@ -15,10 +15,11 @@ ROUTER_DIR   ?= /opt/fluxbox
 
 all: generate build-amd64
 
-## 1. 将 bpf/fluxbox_tc.c 编译为内嵌 Go 字节码 (需要 clang & llvm-strip)
+## 1. 将 bpf/fluxbox_tc.c 编译为标准 eBPF ELF 字节码文件 bpf/fluxbox_tc.o
 generate:
-	@echo "⚡ [1/2] 正在编译 eBPF C 内核程序 (fluxbox_tc.c -> Go Bytecode)..."
-	go generate ./bpf/...
+	@echo "⚡ [1/2] 正在使用 Clang 编译 eBPF 内核字节码 (fluxbox_tc.c -> fluxbox_tc.o)..."
+	clang -target bpf -O2 -g -Wall -Werror -c bpf/fluxbox_tc.c -o bpf/fluxbox_tc.o
+	@ls -lh bpf/fluxbox_tc.o
 
 ## 2. 编译 x86_64 软路由版本 (适用 iStoreOS / OpenWrt x86 / Debian)
 build-amd64:

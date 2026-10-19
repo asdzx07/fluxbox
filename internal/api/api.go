@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -184,13 +185,27 @@ func (s *Server) DeployCore(restart bool) error {
 	}
 	_ = dnsmasq.Hijack(hijackPort)
 
-	// 6. 将节点域名/IP注入 eBPF 直连表
+	// 6. 将节点域名解析为真实 IP 注入 eBPF LPM Trie 直连表
 	if s.bpfEngine != nil {
 		_ = s.bpfEngine.SetGlobalFlags(fullSettings.Network.DirectBypass, fullSettings.Network.RejectQuic)
-		for _, domain := range nodeDomains {
-			_ = s.bpfEngine.AddDirectCIDR(domain)
-		}
-		// 同步内网客户端分流策略
+		go func(hosts []string) {
+			for _, h := range hosts {
+				// 若本身已是 IP 或 CIDR，直接写入
+				if err := s.bpfEngine.AddDirectCIDR(h); err == nil {
+					continue
+				}
+				// 若是节点域名，异步解析出真实 IPv4 压入 eBPF LPM 树，防止阻塞部署
+				if ips, err := net.LookupIP(h); err == nil {
+					for _, ip := range ips {
+						if v4 := ip.To4(); v4 != nil {
+							_ = s.bpfEngine.AddDirectCIDR(v4.String() + "/32")
+						}
+					}
+				}
+			}
+		}(nodeDomains)
+
+		// 同步内网客户端分流策略 (毫秒级生效)
 		for _, c := range s.store.GetClients() {
 			_ = s.bpfEngine.UpdateClientMode(c.IP, c.Mode)
 		}

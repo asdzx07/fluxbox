@@ -2,26 +2,30 @@ package bpf
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"io"
 
 	"github.com/cilium/ebpf"
 )
 
+// 直接将 Clang 编译出的 eBPF ELF 目标文件嵌入 Go 二进制
+//go:embed fluxbox_tc.o
+var fluxboxElfBytes []byte
+
 type fluxboxPrograms struct {
 	FluxboxTcIngress *ebpf.Program `ebpf:"fluxbox_tc_ingress"`
 }
 
 func (p *fluxboxPrograms) Close() error {
-	return closeClosers(
-		p.FluxboxTcIngress,
-	)
+	return closeClosers(p.FluxboxTcIngress)
 }
 
 type fluxboxMaps struct {
-	LanClientsMap *ebpf.Map `ebpf:"lan_clients_map"`
-	DirectCidrMap *ebpf.Map `ebpf:"direct_cidr_map"`
-	GlobalCfgMap  *ebpf.Map `ebpf:"global_cfg_map"`
+	LanClientsMap   *ebpf.Map `ebpf:"lan_clients_map"`
+	DirectCidrMap   *ebpf.Map `ebpf:"direct_cidr_map"`
+	GlobalCfgMap    *ebpf.Map `ebpf:"global_cfg_map"`
+	FluxboxStatsMap *ebpf.Map `ebpf:"fluxbox_stats_map"`
 }
 
 func (m *fluxboxMaps) Close() error {
@@ -29,6 +33,7 @@ func (m *fluxboxMaps) Close() error {
 		m.LanClientsMap,
 		m.DirectCidrMap,
 		m.GlobalCfgMap,
+		m.FluxboxStatsMap,
 	)
 }
 
@@ -38,10 +43,7 @@ type fluxboxObjects struct {
 }
 
 func (o *fluxboxObjects) Close() error {
-	return closeClosers(
-		&o.fluxboxPrograms,
-		&o.fluxboxMaps,
-	)
+	return closeClosers(&o.fluxboxPrograms, &o.fluxboxMaps)
 }
 
 type fluxboxIpv4LpmKey struct {
@@ -58,7 +60,6 @@ func closeClosers(closers ...io.Closer) error {
 	return nil
 }
 
-// loadFluxboxObjects 优先从内嵌编译字节码加载；若未内嵌则安全报错供上层捕获
 func loadFluxboxObjects(obj interface{}, opts *ebpf.CollectionOptions) error {
 	if len(fluxboxElfBytes) == 0 {
 		return fmt.Errorf("fluxbox eBPF ELF bytecode not embedded")
@@ -69,6 +70,3 @@ func loadFluxboxObjects(obj interface{}, opts *ebpf.CollectionOptions) error {
 	}
 	return spec.LoadAndAssign(obj, opts)
 }
-
-// fluxboxElfBytes 存储预编译或构建期注入的 eBPF 字节码
-var fluxboxElfBytes []byte

@@ -176,6 +176,31 @@ func (e *Engine) initPrivateCIDRs() {
 	}
 }
 
+func (e *Engine) GetStats() (Stats, error) {
+	var s Stats
+	if e.objs.FluxboxStatsMap == nil {
+		return s, nil
+	}
+	var directPerCPU, proxyPerCPU, shotPerCPU []uint64
+	var k0, k1, k2 uint32 = 0, 1, 2
+	if err := e.objs.FluxboxStatsMap.Lookup(&k0, &directPerCPU); err == nil {
+		for _, v := range directPerCPU {
+			s.DirectPackets += v
+		}
+	}
+	if err := e.objs.FluxboxStatsMap.Lookup(&k1, &proxyPerCPU); err == nil {
+		for _, v := range proxyPerCPU {
+			s.ProxyPackets += v
+		}
+	}
+	if err := e.objs.FluxboxStatsMap.Lookup(&k2, &shotPerCPU); err == nil {
+		for _, v := range shotPerCPU {
+			s.ShotPackets += v
+		}
+	}
+	return s, nil
+}
+
 func (e *Engine) Close() error {
 	return e.objs.Close()
 }

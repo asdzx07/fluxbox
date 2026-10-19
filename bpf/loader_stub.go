@@ -35,6 +35,10 @@ func (e *Engine) SetGlobalFlags(directBypass, rejectQuic bool) error {
 	return nil
 }
 
+func (e *Engine) GetStats() (Stats, error) {
+	return Stats{}, nil
+}
+
 func (e *Engine) Close() error {
 	log.Printf("[BPF-STUB] 模拟关闭 eBPF 引擎")
 	return nil
