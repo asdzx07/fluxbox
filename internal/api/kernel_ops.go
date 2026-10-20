@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -447,30 +448,100 @@ func (s *Server) handleRulesetSubAction(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleRulesetsStatus(w http.ResponseWriter, r *http.Request) {
 	st := s.store.GetSettings()
+	var formattedDate string
+	if st.Meta.RulesetUpdatedAt != nil && *st.Meta.RulesetUpdatedAt > 0 {
+		formattedDate = time.Unix(*st.Meta.RulesetUpdatedAt, 0).Format("2006-01-02 15:04")
+	} else {
+		// 检查本地 cache.db 的修改时间作为默认兜底
+		cachePath := filepath.Join(s.store.GetDataDir(), "cache.db")
+		if fi, err := os.Stat(cachePath); err == nil && fi.Size() > 0 {
+			formattedDate = fi.ModTime().Format("2006-01-02 15:04")
+		}
+	}
+
 	var items []map[string]any
 	for _, sub := range st.RulesetSubs {
+		subDate := sub.FormattedDate
+		if subDate == "" {
+			subDate = formattedDate
+		}
 		items = append(items, map[string]any{
-			"id":      sub.ID,
-			"tag":     sub.Tag,
-			"url":     sub.URL,
-			"format":  sub.Format,
-			"enabled": sub.Enabled,
-			"status":  "active",
+			"id":            sub.ID,
+			"tag":           sub.Tag,
+			"url":           sub.URL,
+			"format":        sub.Format,
+			"enabled":       sub.Enabled,
+			"status":        "active",
+			"formattedDate": subDate,
 		})
 	}
-	s.writeJSON(w, map[string]any{"ok": true, "items": items})
+	s.writeJSON(w, map[string]any{
+		"ok":            true,
+		"formattedDate": formattedDate,
+		"items":         items,
+	})
 }
 
 func (s *Server) handleRulesetsRefresh(w http.ResponseWriter, r *http.Request) {
-	go func() {
-		_ = s.DeployCore(true)
-	}()
-	s.writeJSON(w, map[string]any{"ok": true, "message": "规则集刷新已触发，内核正在重新拉取并热部署"})
+	var req struct {
+		Tag string `json:"tag"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	// 1. 删除旧的规则集缓存，强迫 sing-box 重新从远端下载最新规则文件
+	cachePath := filepath.Join(s.store.GetDataDir(), "cache.db")
+	_ = os.Remove(cachePath)
+
+	// 2. 重新部署并拉起 sing-box 内核
+	if err := s.DeployCore(true); err != nil {
+		s.writeError(w, http.StatusInternalServerError, fmt.Sprintf("重新部署内核失败: %v", err))
+		return
+	}
+
+	// 3. 记录更新时间戳并持久化
+	now := time.Now().Unix()
+	formatted := time.Now().Format("2006-01-02 15:04")
+	_ = s.store.MutateSettings(func(st *store.FullSettings) {
+		st.Meta.RulesetUpdatedAt = &now
+		for i := range st.RulesetSubs {
+			if req.Tag == "" || st.RulesetSubs[i].Tag == req.Tag {
+				st.RulesetSubs[i].UpdatedAt = &now
+				st.RulesetSubs[i].FormattedDate = formatted
+			}
+		}
+	})
+
+	s.writeJSON(w, map[string]any{
+		"ok":            true,
+		"hasUpdate":     true,
+		"formattedDate": formatted,
+		"updatedCount":  1,
+		"message":       "规则集已成功刷新并重新部署",
+	})
 }
 
 func (s *Server) handleAdblockRefresh(w http.ResponseWriter, r *http.Request) {
-	go func() {
-		_ = s.DeployCore(true)
-	}()
-	s.writeJSON(w, map[string]any{"ok": true, "message": "广告拦截规则集刷新已触发，正在重新拉取并热部署"})
+	// 1. 删除旧规则集缓存
+	cachePath := filepath.Join(s.store.GetDataDir(), "cache.db")
+	_ = os.Remove(cachePath)
+
+	// 2. 重新部署并拉起 sing-box 内核
+	if err := s.DeployCore(true); err != nil {
+		s.writeError(w, http.StatusInternalServerError, fmt.Sprintf("重新部署内核失败: %v", err))
+		return
+	}
+
+	// 3. 记录更新时间戳并持久化
+	now := time.Now().Unix()
+	formatted := time.Now().Format("2006-01-02 15:04")
+	_ = s.store.MutateSettings(func(st *store.FullSettings) {
+		st.Meta.RulesetUpdatedAt = &now
+	})
+
+	s.writeJSON(w, map[string]any{
+		"ok":            true,
+		"hasUpdate":     true,
+		"formattedDate": formatted,
+		"message":       "广告拦截规则集已成功重新拉取并生效",
+	})
 }

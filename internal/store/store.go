@@ -67,8 +67,9 @@ type KernelConfig struct {
 }
 
 type MetaConfig struct {
-	LastDeployAt    *int64 `json:"lastDeployAt"`
-	LastDeployError string `json:"lastDeployError"`
+	LastDeployAt     *int64 `json:"lastDeployAt"`
+	LastDeployError  string `json:"lastDeployError"`
+	RulesetUpdatedAt *int64 `json:"rulesetUpdatedAt"`
 }
 
 type FullSettings struct {

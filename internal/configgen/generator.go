@@ -70,11 +70,13 @@ type PolicyConfig struct {
 
 // RulesetSub 对应前端 /api/ruleset-subs 的自定义规则集订阅
 type RulesetSub struct {
-	ID      string `json:"id"`
-	Tag     string `json:"tag"`
-	URL     string `json:"url"`
-	Format  string `json:"format"`
-	Enabled bool   `json:"enabled"`
+	ID            string `json:"id"`
+	Tag           string `json:"tag"`
+	URL           string `json:"url"`
+	Format        string `json:"format"`
+	Enabled       bool   `json:"enabled"`
+	UpdatedAt     *int64 `json:"updatedAt,omitempty"`
+	FormattedDate string `json:"formattedDate,omitempty"`
 }
 
 type BuildInput struct {
@@ -603,19 +605,23 @@ func buildRoute(in BuildInput, flipDir string, nodeServerDomains, nodeServerIPs 
 		}
 	}
 
+	detourOutbound := "所有-自动"
+	if len(in.Nodes) == 0 {
+		detourOutbound = "直连"
+	}
+
 	for rsTag, needed := range referencedRulesets {
 		if !needed {
 			continue
 		}
 		if custom, ok := customSubMap[rsTag]; ok {
 			ruleSets = append(ruleSets, map[string]any{
-				"type":   "remote",
-				"tag":    custom.Tag,
-				"format": custom.Format,
-				"url":    custom.URL,
-				"http_client": map[string]any{
-					"detour": "所有-自动",
-				},
+				"type":            "remote",
+				"tag":             custom.Tag,
+				"format":          custom.Format,
+				"url":             custom.URL,
+				"download_detour": detourOutbound,
+				"update_interval": "1d",
 			})
 		} else {
 			// 默认映射至 SagerNet 官方 sing-geosite / sing-geoip 二进制源
@@ -624,13 +630,12 @@ func buildRoute(in BuildInput, flipDir string, nodeServerDomains, nodeServerIPs 
 				repo = "sing-geoip"
 			}
 			ruleSets = append(ruleSets, map[string]any{
-				"type":   "remote",
-				"tag":    rsTag,
-				"format": "binary",
-				"url":    "https://testingcf.jsdelivr.net/gh/SagerNet/" + repo + "@rule-set/" + rsTag + ".srs",
-				"http_client": map[string]any{
-					"detour": "所有-自动",
-				},
+				"type":            "remote",
+				"tag":             rsTag,
+				"format":          "binary",
+				"url":             "https://testingcf.jsdelivr.net/gh/SagerNet/" + repo + "@rule-set/" + rsTag + ".srs",
+				"download_detour": detourOutbound,
+				"update_interval": "1d",
 			})
 		}
 	}
