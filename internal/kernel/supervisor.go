@@ -9,11 +9,32 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
+
+// EnsureMuslCompat 检查是否处于 musl libc 环境（如 OpenWrt/iStoreOS）并缺少标准 glibc 解释器软链接。
+// 官方发布的 sing-box 静态构建虽然 CGO: disabled，但其 ELF interpreter 默认声明为 /lib64/ld-linux-x86-64.so.2。
+// 当检测到系统存在 /lib/ld-musl-x86_64.so.1 但缺少 /lib64/ld-linux-x86-64.so.2 时，自动创建软链接，
+// 从而使官方内核开箱即用，避免报 'not found' 导致无法启动。
+func EnsureMuslCompat() {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		return
+	}
+	muslLd := "/lib/ld-musl-x86_64.so.1"
+	glibcLd := "/lib64/ld-linux-x86-64.so.2"
+	if _, err := os.Stat(muslLd); err == nil {
+		if _, err := os.Stat(glibcLd); os.IsNotExist(err) {
+			_ = os.MkdirAll("/lib64", 0755)
+			if err := os.Symlink(muslLd, glibcLd); err == nil {
+				log.Printf("🔗 已自动建立 musl -> glibc 动态解释器软链接: %s -> %s", glibcLd, muslLd)
+			}
+		}
+	}
+}
 
 type Status struct {
 	Running   bool   `json:"running"`
@@ -34,6 +55,7 @@ type Supervisor struct {
 }
 
 func NewSupervisor(binPath, configPath string) *Supervisor {
+	EnsureMuslCompat()
 	if binPath == "" {
 		binPath = findSingBoxBinary()
 	}
@@ -86,6 +108,7 @@ func (s *Supervisor) CheckConfig(cfgPath string) error {
 
 // Start 启动 sing-box 内核进程并实时捕获其输出日志
 func (s *Supervisor) Start() error {
+	EnsureMuslCompat()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

@@ -17,6 +17,7 @@ import (
 
 	"fluxbox/internal/configgen"
 	"fluxbox/internal/dnsmasq"
+	"fluxbox/internal/kernel"
 	"fluxbox/internal/netstack"
 	"fluxbox/internal/store"
 )
@@ -358,6 +359,7 @@ func installSingBoxBinary(tag, targetBinPath string) error {
 		_ = os.Remove(tmpTarget)
 	}
 
+	kernel.EnsureMuslCompat()
 	log.Printf("🎉 sing-box %s 已成功安装至 %s", tag, targetBinPath)
 	return nil
 }
