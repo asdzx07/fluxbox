@@ -101,6 +101,12 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 	ipSeen := make(map[string]bool)
 
 	for _, n := range in.Nodes {
+		nodeType, _ := n["type"].(string)
+		// NaiveProxy 依赖 cronet 动态库 (libcronet.so)，嵌入式/软路由系统通常缺失该库，跳过防崩溃
+		if strings.EqualFold(nodeType, "naive") {
+			continue
+		}
+
 		if tag, ok := n["tag"].(string); ok && tag != "" {
 			allNodeTags = append(allNodeTags, tag)
 		}
@@ -343,12 +349,26 @@ func buildOutbounds(nodes []map[string]any, groups []GroupConfig, allTags []stri
 		}
 	}
 
-	// 注入全部真实节点（清洗内部使用的 __ 字段）
+	// 注入全部真实节点（清洗内部使用的 __ 字段与 UI 辅助字段）
 	for _, n := range nodes {
+		nodeType, _ := n["type"].(string)
+		// NaiveProxy 依赖 cronet 动态库，软路由环境跳过
+		if strings.EqualFold(nodeType, "naive") {
+			continue
+		}
+
 		cleanedNode := make(map[string]any)
 		for k, v := range n {
-			if !strings.HasPrefix(k, "__") {
-				cleanedNode[k] = v
+			// sing-box 严格校验未知字段：出站对象标识字段为 "tag"，严禁带 "name" 及前端私有字段
+			if strings.HasPrefix(k, "__") || k == "name" || k == "id" || k == "latency" || k == "history" {
+				continue
+			}
+			cleanedNode[k] = v
+		}
+		// 容错：若未设置 tag 但有 name，则使用 name 充当 tag
+		if _, ok := cleanedNode["tag"]; !ok {
+			if name, ok := n["name"].(string); ok && name != "" {
+				cleanedNode["tag"] = name
 			}
 		}
 		out = append(out, cleanedNode)
