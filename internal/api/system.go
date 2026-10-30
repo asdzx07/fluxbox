@@ -63,6 +63,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 			"version":       kStatus.Version,
 			"versionOutput": kStatus.Version,
 			"uptime":        formatUptime(kStatus.Uptime),
+			"circuitBroken": kStatus.CircuitBroken,
 		},
 		"dnsmasq": dnsmasq.Status(),
 		"platform": map[string]any{

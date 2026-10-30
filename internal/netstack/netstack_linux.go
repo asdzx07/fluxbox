@@ -54,13 +54,64 @@ func Setup() error {
 		return fmt.Errorf("apply nat nftables: %w", err)
 	}
 
-	log.Printf("[OK] 旁路由单臂网络栈就绪 (IP 转发 + NAT 伪装回包)")
+	// 2. 策略路由：带有 FwmarkBypass (0x2024) 的流量直接查询 main 路由表走直连，防止内核出站自回环与死锁
+	if err := applyBypassRule(); err != nil {
+		return fmt.Errorf("apply bypass rule: %w", err)
+	}
+
+	log.Printf("[OK] 旁路由单臂网络栈就绪 (IP 转发 + NAT 伪装回包 + 策略路由闭环)")
 	return nil
+}
+
+func applyBypassRule() error {
+	// 添加前先检查或清理旧规则防止重复
+	cleanupBypassRule()
+
+	rule := netlink.NewRule()
+	rule.Family = syscall.AF_INET
+	rule.Priority = PrioBypass
+	rule.Mark = FwmarkBypass
+	rule.Table = 254 // syscall.RT_TABLE_MAIN (main 路由表)
+	if err := netlink.RuleAdd(rule); err != nil {
+		// 降级使用 ip 命令行重试
+		cmd := exec.Command("ip", "rule", "add", "pref", fmt.Sprintf("%d", PrioBypass), "fwmark", fmt.Sprintf("0x%x", FwmarkBypass), "table", "main")
+		if out, errCmd := cmd.CombinedOutput(); errCmd != nil {
+			return fmt.Errorf("netlink rule add: %v, cmd rule add: %v (%s)", err, errCmd, string(out))
+		}
+	}
+	return nil
+}
+
+func cleanupBypassRule() {
+	// 遍历 netlink 策略路由清理：匹配优先级或 0x2024 bypass 标记
+	rules, err := netlink.RuleList(netlink.FAMILY_V4)
+	if err == nil {
+		for _, r := range rules {
+			if r.Priority == PrioBypass || r.Mark == FwmarkBypass {
+				rCopy := r
+				_ = netlink.RuleDel(&rCopy)
+			}
+		}
+	}
+	// 执行 ip rule del 确保清理彻底 (针对可能存在的重复规则循环清理直至无匹配)
+	for i := 0; i < 5; i++ {
+		if err := exec.Command("ip", "rule", "del", "pref", fmt.Sprintf("%d", PrioBypass)).Run(); err != nil {
+			break
+		}
+	}
+	for i := 0; i < 5; i++ {
+		if err := exec.Command("ip", "rule", "del", "fwmark", fmt.Sprintf("0x%x", FwmarkBypass), "table", "main").Run(); err != nil {
+			break
+		}
+	}
 }
 
 func Teardown() error {
 	_ = exec.Command("nft", "delete", "table", "inet", "fluxbox_tproxy").Run()
 	_ = exec.Command("nft", "delete", "table", "inet", "fluxbox_nat").Run()
+
+	// 清理 pref 8999 策略路由规则
+	cleanupBypassRule()
 
 	// 强力清理可能残留的旧版 table 2022、rule 8999、9000、9001、9002、32768 等死锁规则
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)

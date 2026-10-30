@@ -2,13 +2,30 @@ package api
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 )
 
 type failAttempt struct {
+	mu        sync.Mutex
 	startedAt time.Time
 	count     int
+}
+
+// extractClientIP 提取 RemoteAddr 中的真实 IP，剥离随机端口号及 IPv6 括号
+func extractClientIP(remoteAddr string) string {
+	remoteAddr = strings.TrimSpace(remoteAddr)
+	if remoteAddr == "" {
+		return "unknown"
+	}
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err == nil && host != "" {
+		return strings.Trim(host, "[]")
+	}
+	return strings.Trim(remoteAddr, "[]")
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -62,16 +79,26 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clientIP := r.RemoteAddr
+	// 提取真实客户端 IP（剥离每次 TCP 连接随机变化的端口），防止防爆破限流被绕过
+	clientIP := extractClientIP(r.RemoteAddr)
 	now := time.Now()
 
 	// 简易限流：15 分钟内最多尝试 5 次
 	if val, ok := s.loginFails.Load(clientIP); ok {
 		att := val.(*failAttempt)
-		if now.Sub(att.startedAt) < 15*time.Minute && att.count >= 5 {
-			s.writeError(w, http.StatusTooManyRequests, "登录尝试过于频繁，请稍后再试")
-			return
+		att.mu.Lock()
+		if now.Sub(att.startedAt) < 15*time.Minute {
+			if att.count >= 5 {
+				att.mu.Unlock()
+				s.writeError(w, http.StatusTooManyRequests, "登录尝试过于频繁，请稍后再试")
+				return
+			}
+		} else {
+			// 超过 15 分钟衰减周期，清除旧的记录
+			att.count = 0
+			att.startedAt = now
 		}
+		att.mu.Unlock()
 	}
 
 	var req struct {
@@ -82,7 +109,14 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	if !s.store.VerifyPassword(req.Password) {
 		val, _ := s.loginFails.LoadOrStore(clientIP, &failAttempt{startedAt: now, count: 0})
 		att := val.(*failAttempt)
-		att.count++
+		att.mu.Lock()
+		if now.Sub(att.startedAt) >= 15*time.Minute {
+			att.startedAt = now
+			att.count = 1
+		} else {
+			att.count++
+		}
+		att.mu.Unlock()
 		s.writeError(w, http.StatusUnauthorized, "密码错误")
 		return
 	}

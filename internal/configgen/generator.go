@@ -544,12 +544,10 @@ func buildRoute(in BuildInput, flipDir string, nodeServerDomains, nodeServerIPs 
 		}
 	}
 
-	// 在 buildRoute 中：如果 eBPF DirectBypass 已开启，国内 IP 已在网卡 TC 层直接旁路，sing-box 无需重复加载 geoip-cn！
-	needGeoipCN := !in.Settings.Network.DirectBypass
-
+	// 始终保留 geoip-cn 作为规则集兜底路由，防止国内纯 IP 流量在 Fallback 时跌落至代理出站
 	referencedRulesets := map[string]bool{
 		"geosite-cn":           true,
-		"geoip-cn":             needGeoipCN,
+		"geoip-cn":             true,
 		"geosite-category-ads": in.Settings.DNS.Adblock,
 	}
 	var flipRuleSets []map[string]any
@@ -573,9 +571,6 @@ func buildRoute(in BuildInput, flipDir string, nodeServerDomains, nodeServerIPs 
 		if len(p.Rulesets) > 0 {
 			var activeRulesets []string
 			for _, rs := range p.Rulesets {
-				if rs == "geoip-cn" && !needGeoipCN {
-					continue // eBPF 已在网卡 TC 层接管大陆 IP 旁路，无需 sing-box 重复下载与加载
-				}
 				referencedRulesets[rs] = true
 				activeRulesets = append(activeRulesets, rs)
 			}
@@ -606,13 +601,9 @@ func buildRoute(in BuildInput, flipDir string, nodeServerDomains, nodeServerIPs 
 		})
 	}
 
-	// 国内流量兜底直连
-	cnRuleSets := []string{"geosite-cn"}
-	if needGeoipCN {
-		cnRuleSets = append(cnRuleSets, "geoip-cn")
-	}
+	// 国内流量兜底直连：始终包含 geosite-cn 与 geoip-cn，防止国内纯 IP 流量倒灌跌落至代理出站
 	rules = append(rules, map[string]any{
-		"rule_set": cnRuleSets,
+		"rule_set": []string{"geosite-cn", "geoip-cn"},
 		"outbound": "直连",
 	})
 
