@@ -173,7 +173,14 @@ func TestStoreSelectedEnabledInConfig(t *testing.T) {
 	if !ok {
 		t.Fatalf("缺少 experimental.cache_file 配置块")
 	}
-	if cacheFile["store_selected"] != true {
-		t.Errorf("experimental.cache_file.store_selected 必须为 true, 实际为: %v", cacheFile["store_selected"])
+	if cacheFile["enabled"] != true {
+		t.Errorf("experimental.cache_file.enabled 必须为 true, 实际为: %v", cacheFile["enabled"])
+	}
+	if _, ok := cacheFile["path"].(string); !ok {
+		t.Errorf("experimental.cache_file.path 必须存在有效路径")
+	}
+	// sing-box 1.15 只要启用 cache_file 就会自动持久化选点，严禁出现 store_selected 未知字段
+	if _, ok := cacheFile["store_selected"]; ok {
+		t.Errorf("experimental.cache_file 不能包含非标准的 store_selected 字段 (会被 sing-box 1.15 报错)")
 	}
 }

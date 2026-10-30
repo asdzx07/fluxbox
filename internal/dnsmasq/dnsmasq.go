@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 )
 
@@ -77,6 +78,14 @@ func Hijack(port int) error {
 		return fmt.Errorf("写入 dnsmasq drop-in 配置文件失败: %w", err)
 	}
 
+	// 兼容 OpenWrt 命名实例目录（例如 /tmp/dnsmasq.cfg01411c.d）
+	if matches, err := filepath.Glob("/tmp/dnsmasq.*.d"); err == nil {
+		for _, m := range matches {
+			instConf := filepath.Join(m, "fluxbox.conf")
+			_ = os.WriteFile(instConf, []byte(content), 0644)
+		}
+	}
+
 	// 3. 触发服务重载
 	reloadDnsmasqService()
 
@@ -107,6 +116,13 @@ func Restore() error {
 		}
 	}
 
+	// 清理 OpenWrt 命名实例目录下的配置文件
+	if matches, err := filepath.Glob("/tmp/dnsmasq.*.d/fluxbox.conf"); err == nil {
+		for _, m := range matches {
+			_ = os.Remove(m)
+		}
+	}
+
 	// 2. 触发服务重载
 	reloadDnsmasqService()
 
@@ -116,38 +132,26 @@ func Restore() error {
 	return nil
 }
 
-// reloadDnsmasqService 优先尝试 ubus 重载，降级使用 /etc/init.d/dnsmasq reload/restart
+// reloadDnsmasqService 重启/重载 dnsmasq 服务以重新加载配置
 func reloadDnsmasqService() {
-	// 1. 优先尝试 ubus call service reload '{"name":"dnsmasq"}'
-	if _, err := exec.LookPath("ubus"); err == nil {
-		cmd := exec.Command("ubus", "call", "service", "reload", `{"name":"dnsmasq"}`)
-		if out, err := cmd.CombinedOutput(); err == nil {
-			log.Printf("[DNSMASQ] 已通过 ubus 成功重载 dnsmasq 服务")
-			return
-		} else {
-			log.Printf("[DNSMASQ] ubus 重载 dnsmasq 失败: %v (%s)，尝试 init.d 脚本", err, string(out))
-		}
-	}
-
-	// 2. 尝试 OpenWrt init.d 脚本
+	// dnsmasq 规范明确指出 SIGHUP (reload) 不会重新读取配置文件指令，必须使用 restart
 	initScript := "/etc/init.d/dnsmasq"
 	if _, err := os.Stat(initScript); err == nil {
-		if out, err := exec.Command(initScript, "reload").CombinedOutput(); err == nil {
-			log.Printf("[DNSMASQ] 已通过 init.d reload 成功重载 dnsmasq 服务")
-			return
-		} else {
-			log.Printf("[DNSMASQ] init.d reload 失败: %v (%s)，尝试 restart", err, string(out))
-		}
-
 		if out, err := exec.Command(initScript, "restart").CombinedOutput(); err == nil {
-			log.Printf("[DNSMASQ] 已通过 init.d restart 成功重启 dnsmasq 服务")
+			log.Printf("[DNSMASQ] 已通过 init.d restart 成功应用 dnsmasq 配置")
 			return
 		} else {
-			log.Printf("[DNSMASQ] init.d restart 失败: %v (%s)", err, string(out))
+			log.Printf("[DNSMASQ] init.d restart 警告: %v (%s)", err, string(out))
 		}
-		return
 	}
 
-	// 3. 非 OpenWrt 研发环境或未安装 dnsmasq
+	if _, err := exec.LookPath("ubus"); err == nil {
+		cmd := exec.Command("ubus", "call", "service", "restart", `{"name":"dnsmasq"}`)
+		if _, err := cmd.CombinedOutput(); err == nil {
+			log.Printf("[DNSMASQ] 已通过 ubus 成功重启 dnsmasq 服务")
+			return
+		}
+	}
+
 	log.Printf("[DNSMASQ] 未检测到 ubus 或 %s，已仅生成/移除内存配置文件 (开发/测试环境)", initScript)
 }

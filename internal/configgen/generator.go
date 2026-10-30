@@ -219,10 +219,9 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 				"external_controller": "127.0.0.1:9095",
 			},
 			"cache_file": map[string]any{
-				"enabled":        true,
-				"path":           filepath.Join(in.DataDir, "cache.db"),
-				"store_fakeip":   in.Settings.DNS.FakeIP,
-				"store_selected": true,
+				"enabled":      true,
+				"path":         filepath.Join(in.DataDir, "cache.db"),
+				"store_fakeip": in.Settings.DNS.FakeIP,
 			},
 		},
 	}
