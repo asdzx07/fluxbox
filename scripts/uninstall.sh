@@ -34,14 +34,18 @@ ip rule del fwmark 0x2023 table 2022 2>/dev/null || true
 ip rule del fwmark 0x2024 table main 2>/dev/null || true
 ip route flush table 2022 2>/dev/null || true
 
-# 还原 UCI dnsmasq
+# 还原 dnsmasq（清理内存 drop-in 配置并兼容还原历史 UCI）
+rm -f /tmp/dnsmasq.d/fluxbox.conf
 if command -v uci >/dev/null 2>&1; then
   uci -q delete dhcp.@dnsmasq[0].server
   uci set dhcp.@dnsmasq[0].noresolv=0
   uci commit dhcp
-  /etc/init.d/dnsmasq restart 2>/dev/null || true
-  say "已还原 dnsmasq 默认上游配置"
 fi
+if command -v ubus >/dev/null 2>&1; then
+  ubus call service reload '{"name":"dnsmasq"}' 2>/dev/null || true
+fi
+/etc/init.d/dnsmasq restart 2>/dev/null || true
+say "已还原 dnsmasq 默认上游配置"
 
 if [ "$PURGE" = "1" ]; then
   say "删除 $ROOT 目录（含配置文件与节点数据）"

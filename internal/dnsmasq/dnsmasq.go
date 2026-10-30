@@ -3,8 +3,8 @@ package dnsmasq
 import (
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
-	"strings"
 	"sync"
 )
 
@@ -12,7 +12,27 @@ var (
 	mu          sync.Mutex
 	hijacked    bool
 	currentPort int
+
+	// 配置文件位于内存虚拟文件系统 /tmp，掉电或重启即自动消失，彻底杜绝 Flash 写入磨损
+	confDir  = "/tmp/dnsmasq.d"
+	confFile = "/tmp/dnsmasq.d/fluxbox.conf"
 )
+
+// SetCustomPaths 供单元测试动态设置配置文件路径
+func SetCustomPaths(dir, file string) {
+	mu.Lock()
+	defer mu.Unlock()
+	confDir = dir
+	confFile = file
+}
+
+// ResetDefaultPaths 还原默认路径
+func ResetDefaultPaths() {
+	mu.Lock()
+	defer mu.Unlock()
+	confDir = "/tmp/dnsmasq.d"
+	confFile = "/tmp/dnsmasq.d/fluxbox.conf"
+}
 
 // Status 返回当前 dnsmasq 接管状态
 func Status() map[string]any {
@@ -23,79 +43,111 @@ func Status() map[string]any {
 	if _, err := exec.LookPath("uci"); err == nil {
 		hasUci = true
 	}
+	hasUbus := false
+	if _, err := exec.LookPath("ubus"); err == nil {
+		hasUbus = true
+	}
 
 	return map[string]any{
-		"hijacked": hijacked,
-		"port":     currentPort,
-		"hasUci":   hasUci,
+		"hijacked":   hijacked,
+		"port":       currentPort,
+		"configFile": confFile,
+		"hasUci":     hasUci,
+		"hasUbus":    hasUbus,
 	}
 }
 
-// Hijack 使用 UCI 命令将 dnsmasq 的上游劫持至 sing-box 监听的本地端口
+// Hijack 向内存虚拟文件系统写入 /tmp/dnsmasq.d/fluxbox.conf 并重载 dnsmasq
 func Hijack(port int) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if _, err := exec.LookPath("uci"); err != nil {
-		log.Printf("[DNSMASQ] 系统缺少 uci 工具 (非 OpenWrt/iStoreOS)，跳过 dnsmasq 自动接管")
-		hijacked = true
-		currentPort = port
-		return nil
+	if port <= 0 || port > 65535 {
+		return fmt.Errorf("无效的劫持端口: %d", port)
 	}
 
-	commands := [][]string{
-		{"uci", "set", "dhcp.@dnsmasq[0].noresolv=1"},
-		{"uci", "-q", "delete", "dhcp.@dnsmasq[0].server"},
-		{"uci", "add_list", fmt.Sprintf("dhcp.@dnsmasq[0].server=127.0.0.1#%d", port)},
-		{"uci", "commit", "dhcp"},
+	// 1. 确保目标目录存在
+	if err := os.MkdirAll(confDir, 0755); err != nil {
+		return fmt.Errorf("创建 dnsmasq 配置目录失败: %w", err)
 	}
 
-	for _, args := range commands {
-		cmd := exec.Command(args[0], args[1:]...)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("execute %s failed: %v (%s)", strings.Join(args, " "), err, string(out))
-		}
+	// 2. 生成内存 drop-in 配置文件内容
+	content := fmt.Sprintf("# 由 FluxBox 自动生成，将 DNS 劫持至本地 sing-box\n# 位于内存虚拟文件系统，断电自动消失，保护 Flash 寿命\nno-resolv\nserver=127.0.0.1#%d\n", port)
+	if err := os.WriteFile(confFile, []byte(content), 0644); err != nil {
+		return fmt.Errorf("写入 dnsmasq drop-in 配置文件失败: %w", err)
 	}
 
-	// 重启 dnsmasq 生效
-	if out, err := exec.Command("/etc/init.d/dnsmasq", "restart").CombinedOutput(); err != nil {
-		_ = exec.Command("/etc/init.d/dnsmasq", "reload").Run()
-		log.Printf("[DNSMASQ] 重启 dnsmasq 警告: %v (%s)", err, string(out))
-	}
+	// 3. 触发服务重载
+	reloadDnsmasqService()
 
 	hijacked = true
 	currentPort = port
-	log.Printf("[DNSMASQ] 已成功将 DNS 请求劫持至 127.0.0.1#%d", port)
+	log.Printf("[DNSMASQ] 已成功将 DNS 请求劫持至 127.0.0.1#%d (通过内存配置 %s)", port, confFile)
 	return nil
 }
 
-// Restore 还原 dnsmasq 默认配置，防止 FluxBox 停止后局域网断网
+// Restore 删除内存中的 drop-in 配置文件并重载 dnsmasq 还原原生解析
 func Restore() error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if !hijacked {
+	// 检查 drop-in 配置文件是否存在
+	_, err := os.Stat(confFile)
+	fileExists := (err == nil)
+
+	// 若未处于劫持状态且文件不存在，则无需重复重载服务，直接返回
+	if !hijacked && !fileExists {
 		return nil
 	}
 
-	if _, err := exec.LookPath("uci"); err != nil {
-		hijacked = false
-		return nil
+	// 1. 删除 drop-in 配置文件
+	if fileExists {
+		if err := os.Remove(confFile); err != nil && !os.IsNotExist(err) {
+			log.Printf("[DNSMASQ] 删除 drop-in 配置文件警告: %v", err)
+		}
 	}
 
-	commands := [][]string{
-		{"uci", "set", "dhcp.@dnsmasq[0].noresolv=0"},
-		{"uci", "-q", "delete", "dhcp.@dnsmasq[0].server"},
-		{"uci", "commit", "dhcp"},
-	}
+	// 2. 触发服务重载
+	reloadDnsmasqService()
 
-	for _, args := range commands {
-		_ = exec.Command(args[0], args[1:]...).Run()
-	}
-
-	_ = exec.Command("/etc/init.d/dnsmasq", "restart").Run()
 	hijacked = false
 	currentPort = 0
-	log.Printf("[DNSMASQ] 已还原 dnsmasq 原生上游配置")
+	log.Printf("[DNSMASQ] 已还原 dnsmasq 原生上游配置 (已移除 %s)", confFile)
 	return nil
+}
+
+// reloadDnsmasqService 优先尝试 ubus 重载，降级使用 /etc/init.d/dnsmasq reload/restart
+func reloadDnsmasqService() {
+	// 1. 优先尝试 ubus call service reload '{"name":"dnsmasq"}'
+	if _, err := exec.LookPath("ubus"); err == nil {
+		cmd := exec.Command("ubus", "call", "service", "reload", `{"name":"dnsmasq"}`)
+		if out, err := cmd.CombinedOutput(); err == nil {
+			log.Printf("[DNSMASQ] 已通过 ubus 成功重载 dnsmasq 服务")
+			return
+		} else {
+			log.Printf("[DNSMASQ] ubus 重载 dnsmasq 失败: %v (%s)，尝试 init.d 脚本", err, string(out))
+		}
+	}
+
+	// 2. 尝试 OpenWrt init.d 脚本
+	initScript := "/etc/init.d/dnsmasq"
+	if _, err := os.Stat(initScript); err == nil {
+		if out, err := exec.Command(initScript, "reload").CombinedOutput(); err == nil {
+			log.Printf("[DNSMASQ] 已通过 init.d reload 成功重载 dnsmasq 服务")
+			return
+		} else {
+			log.Printf("[DNSMASQ] init.d reload 失败: %v (%s)，尝试 restart", err, string(out))
+		}
+
+		if out, err := exec.Command(initScript, "restart").CombinedOutput(); err == nil {
+			log.Printf("[DNSMASQ] 已通过 init.d restart 成功重启 dnsmasq 服务")
+			return
+		} else {
+			log.Printf("[DNSMASQ] init.d restart 失败: %v (%s)", err, string(out))
+		}
+		return
+	}
+
+	// 3. 非 OpenWrt 研发环境或未安装 dnsmasq
+	log.Printf("[DNSMASQ] 未检测到 ubus 或 %s，已仅生成/移除内存配置文件 (开发/测试环境)", initScript)
 }

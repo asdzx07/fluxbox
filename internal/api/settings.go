@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"fluxbox/internal/store"
 )
@@ -69,6 +71,56 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 				}
 				if v, ok := dnsMap["adblock"].(bool); ok {
 					st.DNS.Adblock = v
+				}
+
+				// 补齐反序列化与存储遗漏的 DNS 字段
+				if v, ok := dnsMap["adblockAllow"]; ok {
+					if v == nil {
+						st.DNS.AdblockAllow = []string{}
+					} else if rawList, ok := v.([]any); ok {
+						var list []string
+						for _, item := range rawList {
+							if str, ok := item.(string); ok && strings.TrimSpace(str) != "" {
+								list = append(list, strings.TrimSpace(str))
+							}
+						}
+						st.DNS.AdblockAllow = list
+					} else if strList, ok := v.([]string); ok {
+						st.DNS.AdblockAllow = strList
+					}
+				}
+
+				if v, ok := dnsMap["adblockCustom"]; ok {
+					if v == nil {
+						st.DNS.AdblockCustom = []string{}
+					} else if rawList, ok := v.([]any); ok {
+						var list []string
+						for _, item := range rawList {
+							if str, ok := item.(string); ok && strings.TrimSpace(str) != "" {
+								list = append(list, strings.TrimSpace(str))
+							}
+						}
+						st.DNS.AdblockCustom = list
+					} else if strList, ok := v.([]string); ok {
+						st.DNS.AdblockCustom = strList
+					}
+				}
+
+				if v, ok := dnsMap["hijackPort"]; ok {
+					port := 0
+					switch val := v.(type) {
+					case float64:
+						port = int(val)
+					case int:
+						port = val
+					case string:
+						if p, err := strconv.Atoi(val); err == nil {
+							port = p
+						}
+					}
+					if port > 0 && port <= 65535 {
+						st.DNS.HijackPort = port
+					}
 				}
 			}
 

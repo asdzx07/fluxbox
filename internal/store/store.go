@@ -255,7 +255,7 @@ func (s *Store) SaveSettings() error {
 func (s *Store) GetSettings() FullSettings {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.settings
+	return cloneFullSettings(s.settings)
 }
 
 func (s *Store) MutateSettings(fn func(*FullSettings)) error {
@@ -296,7 +296,6 @@ func (s *Store) ToConfiggenSettings() configgen.Settings {
 	cfg.Network.Tun.Aggressive = s.settings.Network.Tun.Aggressive
 	cfg.Network.Tun.StrictRoute = s.settings.Network.Tun.StrictRoute
 
-
 	cfg.DNS.Mode = s.settings.DNS.Mode
 	cfg.DNS.Direct = s.settings.DNS.Direct
 	cfg.DNS.DirectAddress = s.settings.DNS.DirectAddress
@@ -306,12 +305,166 @@ func (s *Store) ToConfiggenSettings() configgen.Settings {
 	cfg.DNS.Split = s.settings.DNS.Split
 	cfg.DNS.FakeIP = s.settings.DNS.FakeIP
 	cfg.DNS.Adblock = s.settings.DNS.Adblock
-	cfg.DNS.AdblockAllow = s.settings.DNS.AdblockAllow
-	cfg.DNS.AdblockCustom = s.settings.DNS.AdblockCustom
+	cfg.DNS.AdblockAllow = cloneStringSlice(s.settings.DNS.AdblockAllow)
+	cfg.DNS.AdblockCustom = cloneStringSlice(s.settings.DNS.AdblockCustom)
 	cfg.DNS.HijackPort = s.settings.DNS.HijackPort
 
 	cfg.Kernel.LogLevel = s.settings.Kernel.LogLevel
 	return cfg
+}
+
+// --- 深拷贝辅助函数，杜绝外部并发读写引起的 Data Race ---
+
+func cloneStringSlice(s []string) []string {
+	if s == nil {
+		return nil
+	}
+	res := make([]string, len(s))
+	copy(res, s)
+	return res
+}
+
+func cloneInt64Ptr(p *int64) *int64 {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
+}
+
+func cloneMap(m map[string]any) map[string]any {
+	if m == nil {
+		return nil
+	}
+	res := make(map[string]any, len(m))
+	for k, v := range m {
+		res[k] = cloneAny(v)
+	}
+	return res
+}
+
+func cloneAny(v any) any {
+	if v == nil {
+		return nil
+	}
+	switch val := v.(type) {
+	case map[string]any:
+		return cloneMap(val)
+	case map[string]string:
+		res := make(map[string]string, len(val))
+		for k, item := range val {
+			res[k] = item
+		}
+		return res
+	case []any:
+		res := make([]any, len(val))
+		for i, item := range val {
+			res[i] = cloneAny(item)
+		}
+		return res
+	case []string:
+		return cloneStringSlice(val)
+	case []map[string]any:
+		res := make([]map[string]any, len(val))
+		for i, item := range val {
+			res[i] = cloneMap(item)
+		}
+		return res
+	case *int64:
+		return cloneInt64Ptr(val)
+	case *string:
+		if val == nil {
+			return nil
+		}
+		s := *val
+		return &s
+	case *int:
+		if val == nil {
+			return nil
+		}
+		n := *val
+		return &n
+	case *bool:
+		if val == nil {
+			return nil
+		}
+		b := *val
+		return &b
+	default:
+		return v
+	}
+}
+
+func cloneFullSettings(src FullSettings) FullSettings {
+	dst := src
+
+	// 1. DNS 切片深拷贝
+	dst.DNS.AdblockAllow = cloneStringSlice(src.DNS.AdblockAllow)
+	dst.DNS.AdblockCustom = cloneStringSlice(src.DNS.AdblockCustom)
+
+	// 2. Subscriptions 深拷贝
+	if src.Subscriptions != nil {
+		dst.Subscriptions = make([]subscription.Subscription, len(src.Subscriptions))
+		for i, sub := range src.Subscriptions {
+			dSub := sub
+			dSub.NodeTags = cloneStringSlice(sub.NodeTags)
+			dSub.UpdatedAt = cloneAny(sub.UpdatedAt)
+			dSub.AddedAt = cloneAny(sub.AddedAt)
+			if sub.Nodes != nil {
+				dSub.Nodes = make([]map[string]any, len(sub.Nodes))
+				for j, n := range sub.Nodes {
+					dSub.Nodes[j] = cloneMap(n)
+				}
+			}
+			dst.Subscriptions[i] = dSub
+		}
+	}
+
+	// 3. RulesetSubs 深拷贝
+	if src.RulesetSubs != nil {
+		dst.RulesetSubs = make([]configgen.RulesetSub, len(src.RulesetSubs))
+		for i, rs := range src.RulesetSubs {
+			dRs := rs
+			dRs.UpdatedAt = cloneInt64Ptr(rs.UpdatedAt)
+			dst.RulesetSubs[i] = dRs
+		}
+	}
+
+	// 4. Nodes 切片与内部 map 深拷贝
+	if src.Nodes != nil {
+		dst.Nodes = make([]map[string]any, len(src.Nodes))
+		for i, n := range src.Nodes {
+			dst.Nodes[i] = cloneMap(n)
+		}
+	}
+
+	// 5. Groups 深拷贝
+	if src.Groups != nil {
+		dst.Groups = make([]configgen.GroupConfig, len(src.Groups))
+		for i, g := range src.Groups {
+			dG := g
+			dG.Keywords = cloneStringSlice(g.Keywords)
+			dG.Members = cloneStringSlice(g.Members)
+			dst.Groups[i] = dG
+		}
+	}
+
+	// 6. Policies 深拷贝
+	if src.Policies != nil {
+		dst.Policies = make([]configgen.PolicyConfig, len(src.Policies))
+		for i, p := range src.Policies {
+			dP := p
+			dP.Rulesets = cloneStringSlice(p.Rulesets)
+			dP.DomainSuffix = cloneStringSlice(p.DomainSuffix)
+			dst.Policies[i] = dP
+		}
+	}
+
+	// 7. Meta 指针深拷贝
+	dst.Meta.LastDeployAt = cloneInt64Ptr(src.Meta.LastDeployAt)
+	dst.Meta.RulesetUpdatedAt = cloneInt64Ptr(src.Meta.RulesetUpdatedAt)
+
+	return dst
 }
 
 func (s *Store) GetDataDir() string {

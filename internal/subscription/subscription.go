@@ -142,6 +142,119 @@ func convertClashProxyToSingBox(p map[string]any) map[string]any {
 		base["password"] = asString(p["password"])
 		return base
 
+	case "vmess":
+		uuid := asString(p["uuid"])
+		if uuid == "" {
+			return nil
+		}
+		base["type"] = "vmess"
+		base["uuid"] = uuid
+		alterId := asInt(p["alterId"])
+		if alterId == 0 {
+			alterId = asInt(p["alter_id"])
+		}
+		base["alter_id"] = alterId
+
+		security := asString(p["cipher"])
+		if security == "" {
+			security = "auto"
+		}
+		base["security"] = security
+
+		if asBool(p["tls"]) {
+			sni := asString(p["servername"])
+			if sni == "" {
+				sni = asString(p["sni"])
+			}
+			if sni == "" {
+				sni = server
+			}
+			base["tls"] = map[string]any{
+				"enabled":     true,
+				"server_name": sni,
+				"insecure":    asBool(p["skip-cert-verify"]),
+			}
+		}
+
+		if pe := asString(p["packet-encoding"]); pe != "" {
+			base["packet_encoding"] = pe
+		}
+
+		netType := strings.ToLower(asString(p["network"]))
+		switch netType {
+		case "ws", "websocket":
+			transport := map[string]any{"type": "ws"}
+			var path string
+			var headers map[string]any
+			if wsOpts, ok := p["ws-opts"].(map[string]any); ok {
+				path = asString(wsOpts["path"])
+				if h, ok := wsOpts["headers"].(map[string]any); ok {
+					headers = h
+				} else if hStr, ok := wsOpts["headers"].(map[string]string); ok {
+					headers = make(map[string]any, len(hStr))
+					for k, v := range hStr {
+						headers[k] = v
+					}
+				}
+			}
+			if path == "" {
+				path = asString(p["ws-path"])
+			}
+			if headers == nil {
+				if h, ok := p["ws-headers"].(map[string]any); ok {
+					headers = h
+				} else if hStr, ok := p["ws-headers"].(map[string]string); ok {
+					headers = make(map[string]any, len(hStr))
+					for k, v := range hStr {
+						headers[k] = v
+					}
+				}
+			}
+			if path != "" {
+				transport["path"] = path
+			}
+			if len(headers) > 0 {
+				hMap := make(map[string]string)
+				for k, v := range headers {
+					hMap[k] = asString(v)
+				}
+				transport["headers"] = hMap
+			}
+			base["transport"] = transport
+		case "grpc":
+			transport := map[string]any{"type": "grpc"}
+			var sn string
+			if grpcOpts, ok := p["grpc-opts"].(map[string]any); ok {
+				sn = asString(grpcOpts["grpc-service-name"])
+				if sn == "" {
+					sn = asString(grpcOpts["service-name"])
+				}
+				if sn == "" {
+					sn = asString(grpcOpts["service_name"])
+				}
+			}
+			if sn == "" {
+				sn = asString(p["grpc-service-name"])
+			}
+			if sn != "" {
+				transport["service_name"] = sn
+			}
+			base["transport"] = transport
+		case "http", "h2":
+			transport := map[string]any{"type": "http"}
+			if hOpts, ok := p["http-opts"].(map[string]any); ok {
+				if s, ok := hOpts["path"].(string); ok && s != "" {
+					transport["path"] = s
+				} else if pList, ok := hOpts["path"].([]any); ok && len(pList) > 0 {
+					transport["path"] = asString(pList[0])
+				} else if pList, ok := hOpts["path"].([]string); ok && len(pList) > 0 {
+					transport["path"] = pList[0]
+				}
+			}
+			base["transport"] = transport
+		}
+		return base
+
 	case "trojan":
 		base["type"] = "trojan"
 		base["password"] = asString(p["password"])
@@ -247,6 +360,11 @@ func parseURILines(text string) []map[string]any {
 }
 
 func parseSingleURI(uriStr string) map[string]any {
+	uriStr = strings.TrimSpace(uriStr)
+	if uriStr == "" {
+		return nil
+	}
+
 	// 优先处理 vmess://base64(json)
 	if strings.HasPrefix(strings.ToLower(uriStr), "vmess://") {
 		b64 := strings.TrimPrefix(uriStr, "vmess://")
@@ -292,6 +410,11 @@ func parseSingleURI(uriStr string) map[string]any {
 			}
 			return ob
 		}
+	}
+
+	// 优先处理 ss:// 全格式 (Legacy 与 SIP002)
+	if strings.HasPrefix(strings.ToLower(uriStr), "ss://") {
+		return parseShadowsocksURI(uriStr)
 	}
 
 	u, err := url.Parse(uriStr)
@@ -384,6 +507,141 @@ func parseSingleURI(uriStr string) map[string]any {
 		}
 	}
 	return nil
+}
+
+// parseShadowsocksURI 解析标准 shadowsocks 分享链接 (支持 Legacy Base64 与 SIP002 规范)
+func parseShadowsocksURI(uriStr string) map[string]any {
+	var tag string
+	parts := strings.SplitN(uriStr, "#", 2)
+	if len(parts) == 2 {
+		tag, _ = url.PathUnescape(parts[1])
+		if tag == "" {
+			tag, _ = url.QueryUnescape(parts[1])
+		}
+		if tag == "" {
+			tag = strings.TrimSpace(parts[1])
+		}
+	}
+	body := parts[0]
+	if idx := strings.Index(body, "://"); idx != -1 {
+		body = body[idx+3:]
+	}
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return nil
+	}
+
+	var method, password, host string
+	var port int
+
+	if strings.Contains(body, "@") {
+		// SIP002 规范: ss://userinfo@host:port/?plugin=...#tag
+		lastAt := strings.LastIndex(body, "@")
+		userInfoPart := body[:lastAt]
+		hostPart := body[lastAt+1:]
+
+		if slashIdx := strings.IndexAny(hostPart, "/?#"); slashIdx != -1 {
+			hostPart = hostPart[:slashIdx]
+		}
+
+		h, pStr, err := net.SplitHostPort(hostPart)
+		if err != nil {
+			return nil
+		}
+		p, err := strconv.Atoi(pStr)
+		if err != nil || p <= 0 || p > 65535 {
+			return nil
+		}
+		host = h
+		port = p
+
+		// 使用 PathUnescape 避免将 Base64 中的 '+' 错误转义为空格
+		if unescaped, err := url.PathUnescape(userInfoPart); err == nil && unescaped != "" {
+			userInfoPart = unescaped
+		}
+
+		decodedUser := tryDecodeBase64(userInfoPart)
+		userStr := decodedUser
+		if !strings.Contains(userStr, ":") {
+			userStr = userInfoPart
+			if qUnescaped, err := url.QueryUnescape(userStr); err == nil && strings.Contains(qUnescaped, ":") {
+				userStr = qUnescaped
+			}
+		}
+		if colonIdx := strings.Index(userStr, ":"); colonIdx != -1 {
+			method = userStr[:colonIdx]
+			password = userStr[colonIdx+1:]
+		} else {
+			return nil
+		}
+	} else {
+		// Legacy 格式: ss://BASE64(method:password@host:port)#tag
+		// 去除末尾可能拼接的 / 或 ?query 参数后再进行 Base64 解码
+		cleanBody := body
+		if qIdx := strings.IndexAny(cleanBody, "/?#"); qIdx != -1 {
+			cleanBody = cleanBody[:qIdx]
+		}
+		decoded := tryDecodeBase64(cleanBody)
+		if !strings.Contains(decoded, "@") {
+			return nil
+		}
+
+		if innerParts := strings.SplitN(decoded, "#", 2); len(innerParts) == 2 {
+			if tag == "" {
+				tag, _ = url.PathUnescape(innerParts[1])
+				if tag == "" {
+					tag, _ = url.QueryUnescape(innerParts[1])
+				}
+				if tag == "" {
+					tag = strings.TrimSpace(innerParts[1])
+				}
+			}
+			decoded = innerParts[0]
+		}
+
+		lastAt := strings.LastIndex(decoded, "@")
+		userInfoPart := decoded[:lastAt]
+		hostPart := decoded[lastAt+1:]
+
+		if slashIdx := strings.IndexAny(hostPart, "/?#"); slashIdx != -1 {
+			hostPart = hostPart[:slashIdx]
+		}
+
+		h, pStr, err := net.SplitHostPort(hostPart)
+		if err != nil {
+			return nil
+		}
+		p, err := strconv.Atoi(pStr)
+		if err != nil || p <= 0 || p > 65535 {
+			return nil
+		}
+		host = h
+		port = p
+
+		if colonIdx := strings.Index(userInfoPart, ":"); colonIdx != -1 {
+			method = userInfoPart[:colonIdx]
+			password = userInfoPart[colonIdx+1:]
+		} else {
+			return nil
+		}
+	}
+
+	if method == "" || host == "" || password == "" || port <= 0 || port > 65535 {
+		return nil
+	}
+	if tag == "" {
+		tag = host
+	}
+
+	return map[string]any{
+		"type":        "shadowsocks",
+		"tag":         tag,
+		"name":        tag,
+		"server":      host,
+		"server_port": port,
+		"method":      method,
+		"password":    password,
+	}
 }
 
 func tryDecodeBase64(s string) string {

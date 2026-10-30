@@ -144,3 +144,36 @@ func TestDirectBypassWithCustomPolicyAndNoNodes(t *testing.T) {
 		t.Errorf("自定义策略引用时，route.rule_set 未包含 geoip-cn！")
 	}
 }
+
+func TestStoreSelectedEnabledInConfig(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "configgen-store-selected-*")
+	if err != nil {
+		t.Fatalf("创建临时目录失败: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	var in BuildInput
+	in.DataDir = tempDir
+
+	cfgBytes, _, err := GenerateConfig(in)
+	if err != nil {
+		t.Fatalf("GenerateConfig 失败: %v", err)
+	}
+
+	var cfg map[string]any
+	if err := json.Unmarshal(cfgBytes, &cfg); err != nil {
+		t.Fatalf("解析生成的 JSON 失败: %v", err)
+	}
+
+	exp, ok := cfg["experimental"].(map[string]any)
+	if !ok {
+		t.Fatalf("缺少 experimental 配置块")
+	}
+	cacheFile, ok := exp["cache_file"].(map[string]any)
+	if !ok {
+		t.Fatalf("缺少 experimental.cache_file 配置块")
+	}
+	if cacheFile["store_selected"] != true {
+		t.Errorf("experimental.cache_file.store_selected 必须为 true, 实际为: %v", cacheFile["store_selected"])
+	}
+}

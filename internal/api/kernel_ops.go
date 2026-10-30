@@ -53,7 +53,11 @@ func (s *Server) handleKernelAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_ = netstack.Setup()
-		_ = dnsmasq.Hijack(s.store.GetSettings().DNS.HijackPort)
+		port := s.store.GetSettings().DNS.HijackPort
+		if port <= 0 {
+			port = 36053
+		}
+		_ = dnsmasq.Hijack(port)
 		s.writeJSON(w, map[string]any{"ok": true, "running": true})
 
 	case "stop":
@@ -68,7 +72,11 @@ func (s *Server) handleKernelAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_ = netstack.Setup()
-		_ = dnsmasq.Hijack(s.store.GetSettings().DNS.HijackPort)
+		port := s.store.GetSettings().DNS.HijackPort
+		if port <= 0 {
+			port = 36053
+		}
+		_ = dnsmasq.Hijack(port)
 		s.writeJSON(w, map[string]any{"ok": true, "running": true})
 
 	case "install":
