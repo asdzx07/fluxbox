@@ -32,7 +32,7 @@
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
       </div>
       <span>FluxBox</span>
-      <small id="brandVersion">v1.20 (B114)</small>
+      <small id="brandVersion">v2.1.0 (eBPF)</small>
     </div>
     
     <div class="sb-sec">核心控制台</div>
@@ -175,6 +175,11 @@
             <div class="stat"><div class="k">↓ 实时下行</div><div class="v num-mono" id="statDown" style="color:var(--ok)">—</div></div>
             <div class="stat"><div class="k">累计上传总量</div><div class="v num-mono" id="statTotalUp">—</div></div>
             <div class="stat"><div class="k">累计下载总量</div><div class="v num-mono" id="statTotalDown">—</div></div>
+          </div>
+          <div class="grid" style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(148,163,184,0.15)">
+            <div class="stat"><div class="k">⚡ eBPF 直连包</div><div class="v num-mono" id="statDirectPkts" style="font-size:13px;color:var(--text-muted)">0</div></div>
+            <div class="stat"><div class="k">🛡️ eBPF 代理包</div><div class="v num-mono" id="statProxyPkts" style="font-size:13px;color:var(--text-muted)">0</div></div>
+            <div class="stat"><div class="k">🚀 eBPF 快速放行</div><div class="v num-mono" id="statShotPkts" style="font-size:13px;color:var(--text-muted)">0</div></div>
           </div>
         </div>
 
@@ -395,7 +400,7 @@
         <div>
           <div class="page-title-row">
             <h2>核心设置</h2>
-            <span class="version-tag" id="settingCurrentVerTag">v1.20 (B111)</span>
+            <span class="version-tag" id="settingCurrentVerTag">v2.1.0</span>
           </div>
           <p class="note" style="margin-top:2px">底层透明代理网络栈、DNS 防污染分流、广告拦截、版本升级与实时内核终端</p>
         </div>
@@ -643,10 +648,10 @@
                 <span class="bdg" id="panelUpdateBadge">当前已是最新</span>
               </div>
               <div class="vmc-val">
-                <span id="sysVersion">FluxBox: v1.20 (B114)</span>
+                <span id="sysVersion">FluxBox: v2.1.0 (Go + eBPF)</span>
               </div>
               <div class="vmc-foot">
-                <span>最新版本：<strong id="latestSysVersion">FluxBox: v1.20 (B114)</strong></span>
+                <span>最新版本：<strong id="latestSysVersion">FluxBox: v2.1.0 (Go + eBPF)</strong></span>
                 <span id="panelCheckTime">刚刚检查</span>
               </div>
             </div>

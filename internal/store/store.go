@@ -86,11 +86,16 @@ type FullSettings struct {
 }
 
 type ClientInfo struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	IP     string `json:"ip"`
-	Mode   string `json:"mode"` // "rule" | "direct" | "proxy"
-	Online bool   `json:"online"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	IP       string `json:"ip"`
+	MAC      string `json:"mac,omitempty"`
+	Mode     string `json:"mode"` // "rule" | "direct" | "proxy"
+	Online   bool   `json:"online"`
+	Hostname string `json:"hostname,omitempty"`
+	Vendor   string `json:"vendor,omitempty"`
+	Alias    string `json:"alias,omitempty"`
+	Note     string `json:"note,omitempty"`
 }
 
 type Store struct {

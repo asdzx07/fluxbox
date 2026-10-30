@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -95,6 +96,7 @@ func (s *Server) handleSubscriptions(w http.ResponseWriter, r *http.Request) {
 				"nodeTags":    nodeTags,
 				"sampleNodes": sampleNodes,
 				"updatedAt":   formatTimeVal(sub.UpdatedAt),
+				"userinfo":    sub.Userinfo,
 			})
 		}
 		s.writeJSON(w, map[string]any{
@@ -118,7 +120,7 @@ func (s *Server) handleSubscriptions(w http.ResponseWriter, r *http.Request) {
 			name = fmt.Sprintf("订阅 %d", len(s.store.GetSettings().Subscriptions)+1)
 		}
 
-		parsedNodes, fetchErr := subscription.FetchAndParse(req.URL)
+		parsedNodes, userinfo, fetchErr := subscription.FetchAndParseWithInfo(req.URL)
 		if fetchErr != nil {
 			s.writeError(w, http.StatusBadGateway, fmt.Sprintf("拉取订阅失败: %v", fetchErr))
 			return
@@ -136,6 +138,7 @@ func (s *Server) handleSubscriptions(w http.ResponseWriter, r *http.Request) {
 			Enabled:   true,
 			NodeCount: len(parsedNodes),
 			UpdatedAt: nowStr,
+			Userinfo:  userinfo,
 		}
 
 		_ = s.store.MutateSettings(func(st *store.FullSettings) {
@@ -148,6 +151,7 @@ func (s *Server) handleSubscriptions(w http.ResponseWriter, r *http.Request) {
 			"id":        subID,
 			"nodeCount": len(parsedNodes),
 			"ok":        true,
+			"userinfo":  userinfo,
 		})
 	}
 }
@@ -158,7 +162,11 @@ func (s *Server) handleSubscriptionAction(w http.ResponseWriter, r *http.Request
 	parts := strings.Split(path, "/")
 	id := parts[0]
 
-	if len(parts) == 2 && parts[1] == "refresh" && r.Method == http.MethodPost {
+	if len(parts) == 2 && parts[1] == "refresh" {
+		if r.Method != http.MethodPost {
+			s.writeError(w, http.StatusMethodNotAllowed, "仅支持 POST 请求")
+			return
+		}
 		s.handleSubscriptionRefresh(w, r, id)
 		return
 	}
@@ -209,6 +217,9 @@ func (s *Server) handleSubscriptionAction(w http.ResponseWriter, r *http.Request
 		})
 		_ = s.DeployCore(true)
 		s.writeJSON(w, map[string]any{"ok": true})
+
+	default:
+		s.writeError(w, http.StatusMethodNotAllowed, "仅支持 PUT 或 DELETE 请求")
 	}
 }
 
@@ -227,7 +238,7 @@ func (s *Server) handleSubscriptionRefresh(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	parsedNodes, err := subscription.FetchAndParse(targetSub.URL)
+	parsedNodes, userinfo, err := subscription.FetchAndParseWithInfo(targetSub.URL)
 	if err != nil {
 		s.writeError(w, http.StatusBadGateway, fmt.Sprintf("拉取更新失败: %v", err))
 		return
@@ -243,6 +254,9 @@ func (s *Server) handleSubscriptionRefresh(w http.ResponseWriter, r *http.Reques
 			if st.Subscriptions[i].ID == id {
 				st.Subscriptions[i].UpdatedAt = nowStr
 				st.Subscriptions[i].NodeCount = len(parsedNodes)
+				if userinfo != nil {
+					st.Subscriptions[i].Userinfo = userinfo
+				}
 				break
 			}
 		}
@@ -261,7 +275,81 @@ func (s *Server) handleSubscriptionRefresh(w http.ResponseWriter, r *http.Reques
 		"id":        id,
 		"nodeCount": len(parsedNodes),
 		"updatedAt": nowStr,
+		"userinfo":  userinfo,
 	})
+}
+
+// SyncSubscriptions 刷新全部已启用的订阅节点与 Userinfo 配额，并自动热重载内核
+func (s *Server) SyncSubscriptions() (int, error) {
+	st := s.store.GetSettings()
+	if len(st.Subscriptions) == 0 {
+		return 0, nil
+	}
+
+	updatedCount := 0
+	nowStr := time.Now().Format("2006-01-02 15:04:05")
+
+	for _, sub := range st.Subscriptions {
+		if !sub.Enabled || sub.URL == "" {
+			continue
+		}
+
+		parsedNodes, userinfo, err := subscription.FetchAndParseWithInfo(sub.URL)
+		if err != nil {
+			log.Printf("⚠️  [订阅同步] 刷新订阅 %s (%s) 失败: %v", sub.Name, sub.URL, err)
+			continue
+		}
+
+		for _, n := range parsedNodes {
+			n["__subscriptionId"] = sub.ID
+		}
+
+		_ = s.store.MutateSettings(func(settings *store.FullSettings) {
+			subFound := false
+			for i := range settings.Subscriptions {
+				if settings.Subscriptions[i].ID == sub.ID {
+					settings.Subscriptions[i].UpdatedAt = nowStr
+					settings.Subscriptions[i].NodeCount = len(parsedNodes)
+					if userinfo != nil {
+						settings.Subscriptions[i].Userinfo = userinfo
+					}
+					subFound = true
+					break
+				}
+			}
+			if !subFound {
+				return
+			}
+			var keptNodes []map[string]any
+			for _, n := range settings.Nodes {
+				if subID, ok := n["__subscriptionId"].(string); !ok || subID != sub.ID {
+					keptNodes = append(keptNodes, n)
+				}
+			}
+			settings.Nodes = append(keptNodes, parsedNodes...)
+		})
+
+		updatedCount++
+	}
+
+	if updatedCount > 0 {
+		_ = s.DeployCore(true)
+	}
+
+	return updatedCount, nil
+}
+
+func (s *Server) handleSubscriptionsSync(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "仅支持 POST 请求")
+		return
+	}
+	count, err := s.SyncSubscriptions()
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, fmt.Sprintf("批量同步失败: %v", err))
+		return
+	}
+	s.writeJSON(w, map[string]any{"ok": true, "updated": count})
 }
 
 func (s *Server) handleNodes(w http.ResponseWriter, r *http.Request) {

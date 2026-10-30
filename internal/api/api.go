@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -29,15 +30,22 @@ type Server struct {
 	startTime      time.Time
 	deployMu       sync.Mutex
 	loginFails     sync.Map
+	syncStopChan   chan struct{}
+	syncStopOnce   sync.Once
 }
 
 func NewServer(st *store.Store, bpfEng *bpf.Engine, sup *kernel.Supervisor) *Server {
+	tr := traffic.NewTracker(9095)
+	if bpfEng != nil {
+		tr.SetBPFProvider(bpfEng)
+	}
 	return &Server{
 		store:          st,
 		bpfEngine:      bpfEng,
 		supervisor:     sup,
-		trafficTracker: traffic.NewTracker(9095),
+		trafficTracker: tr,
 		startTime:      time.Now(),
+		syncStopChan:   make(chan struct{}),
 	}
 }
 
@@ -158,9 +166,11 @@ func (s *Server) DeployCore(restart bool) error {
 	}
 
 	// 2. 预检配置有效性
-	if err := s.supervisor.CheckConfig(candidatePath); err != nil {
-		_ = os.Remove(candidatePath)
-		return fmt.Errorf("sing-box check failed: %w", err)
+	if s.supervisor != nil {
+		if err := s.supervisor.CheckConfig(candidatePath); err != nil {
+			_ = os.Remove(candidatePath)
+			return fmt.Errorf("sing-box check failed: %w", err)
+		}
 	}
 
 	// 3. 预检通过，原子替换主配置文件
@@ -168,13 +178,17 @@ func (s *Server) DeployCore(restart bool) error {
 	if err := os.Rename(candidatePath, realConfigPath); err != nil {
 		return fmt.Errorf("apply config failed: %w", err)
 	}
-	s.supervisor.SetConfigPath(realConfigPath)
+	if s.supervisor != nil {
+		s.supervisor.SetConfigPath(realConfigPath)
+	}
 
 	// 4. 重启或启动内核
-	if restart {
-		_ = s.supervisor.Restart()
-	} else {
-		_ = s.supervisor.Start()
+	if s.supervisor != nil {
+		if restart {
+			_ = s.supervisor.Restart()
+		} else {
+			_ = s.supervisor.Start()
+		}
 	}
 
 	// 5. 确保网络栈与 DNS 劫持生效
@@ -220,3 +234,68 @@ func (s *Server) DeployCore(restart bool) error {
 
 	return nil
 }
+
+// StartSubscriptionAutoSync 启动定时自动后台同步协程 (支持自定义间隔，默认 24h 凌晨)
+func (s *Server) StartSubscriptionAutoSync(interval time.Duration) {
+	if interval <= 0 {
+		interval = 24 * time.Hour
+	}
+	go func() {
+		// 若为 24h 周期，优先等待至次日凌晨 4:00 执行，避开网络使用高峰
+		if interval >= 24*time.Hour {
+			now := time.Now()
+			next4AM := time.Date(now.Year(), now.Month(), now.Day(), 4, 0, 0, 0, now.Location())
+			if !next4AM.After(now) {
+				next4AM = next4AM.Add(24 * time.Hour)
+			}
+			initialWait := next4AM.Sub(now)
+
+			select {
+			case <-s.syncStopChan:
+				return
+			case <-time.After(initialWait):
+				updated, err := s.SyncSubscriptions()
+				if err != nil {
+					log.Printf("⚠️  [订阅自动同步] 凌晨周期同步提示: %v", err)
+				} else if updated > 0 {
+					log.Printf("✅ [订阅自动同步] 凌晨周期同步完成，成功刷新 %d 个订阅与最新流量配额", updated)
+				}
+			}
+		}
+
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-s.syncStopChan:
+				return
+			case <-ticker.C:
+				updated, err := s.SyncSubscriptions()
+				if err != nil {
+					log.Printf("⚠️  [订阅自动同步] 周期同步提示: %v", err)
+				} else if updated > 0 {
+					log.Printf("✅ [订阅自动同步] 周期同步完成，成功刷新 %d 个订阅与最新流量配额", updated)
+				}
+			}
+		}
+	}()
+}
+
+// StopSubscriptionAutoSync 停止定时同步协程
+func (s *Server) StopSubscriptionAutoSync() {
+	s.syncStopOnce.Do(func() {
+		if s.syncStopChan != nil {
+			close(s.syncStopChan)
+		}
+	})
+}
+
+// Close 优雅停止所有后台子任务 (自动同步协程、流量监控协程等)
+func (s *Server) Close() {
+	s.StopSubscriptionAutoSync()
+	if s.trafficTracker != nil {
+		s.trafficTracker.Close()
+	}
+}
+
+

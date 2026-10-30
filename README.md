@@ -2,7 +2,7 @@
 
 > **现代高性能 Linux eBPF 旁路加速 + 官方原版 sing-box 软路由代理管理平台**
 
-[![Release](https://img.shields.io/badge/version-v2.0.0--ebpf-blue.svg)](https://github.com/asdzx07/fluxbox/releases)
+[![Release](https://img.shields.io/badge/version-v2.1.0--ebpf-blue.svg)](https://github.com/asdzx07/fluxbox/releases)
 [![Kernel](https://img.shields.io/badge/eBPF-TC%20Direct--Action-success.svg)](https://github.com/asdzx07/fluxbox)
 [![Memory](https://img.shields.io/badge/Memory-~84MB%20Stable-brightgreen.svg)](https://github.com/asdzx07/fluxbox)
 [![sing-box](https://img.shields.io/badge/sing--box-official%20binary-orange.svg)](https://github.com/SagerNet/sing-box)

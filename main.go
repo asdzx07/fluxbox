@@ -27,7 +27,7 @@ import (
 var panelFS embed.FS
 
 var (
-	Version   = "v2.0.0-ebpf"
+	Version   = "v2.1.0-ebpf"
 	Commit    = "dev"
 	startTime = time.Now()
 )
@@ -94,6 +94,7 @@ func main() {
 	// 5. 初始化 HTTP API 服务
 	apiServer := api.NewServer(st, bpfEngine, sup)
 	apiServer.StartDirectIPLearner()
+	apiServer.StartSubscriptionAutoSync(24 * time.Hour)
 
 	// 6. 若存在节点配置，在启动时自动执行最新配置重新生成与下发
 	go func() {
@@ -141,6 +142,7 @@ func main() {
 	defer cancel()
 	_ = server.Shutdown(ctx)
 
+	apiServer.Close()
 	_ = sup.Stop()
 	_ = netstack.Teardown()
 	_ = dnsmasq.Restore()

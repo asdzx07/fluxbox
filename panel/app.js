@@ -354,6 +354,9 @@ async function loadTraffic() {
     $('statDown').textContent = fmtSpeed(down);
     $('statTotalUp').textContent = fmtBytes(totalUp);
     $('statTotalDown').textContent = fmtBytes(totalDown);
+    if ($('statDirectPkts')) $('statDirectPkts').textContent = (Number(t.directPackets) || 0).toLocaleString();
+    if ($('statProxyPkts')) $('statProxyPkts').textContent = (Number(t.proxyPackets) || 0).toLocaleString();
+    if ($('statShotPkts')) $('statShotPkts').textContent = (Number(t.shotPackets) || 0).toLocaleString();
 
     // 写入历史
     trafficHist.up.push(up);
@@ -862,6 +865,7 @@ function renderClients() {
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span>${escapeHtml(c.name || '未命名设备')}</span>
+          ${c.vendor ? `<span class="tag" style="background:rgba(59,130,246,0.15);color:var(--primary);font-size:11px;font-weight:600">${escapeHtml(c.vendor)}</span>` : ''}
           <span class="tag muted" style="font-family:monospace;font-size:12px">${escapeHtml(c.ip)}</span>
           ${c.mac ? `<span class="tag muted" style="font-size:11px;opacity:0.8">${escapeHtml(c.mac)}</span>` : ''}
           ${c.online ? `<span class="tag" style="color:var(--ok);font-size:11px;font-weight:600">● 在线</span>` : ''}
@@ -888,7 +892,7 @@ window.openClientModal = function(index = -1) {
   if (index >= 0 && state.clients[index]) {
     const c = state.clients[index];
     $('modalTitle').textContent = '编辑内网设备';
-    $('modalClientName').value = c.name || '';
+    $('modalClientName').value = c.alias || c.name || '';
     $('modalClientIp').value = c.ip || '';
     $('modalClientMode').value = c.mode || 'rule';
   } else {
@@ -920,12 +924,14 @@ async function saveClientModal() {
   }
   if (idx >= 0 && state.clients[idx]) {
     state.clients[idx].name = name || '未命名设备';
+    state.clients[idx].alias = name;
     state.clients[idx].ip = ip;
     state.clients[idx].mode = mode;
   } else {
     state.clients.push({
       id: `client-${Date.now()}`,
       name: name || `设备 ${ip}`,
+      alias: name,
       ip,
       mode,
       note: '手动添加',
@@ -988,7 +994,23 @@ function renderSubList(subs) {
     box.innerHTML = '<p class="note">还没有订阅，请在上方添加。</p>';
     return;
   }
-  box.innerHTML = subs.map((s) => `
+  box.innerHTML = subs.map((s) => {
+    let quotaHtml = '';
+    if (s.userinfo && (s.userinfo.total > 0 || s.userinfo.expire > 0 || ((s.userinfo.upload || 0) + (s.userinfo.download || 0)) > 0)) {
+      const used = (s.userinfo.upload || 0) + (s.userinfo.download || 0);
+      const total = s.userinfo.total || 0;
+      const usedStr = fmtBytes(used);
+      const totalStr = total > 0 ? fmtBytes(total) : '不限流量';
+      let expireStr = '';
+      if (s.userinfo.expire > 0) {
+        const expDate = new Date(s.userinfo.expire * 1000);
+        const daysLeft = Math.ceil((expDate.getTime() - Date.now()) / (86400 * 1000));
+        expireStr = daysLeft > 0 ? ` · 剩余 ${daysLeft} 天` : ' · 已到期';
+      }
+      quotaHtml = `<div class="sub" style="margin-top:4px;color:var(--accent);font-size:12px;font-weight:500">📊 流量配额: ${usedStr} / ${totalStr}${expireStr}</div>`;
+    }
+
+    return `
     <div class="item">
       <label class="switch">
         <input type="checkbox" data-sub-toggle="${escapeHtml(s.id)}"${s.enabled ? ' checked' : ''}>
@@ -997,13 +1019,15 @@ function renderSubList(subs) {
       <div class="grow">
         <div class="title">${escapeHtml(s.name || s.id)}</div>
         <div class="sub">${escapeHtml(s.url || '')} · 节点: ${s.nodeCount ?? s.nodes?.length ?? 0} 个</div>
+        ${quotaHtml}
       </div>
       <div class="inline">
         <button class="small" data-refresh="${escapeHtml(s.id)}">刷新</button>
         <button class="small danger" data-remove="${escapeHtml(s.id)}">删除</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 /* --------------------------------------------------------------- 节点分组策略 */
@@ -1580,10 +1604,10 @@ async function loadSettings() {
       if (applyBtn) applyBtn.classList.add('hidden');
     }
   } catch {
-    if ($('sysVersion')) $('sysVersion').textContent = 'FluxBox: v1.20 (B114)';
-    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v1.20 (B114)';
-    if ($('brandVersion')) $('brandVersion').textContent = 'v1.20 (B114)';
-    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'FluxBox: v1.20 (B114)';
+    if ($('sysVersion')) $('sysVersion').textContent = 'FluxBox: v2.1.0 (Go + eBPF)';
+    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v2.1.0';
+    if ($('brandVersion')) $('brandVersion').textContent = 'v2.1.0 (eBPF)';
+    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'FluxBox: v2.1.0 (Go + eBPF)';
   }
 
   // 获取并展示内核最新版本

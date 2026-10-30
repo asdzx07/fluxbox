@@ -18,6 +18,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Userinfo 对应机场订阅流量与有效期信息 (Subscription-Userinfo 响应头)
+type Userinfo struct {
+	Upload   int64 `json:"upload"`
+	Download int64 `json:"download"`
+	Total    int64 `json:"total"`
+	Expire   int64 `json:"expire"`
+}
+
 // Subscription 对应前端 /api/subscriptions 的数据结构
 type Subscription struct {
 	ID        string           `json:"id"`
@@ -30,28 +38,88 @@ type Subscription struct {
 	UpdatedAt any              `json:"updatedAt"`
 	AddedAt   any              `json:"addedAt,omitempty"`
 	Format    string           `json:"format,omitempty"`
+	Userinfo  *Userinfo        `json:"userinfo,omitempty"`
 }
 
-// FetchAndParse 拉取远程订阅并自动识别 sing-box JSON / Clash YAML / Base64 URI
-func FetchAndParse(subURL string) ([]map[string]any, error) {
-	rawBytes, err := fetchRawBytes(subURL)
-	if err != nil {
-		return nil, fmt.Errorf("拉取订阅失败: %w", err)
+// ParseSubscriptionUserinfo 解析 HTTP 响应头 Subscription-Userinfo
+func ParseSubscriptionUserinfo(raw string) *Userinfo {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
 	}
+	info := &Userinfo{}
+	hasAny := false
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ';' || r == ','
+	})
+	for _, part := range parts {
+		kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(kv[0]))
+		valStr := strings.Trim(strings.TrimSpace(kv[1]), "\"'")
+		val, err := strconv.ParseInt(valStr, 10, 64)
+		if err != nil {
+			if f, fErr := strconv.ParseFloat(valStr, 64); fErr == nil {
+				val = int64(f)
+			} else {
+				continue
+			}
+		}
+		switch key {
+		case "upload":
+			info.Upload = val
+			hasAny = true
+		case "download":
+			info.Download = val
+			hasAny = true
+		case "total":
+			info.Total = val
+			hasAny = true
+		case "expire":
+			info.Expire = val
+			hasAny = true
+		}
+	}
+	if !hasAny {
+		return nil
+	}
+	return info
+}
+
+// FetchAndParse 拉取远程订阅并自动识别 sing-box JSON / Clash YAML / Base64 URI (兼容旧签名)
+func FetchAndParse(subURL string) ([]map[string]any, error) {
+	nodes, _, err := FetchAndParseWithInfo(subURL)
+	return nodes, err
+}
+
+// FetchAndParseWithInfo 拉取远程订阅并同时解析返回节点列表与 Subscription-Userinfo 配额信息
+func FetchAndParseWithInfo(subURL string) ([]map[string]any, *Userinfo, error) {
+	rawBytes, headers, err := fetchRawBytes(subURL)
+	if err != nil {
+		return nil, nil, fmt.Errorf("拉取订阅失败: %w", err)
+	}
+
+	var userinfo *Userinfo
+	if headers != nil {
+		userinfo = ParseSubscriptionUserinfo(headers.Get("Subscription-Userinfo"))
+	}
+
 	// 去除可能存在的 UTF-8 BOM 头与首尾空白
 	content := strings.TrimSpace(strings.TrimPrefix(string(rawBytes), "\xef\xbb\xbf"))
 
 	// 1. 尝试作为原生 sing-box JSON 解析
 	if strings.HasPrefix(content, "{") {
 		if nodes, err := parseSingBoxJSON([]byte(content)); err == nil && len(nodes) > 0 {
-			return deduplicateTags(nodes), nil
+			return deduplicateTags(nodes), userinfo, nil
 		}
 	}
 
 	// 2. 尝试作为 Clash / Mihomo YAML 解析 (包含 proxies: 字段)
 	if strings.Contains(content, "proxies:") {
 		if nodes, err := parseClashYAML([]byte(content)); err == nil && len(nodes) > 0 {
-			return deduplicateTags(nodes), nil
+			return deduplicateTags(nodes), userinfo, nil
 		}
 	}
 
@@ -60,21 +128,21 @@ func FetchAndParse(subURL string) ([]map[string]any, error) {
 	// 如果 Base64 解码后实际上是 Clash YAML (部分机场采用此编码)
 	if strings.Contains(decoded, "proxies:") {
 		if nodes, err := parseClashYAML([]byte(decoded)); err == nil && len(nodes) > 0 {
-			return deduplicateTags(nodes), nil
+			return deduplicateTags(nodes), userinfo, nil
 		}
 	}
 	// 如果 Base64 解码后是 sing-box JSON
 	if strings.HasPrefix(strings.TrimSpace(decoded), "{") {
 		if nodes, err := parseSingBoxJSON([]byte(decoded)); err == nil && len(nodes) > 0 {
-			return deduplicateTags(nodes), nil
+			return deduplicateTags(nodes), userinfo, nil
 		}
 	}
 
 	nodes := parseURILines(decoded)
 	if len(nodes) == 0 {
-		return nil, fmt.Errorf("未能从订阅内容中解析出有效节点 (响应长度 %d 字节)", len(rawBytes))
+		return nil, userinfo, fmt.Errorf("未能从订阅内容中解析出有效节点 (响应长度 %d 字节)", len(rawBytes))
 	}
-	return deduplicateTags(nodes), nil
+	return deduplicateTags(nodes), userinfo, nil
 }
 
 // 1. 解析原生 sing-box JSON
@@ -709,11 +777,25 @@ func asBool(v any) bool {
 	return false
 }
 
-func fetchRawBytes(subURL string) ([]byte, error) {
+func isLoopbackURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	h := u.Hostname()
+	return h == "127.0.0.1" || h == "localhost" || h == "::1"
+}
+
+func fetchRawBytes(subURL string) ([]byte, http.Header, error) {
 	// 1. 优先尝试直连公共 DNS 快速拉取 (自带 0x2024 免死金牌)
-	data, directErr := doFetch(subURL, nil, 6*time.Second)
+	data, header, directErr := doFetch(subURL, nil, 6*time.Second)
 	if directErr == nil && len(data) > 0 {
-		return data, nil
+		return data, header, nil
+	}
+
+	// 若为本地环回地址，不应经过 7891 代理，直接返回直连错误
+	if isLoopbackURL(subURL) {
+		return nil, nil, fmt.Errorf("本地环回拉取失败: %v", directErr)
 	}
 
 	// 2. 若直连失败，探测本地 7891 代理端口是否存活，若存活则自动通过代理拉取（解决海外机场被阻断）
@@ -722,16 +804,16 @@ func fetchRawBytes(subURL string) ([]byte, error) {
 		conn, cErr := net.DialTimeout("tcp", "127.0.0.1:7891", 300*time.Millisecond)
 		if cErr == nil {
 			_ = conn.Close()
-			if proxyData, proxyErr := doFetch(subURL, http.ProxyURL(proxyURL), 15*time.Second); proxyErr == nil && len(proxyData) > 0 {
-				return proxyData, nil
+			if proxyData, proxyHeader, proxyErr := doFetch(subURL, http.ProxyURL(proxyURL), 15*time.Second); proxyErr == nil && len(proxyData) > 0 {
+				return proxyData, proxyHeader, nil
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("直连拉取失败: %v (若为海外机场请先启用已有节点并热部署后再试)", directErr)
+	return nil, nil, fmt.Errorf("直连拉取失败: %v (若为海外机场请先启用已有节点并热部署后再试)", directErr)
 }
 
-func doFetch(subURL string, proxyFunc func(*http.Request) (*url.URL, error), timeout time.Duration) ([]byte, error) {
+func doFetch(subURL string, proxyFunc func(*http.Request) (*url.URL, error), timeout time.Duration) ([]byte, http.Header, error) {
 	dialer := &net.Dialer{
 		Timeout:   timeout,
 		KeepAlive: 30 * time.Second,
@@ -742,8 +824,11 @@ func doFetch(subURL string, proxyFunc func(*http.Request) (*url.URL, error), tim
 		},
 	}
 
-	// 直连时使用带有 SO_MARK=0x2024 的直连 DNS 解析器，避开软路由本机可能被劫持或死锁的本地 dnsmasq
-	if proxyFunc == nil {
+	// 直连时使用带有 SO_MARK=0x2024 的直连 DNS 解析器（仅当 host 为非 IP 域名时启用，避免直接 IP 地址被外部 DNS 阻塞）
+	u, _ := url.Parse(subURL)
+	isPlainIP := u != nil && (net.ParseIP(u.Hostname()) != nil || isLoopbackURL(subURL))
+
+	if proxyFunc == nil && !isPlainIP {
 		dialer.Resolver = &net.Resolver{
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
@@ -771,19 +856,20 @@ func doFetch(subURL string, proxyFunc func(*http.Request) (*url.URL, error), tim
 	}
 	req, err := http.NewRequest("GET", subURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	req.Header.Set("User-Agent", "Clash.Meta/v1.18.0 Mihomo/1.18 sing-box/1.15.0")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("订阅返回 HTTP %d", resp.StatusCode)
+		return nil, nil, fmt.Errorf("订阅返回 HTTP %d", resp.StatusCode)
 	}
 
-	return io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	return body, resp.Header, err
 }

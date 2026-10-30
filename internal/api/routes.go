@@ -30,6 +30,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 
 	// 订阅与节点
 	mux.HandleFunc("/api/subscriptions", s.handleSubscriptions)
+	mux.HandleFunc("/api/subscriptions/sync", s.handleSubscriptionsSync)
 	mux.HandleFunc("/api/subscriptions/", s.handleSubscriptionAction)
 	mux.HandleFunc("/api/nodes", s.handleNodes)
 	mux.HandleFunc("/api/nodes/status", s.handleNodesStatus)

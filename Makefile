@@ -1,5 +1,5 @@
 PROJECT_NAME := fluxboxd
-VERSION      := $(shell cat VERSION 2>/dev/null || echo "v2.0.0-ebpf")
+VERSION      := $(shell cat VERSION 2>/dev/null || echo "v2.1.0-ebpf")
 COMMIT_SHA   := $(shell git rev-parse --short HEAD 2>/dev/null || cat commit.sha 2>/dev/null || echo "dev")
 BUILD_DIR    := dist
 

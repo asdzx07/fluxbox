@@ -174,12 +174,12 @@ func getHostCPUPct() int {
 func (s *Server) handleSystemVersion(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, map[string]any{
 		"ok":           true,
-		"current":      "FluxBox: v2.0.0 (Go + eBPF)",
-		"shortVersion": "v2.0.0 (eBPF)",
-		"semver":       "v2.0.0",
-		"buildNumber":  200,
+		"current":      "FluxBox: v2.1.0 (Go + eBPF)",
+		"shortVersion": "v2.1.0 (eBPF)",
+		"semver":       "v2.1.0",
+		"buildNumber":  210,
 		"commitSha":    "ebpf-tc",
-		"latest":       "FluxBox: v2.0.0 (Go + eBPF)",
+		"latest":       "FluxBox: v2.1.0 (Go + eBPF)",
 		"hasUpdate":    false,
 		"checkFailed":  false,
 	})
@@ -188,16 +188,19 @@ func (s *Server) handleSystemVersion(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleTraffic(w http.ResponseWriter, r *http.Request) {
 	st := s.trafficTracker.GetStats()
 	s.writeJSON(w, map[string]any{
-		"ok":         true,
-		"up":         st.Up,
-		"down":       st.Down,
-		"totalUp":    st.TotalUp,
-		"totalDown":  st.TotalDown,
-		"upSpeed":    st.Up,
-		"downSpeed":  st.Down,
-		"upload":     st.TotalUp,
-		"download":   st.TotalDown,
-		"lastSample": time.Now().UnixMilli(),
+		"ok":            true,
+		"up":            st.Up,
+		"down":          st.Down,
+		"totalUp":       st.TotalUp,
+		"totalDown":     st.TotalDown,
+		"upSpeed":       st.Up,
+		"downSpeed":     st.Down,
+		"upload":        st.TotalUp,
+		"download":      st.TotalDown,
+		"directPackets": st.DirectPackets,
+		"proxyPackets":  st.ProxyPackets,
+		"shotPackets":   st.ShotPackets,
+		"lastSample":    time.Now().UnixMilli(),
 	})
 }
 
