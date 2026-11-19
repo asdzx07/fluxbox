@@ -50,15 +50,23 @@ const (
 	MaxBackoff = 30 * time.Second
 	// StableRunDuration 稳定运行判定阈值：若单次稳定运行超过 1 分钟，复位退避计数
 	StableRunDuration = 1 * time.Minute
+
+	// 二级熔断等级常量 (CircumVolve 架构落地)
+	CircuitLevelNormal   = 0 // 正常代理模式
+	CircuitLevelDegraded = 1 // 一级熔断：降级直连规避模式 (国内直连 + TLS分片直通)
+	CircuitLevelFallback = 2 // 二级熔断：纯物理直连模式 (脱离网络接管)
 )
 
 type Status struct {
-	Running       bool   `json:"running"`
-	Pid           int    `json:"pid"`
-	Uptime        int64  `json:"uptime"`
-	Version       string `json:"version"`
-	ConfigErr     string `json:"configErr,omitempty"`
-	CircuitBroken bool   `json:"circuitBroken"`
+	Running       bool    `json:"running"`
+	Pid           int     `json:"pid"`
+	Uptime        int64   `json:"uptime"`
+	Version       string  `json:"version"`
+	ConfigErr     string  `json:"configErr,omitempty"`
+	CircuitBroken bool    `json:"circuitBroken"` // 兼容旧接口: circuitLevel > 0
+	CircuitLevel  int     `json:"circuitLevel"`  // 0: Normal, 1: Degraded, 2: Fallback
+	FitnessScore  float64 `json:"fitnessScore"`  // CircumVolve 双向适应度评分 (0.0 ~ 1.0)
+	LastProbeMsg  string  `json:"lastProbeMsg"`   // 最近一次双向探测详情
 }
 
 type Supervisor struct {
@@ -72,11 +80,17 @@ type Supervisor struct {
 	maxLogs    int
 
 	manualStop       bool               // 标记是否为主动停止 (避免主动退出时触发 Watchdog)
-	circuitBroken    bool               // 标记是否已触发防断网熔断
+	circuitBroken    bool               // 标记是否已触发防断网熔断 (兼容旧字段)
+	circuitLevel     int                // 当前熔断级别 (0: Normal, 1: Degraded, 2: Fallback)
+	fitnessScore     float64            // CircumVolve 双向适应度评分
+	lastProbeMsg     string             // 最近一次探针信息
 	crashTimes       []time.Time        // 记录滑动窗口内的崩溃时间戳
 	retryCount       int                // 指数退避重试计数
 	cancelWatch      context.CancelFunc // 取消当前退避等待上下文
-	onCircuitBreaker func()             // 熔断恢复执行函数 (支持测试注入)
+	cancelProber     context.CancelFunc // 取消探针拨测上下文
+	prober           *Prober            // 双向适应度探针
+	onDegraded       func()             // 一级降级熔断执行函数
+	onCircuitBreaker func()             // 二级彻底熔断执行函数 (支持测试注入)
 }
 
 func NewSupervisor(binPath, configPath string) *Supervisor {
@@ -85,23 +99,40 @@ func NewSupervisor(binPath, configPath string) *Supervisor {
 		binPath = findSingBoxBinary()
 	}
 	s := &Supervisor{
-		binPath:    binPath,
-		configPath: configPath,
-		logRing:    make([]string, 0, 500),
-		maxLogs:    500,
-		crashTimes: make([]time.Time, 0, 10),
+		binPath:      binPath,
+		configPath:   configPath,
+		logRing:      make([]string, 0, 500),
+		maxLogs:      500,
+		crashTimes:   make([]time.Time, 0, 10),
+		circuitLevel: CircuitLevelNormal,
+		prober:       NewProber(DefaultProberConfig()),
 	}
-	// 默认防断网熔断动作：还原 dnsmasq 与网络栈，确保全家网络立即直连不断网
+
+	// 默认一级熔断动作：降级直连规避模式，卸载 TPROXY 劫持以保国内网络畅通，保留 TLS 分片与安全 DNS
+	s.onDegraded = func() {
+		log.Printf("🛡️ [一级熔断] 代理链路静默阻断或服务端拒收，自动切入【降级直连规避模式】！")
+		_ = netstack.Teardown()
+		log.Printf("🛡️ [一级熔断] 国内流量全速直连，海外受限服务直连分片中，全屋网络畅通！")
+	}
+
+	// 默认二级防断网熔断动作：还原 dnsmasq 与网络栈，确保全家网络立即直连不断网
 	s.onCircuitBreaker = func() {
-		log.Printf("🛡️ [防断网熔断] 正在将局域网网络无缝还原为纯原生直连模式...")
+		log.Printf("🛡️ [二级熔断] 正在将局域网网络无缝还原为纯原生直连模式...")
 		_ = dnsmasq.Restore()
 		_ = netstack.Teardown()
-		log.Printf("🛡️ [防断网熔断] 网络还原完成，全家断网风险已彻底排除！")
+		log.Printf("🛡️ [二级熔断] 网络还原完成，全家断网风险已彻底排除！")
 	}
 	return s
 }
 
-// SetCircuitBreakerHook 允许注入自定义熔断恢复逻辑 (便于单元测试)
+// SetDegradedHook 允许注入自定义一级降级熔断逻辑 (便于单元测试)
+func (s *Supervisor) SetDegradedHook(fn func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onDegraded = fn
+}
+
+// SetCircuitBreakerHook 允许注入自定义二级熔断恢复逻辑 (便于单元测试)
 func (s *Supervisor) SetCircuitBreakerHook(fn func()) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -113,15 +144,36 @@ func (s *Supervisor) ResetCircuitBreaker() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.circuitBroken = false
+	s.circuitLevel = CircuitLevelNormal
 	s.crashTimes = nil
 	s.retryCount = 0
+	if s.prober != nil {
+		s.prober.mu.Lock()
+		s.prober.consecutiveFails = 0
+		s.prober.consecutiveSuccess = 0
+		s.prober.mu.Unlock()
+	}
 }
 
 // IsCircuitBroken 查询当前是否处于熔断状态
 func (s *Supervisor) IsCircuitBroken() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.circuitBroken
+	return s.circuitLevel > CircuitLevelNormal || s.circuitBroken
+}
+
+// GetCircuitLevel 获取当前熔断级别
+func (s *Supervisor) GetCircuitLevel() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.circuitLevel
+}
+
+// SetProber 允许注入自定义探针实例 (便于测试)
+func (s *Supervisor) SetProber(p *Prober) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.prober = p
 }
 
 func findSingBoxBinary() string {
@@ -244,6 +296,11 @@ func (s *Supervisor) startInternal(isAutoRecovery bool) error {
 	// 启动稳定运行监控器：稳定运行 1 分钟后自动复位退避计数与崩溃记录
 	go s.monitorStability(cmd, s.startedAt, watchCtx)
 
+	// CircumVolve (CCS 2026) 成果落地：启动双向适应度探针巡检 (低频 Jitter 拨测，监控静默阻断与双向有效性)
+	proberCtx, cancelProber := context.WithCancel(watchCtx)
+	s.cancelProber = cancelProber
+	go s.runProberLoop(proberCtx)
+
 	log.Printf("[KERNEL] sing-box 已启动 (PID: %d, 配置: %s)", cmd.Process.Pid, s.configPath)
 	return nil
 }
@@ -298,11 +355,12 @@ func (s *Supervisor) handleCrashOrFailure(lastErr error, ctx context.Context) {
 		// 检查是否在滑动窗口内连续崩溃/失败达到熔断阈值
 		if len(s.crashTimes) >= CircuitBreakerThreshold {
 			s.circuitBroken = true
-			s.manualStop = true // 锁定停止自愈
+			s.circuitLevel = CircuitLevelFallback // 彻底升级为二级纯物理直连熔断
+			s.manualStop = true                   // 锁定停止自愈
 			hook := s.onCircuitBreaker
 			s.mu.Unlock()
 
-			log.Printf("🚨 [熔断保护] sing-box 内核在 %v 内连续崩溃/拉起失败 %d 次 (>= %d)，已触发防断网熔断保护！立即停止自动重启并恢复网络...",
+			log.Printf("🚨 [熔断保护] sing-box 内核在 %v 内连续崩溃/拉起失败 %d 次 (>= %d)，已触发二级完全物理直连熔断！立即停止自动重启并恢复网络...",
 				CircuitBreakerWindow, len(recent), CircuitBreakerThreshold)
 
 			// 触发防断网熔断：还原网络栈与 dnsmasq，确保原生直连不断网
@@ -379,10 +437,14 @@ func (s *Supervisor) Stop() error {
 	// 标记为主动作出停止，防止触发 Watchdog 重启
 	s.manualStop = true
 
-	// 取消正在进行的退避重试
+	// 取消正在进行的退避重试与探针循环
 	if s.cancelWatch != nil {
 		s.cancelWatch()
 		s.cancelWatch = nil
+	}
+	if s.cancelProber != nil {
+		s.cancelProber()
+		s.cancelProber = nil
 	}
 
 	cmd := s.cmd
@@ -466,7 +528,10 @@ func (s *Supervisor) Status() Status {
 		Pid:           pid,
 		Uptime:        uptime,
 		Version:       ver,
-		CircuitBroken: s.circuitBroken,
+		CircuitBroken: s.circuitLevel > CircuitLevelNormal || s.circuitBroken,
+		CircuitLevel:  s.circuitLevel,
+		FitnessScore:  s.fitnessScore,
+		LastProbeMsg:  s.lastProbeMsg,
 	}
 }
 
@@ -558,5 +623,73 @@ func (s *Supervisor) GetBinPath() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.binPath
+}
+
+// runProberLoop 双向网络适应度探针主循环 (CircumVolve 成果落地)
+// 以低频随机抖动对目标端点进行双向验证，若连续 3 次适应度低于 0.6 则切入一级降级熔断
+func (s *Supervisor) runProberLoop(ctx context.Context) {
+	if s.prober == nil {
+		return
+	}
+	// 启动后等待 10 秒，让 sing-box 充分就绪
+	select {
+	case <-time.After(10 * time.Second):
+	case <-ctx.Done():
+		return
+	}
+
+	for {
+		s.mu.Lock()
+		running := (s.cmd != nil && s.cmd.Process != nil) || isPortListening("127.0.0.1:9095")
+		manualStop := s.manualStop
+		s.mu.Unlock()
+
+		if !running || manualStop {
+			return
+		}
+
+		res := s.prober.ProbeOnce(ctx)
+
+		s.mu.Lock()
+		s.fitnessScore = res.Fitness
+		if res.Error != nil {
+			s.lastProbeMsg = fmt.Sprintf("阻断/失败: %v", res.Error)
+		} else {
+			s.lastProbeMsg = fmt.Sprintf("健康 (F=%.2f, RTT=%v)", res.Fitness, res.RTT)
+		}
+
+		_, fails, succ := s.prober.GetLastResult()
+
+		// 1. 正常状态下检测到连续失败达到阈值 -> 触发一级降级熔断 (降级直连规避模式)
+		if s.circuitLevel == CircuitLevelNormal && fails >= s.prober.cfg.FailThreshold {
+			s.circuitLevel = CircuitLevelDegraded
+			s.circuitBroken = true
+			hook := s.onDegraded
+			msg := s.lastProbeMsg
+			s.mu.Unlock()
+
+			log.Printf("🚨 [双向感知] 连续 %d 次双向探针适应度不合格 (%s)，触发【一级熔断：降级直连规避模式】", fails, msg)
+			if hook != nil {
+				hook()
+			}
+		} else if s.circuitLevel == CircuitLevelDegraded && succ >= s.prober.cfg.ResumeThreshold {
+			// 2. 降级状态下检测到连续成功达到恢复阈值 -> 自动退出降级熔断，自愈恢复正常代理
+			s.circuitLevel = CircuitLevelNormal
+			s.circuitBroken = false
+			s.mu.Unlock()
+
+			log.Printf("✨ [双向感知] 代理链路连续 %d 次双向拨测成功，自动退出降级熔断，恢复【正常代理模式】", succ)
+			_ = netstack.Setup()
+		} else {
+			s.mu.Unlock()
+		}
+
+		nextInterval := s.prober.CalculateNextInterval()
+		select {
+		case <-time.After(nextInterval):
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 

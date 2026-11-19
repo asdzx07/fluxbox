@@ -235,3 +235,125 @@ func TestSupervisorCircuitBreakerOnStartFailures(t *testing.T) {
 		t.Errorf("预期熔断恢复钩子被触发 1 次，实际调用次数: %d", atomic.LoadInt32(&hookTriggered))
 	}
 }
+
+func TestProberDualFeedbackFitnessCalculation(t *testing.T) {
+	cfg := DefaultProberConfig()
+	prober := NewProber(cfg)
+
+	// 1. 模拟健康 204 响应
+	prober.SetCustomProbeFn(func(ctx context.Context) ProbeResult {
+		return ProbeResult{
+			EvadeScore: 1.0,
+			ValidScore: 1.0,
+			Overhead:   0.02,
+			Fitness:    0.98,
+			StatusCode: 204,
+		}
+	})
+	res := prober.ProbeOnce(context.Background())
+	if res.Fitness < 0.95 {
+		t.Errorf("正常 204 探针预期高适应度 (>0.95)，实际: %f", res.Fitness)
+	}
+
+	// 2. 模拟伪规避 (服务端返回 HTTP 400 畸形报错)
+	prober.SetCustomProbeFn(func(ctx context.Context) ProbeResult {
+		return ProbeResult{
+			EvadeScore: 1.0,
+			ValidScore: 0.0,
+			Fitness:    0.0,
+			StatusCode: 400,
+		}
+	})
+	res400 := prober.ProbeOnce(context.Background())
+	if res400.Fitness != 0.0 {
+		t.Errorf("伪规避 (400) 预期适应度为 0.0，实际: %f", res400.Fitness)
+	}
+}
+
+func TestTwoStageCircuitBreakerTransitions(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "two-stage-test-*")
+	if err != nil {
+		t.Fatalf("创建临时目录失败: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	cfgPath := filepath.Join(tempDir, "config.json")
+	_ = os.WriteFile(cfgPath, []byte("{}"), 0644)
+
+	sup := NewSupervisor("echo", cfgPath)
+
+	var degradedTriggered int32
+	var fallbackTriggered int32
+
+	sup.SetDegradedHook(func() {
+		atomic.AddInt32(&degradedTriggered, 1)
+	})
+	sup.SetCircuitBreakerHook(func() {
+		atomic.AddInt32(&fallbackTriggered, 1)
+	})
+
+	// 配置一个探针，FailThreshold = 3, ResumeThreshold = 2
+	pCfg := DefaultProberConfig()
+	pCfg.FailThreshold = 3
+	pCfg.ResumeThreshold = 2
+	pCfg.Interval = 10 * time.Millisecond
+	testProber := NewProber(pCfg)
+
+	failCount := 0
+	testProber.SetCustomProbeFn(func(ctx context.Context) ProbeResult {
+		failCount++
+		if failCount <= 3 {
+			// 前 3 次模拟被静默阻断 (Fitness = 0)
+			return ProbeResult{EvadeScore: 0, ValidScore: 0, Fitness: 0}
+		}
+		// 后续模拟恢复健康 (Fitness = 1.0)
+		return ProbeResult{EvadeScore: 1.0, ValidScore: 1.0, Fitness: 1.0, StatusCode: 204}
+	})
+
+	sup.SetProber(testProber)
+
+	// 模拟连续 3 次探针失败
+	for i := 0; i < 3; i++ {
+		res := testProber.ProbeOnce(context.Background())
+		sup.mu.Lock()
+		sup.fitnessScore = res.Fitness
+		_, fails, _ := testProber.GetLastResult()
+		if sup.circuitLevel == CircuitLevelNormal && fails >= testProber.cfg.FailThreshold {
+			sup.circuitLevel = CircuitLevelDegraded
+			sup.circuitBroken = true
+			if sup.onDegraded != nil {
+				sup.onDegraded()
+			}
+		}
+		sup.mu.Unlock()
+	}
+
+	// 验证进入一级降级熔断
+	if sup.GetCircuitLevel() != CircuitLevelDegraded {
+		t.Errorf("预期进入 CircuitLevelDegraded (一级熔断)，实际级别: %d", sup.GetCircuitLevel())
+	}
+	if atomic.LoadInt32(&degradedTriggered) != 1 {
+		t.Errorf("预期一级降级钩子触发 1 次，实际: %d", atomic.LoadInt32(&degradedTriggered))
+	}
+
+	// 模拟连续 2 次探针成功恢复
+	for i := 0; i < 2; i++ {
+		res := testProber.ProbeOnce(context.Background())
+		sup.mu.Lock()
+		sup.fitnessScore = res.Fitness
+		_, _, succ := testProber.GetLastResult()
+		if sup.circuitLevel == CircuitLevelDegraded && succ >= testProber.cfg.ResumeThreshold {
+			sup.circuitLevel = CircuitLevelNormal
+			sup.circuitBroken = false
+		}
+		sup.mu.Unlock()
+	}
+
+	// 验证成功自愈回 Normal
+	if sup.GetCircuitLevel() != CircuitLevelNormal {
+		t.Errorf("预期自愈回 CircuitLevelNormal，实际级别: %d", sup.GetCircuitLevel())
+	}
+	if sup.IsCircuitBroken() {
+		t.Errorf("自愈后 IsCircuitBroken 应当为 false")
+	}
+}
