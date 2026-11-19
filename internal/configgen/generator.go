@@ -323,7 +323,7 @@ func buildOutbounds(nodes []map[string]any, groups []GroupConfig, allTags []stri
 				"type":      "urltest",
 				"tag":       "所有-自动",
 				"outbounds": allTags,
-				"url":       "http://www.gstatic.com/generate_204",
+				"url":       "http://cp.cloudflare.com/generate_204",
 				"interval":  "3m",
 				"tolerance": 80,
 			},
@@ -365,7 +365,7 @@ func buildOutbounds(nodes []map[string]any, groups []GroupConfig, allTags []stri
 				"type":      "urltest",
 				"tag":       g.Name,
 				"outbounds": matched,
-				"url":       "http://www.gstatic.com/generate_204",
+				"url":       "http://cp.cloudflare.com/generate_204",
 				"interval":  "5m",
 			})
 		} else {

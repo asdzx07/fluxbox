@@ -78,11 +78,24 @@ func (s *Server) handleNodesStatus(w http.ResponseWriter, r *http.Request) {
 				"members": p["all"],
 			})
 		} else if pType != "Direct" && pType != "Reject" && pType != "Compatible" {
-			nodes = append(nodes, map[string]any{
+			var lastDelay *int
+			if hist, ok := p["history"].([]any); ok && len(hist) > 0 {
+				if last, ok := hist[len(hist)-1].(map[string]any); ok {
+					if d, ok := last["delay"].(float64); ok && d > 0 {
+						id := int(d)
+						lastDelay = &id
+					}
+				}
+			}
+			nodeData := map[string]any{
 				"name": name,
 				"type": pType,
 				"udp":  p["udp"] != false,
-			})
+			}
+			if lastDelay != nil {
+				nodeData["delay"] = *lastDelay
+			}
+			nodes = append(nodes, nodeData)
 		}
 	}
 
@@ -140,9 +153,9 @@ func (s *Server) handleNodesLatency(w http.ResponseWriter, r *http.Request) {
 	}
 	testURL := r.URL.Query().Get("url")
 	if testURL == "" {
-		testURL = "http://www.gstatic.com/generate_204"
+		testURL = "http://cp.cloudflare.com/generate_204"
 	}
-	timeout := 2800
+	timeout := 5000
 	if tStr := r.URL.Query().Get("timeout"); tStr != "" {
 		if t, err := strconv.Atoi(tStr); err == nil && t > 0 {
 			timeout = t
@@ -174,17 +187,17 @@ func (s *Server) handleNodesLatencyBatch(w http.ResponseWriter, r *http.Request)
 	}
 	_ = json.NewDecoder(r.Body).Decode(&req)
 	if req.Timeout <= 0 {
-		req.Timeout = 2800
+		req.Timeout = 5000
 	}
 	if req.URL == "" {
-		req.URL = "http://www.gstatic.com/generate_204"
+		req.URL = "http://cp.cloudflare.com/generate_204"
 	}
 
 	results := make(map[string]map[string]any)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	sem := make(chan struct{}, 10) // 最多 10 并发
+	sem := make(chan struct{}, 6) // 控制为平滑的 6 并发，杜绝出口争抢抖动
 	for _, name := range req.Names {
 		wg.Add(1)
 		go func(n string) {

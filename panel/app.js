@@ -167,6 +167,14 @@ async function loadNodes() {
     const data = await api('/nodes/status');
     state.nodeGroups = data.groups || [];
     state.nodeList = data.nodes || [];
+    // 同步内核平滑测速历史，即开即显，与官方客户端完全对齐
+    if (Array.isArray(data.nodes)) {
+      for (const n of data.nodes) {
+        if (n.delay != null && n.delay > 0 && !state.latency[n.name]?.pending) {
+          state.latency[n.name] = { delay: n.delay, error: null };
+        }
+      }
+    }
     renderNodeGroups();
     renderNodeList();
   } catch (err) {
@@ -669,6 +677,13 @@ async function loadOverviewGroups() {
   try {
     const data = await api('/nodes/status');
     state.overviewGroupsData = data.groups || [];
+    if (Array.isArray(data.nodes)) {
+      for (const n of data.nodes) {
+        if (n.delay != null && n.delay > 0 && !state.latency[n.name]?.pending) {
+          state.latency[n.name] = { delay: n.delay, error: null };
+        }
+      }
+    }
     renderOverviewGroups();
   } catch (err) {
     box.innerHTML = `<div class="mini-empty">${escapeHtml(err.message)}</div>`;
@@ -1667,10 +1682,10 @@ async function loadSettings() {
       if (applyBtn) applyBtn.classList.add('hidden');
     }
   } catch {
-    if ($('sysVersion')) $('sysVersion').textContent = 'FluxBox: v2.2.04 (Go + eBPF)';
-    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v2.2.04';
-    if ($('brandVersion')) $('brandVersion').textContent = 'v2.2.04 (eBPF)';
-    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'FluxBox: v2.2.04 (Go + eBPF)';
+    if ($('sysVersion')) $('sysVersion').textContent = 'FluxBox: v2.2.05 (Go + eBPF)';
+    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v2.2.05';
+    if ($('brandVersion')) $('brandVersion').textContent = 'v2.2.05 (eBPF)';
+    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'FluxBox: v2.2.05 (Go + eBPF)';
   }
 
   // 获取并展示内核最新版本
