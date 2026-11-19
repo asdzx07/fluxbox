@@ -484,6 +484,69 @@ async function loadOverview() {
         hint.classList.add('hidden');
       }
     }
+
+    // 渲染 CircumVolve 自进化抗封锁与双向自愈防线看板
+    const cv = data.circumvolve || {};
+    const k = data.kernel || {};
+    const lvl = cv.circuitLevel ?? k.circuitLevel ?? 0;
+    const score = cv.fitnessScore ?? k.fitnessScore ?? 1.0;
+    const msg = cv.lastProbeMsg ?? k.lastProbeMsg ?? '等待初次拨测';
+
+    const cvBadge = $('cvCircuitBadge');
+    const cvBreaker = $('cvBreakerStatus');
+    if (cvBadge) {
+      if (lvl === 0) {
+        cvBadge.textContent = '正常代理';
+        cvBadge.className = 'bdg';
+      } else if (lvl === 1) {
+        cvBadge.textContent = '一级熔断 (降级直连规避)';
+        cvBadge.className = 'bdg warn';
+      } else {
+        cvBadge.textContent = '二级熔断 (完全物理直连)';
+        cvBadge.className = 'bdg danger';
+      }
+    }
+    if (cvBreaker) {
+      if (lvl === 0) {
+        cvBreaker.textContent = '就绪 (无痛自愈)';
+        cvBreaker.style.color = 'var(--ok)';
+      } else if (lvl === 1) {
+        cvBreaker.textContent = '已切入降级直连';
+        cvBreaker.style.color = 'var(--warn)';
+      } else {
+        cvBreaker.textContent = '已完全断开接管';
+        cvBreaker.style.color = 'var(--danger)';
+      }
+    }
+
+    const cvVal = $('cvFitnessVal');
+    const cvBar = $('cvFitnessBar');
+    if (cvVal) {
+      cvVal.textContent = Number(score).toFixed(2);
+      if (score >= 0.8) {
+        cvVal.style.color = 'var(--ok)';
+      } else if (score >= 0.5) {
+        cvVal.style.color = 'var(--warn)';
+      } else {
+        cvVal.style.color = 'var(--danger)';
+      }
+    }
+    if (cvBar) {
+      const pct = Math.min(100, Math.max(0, Math.round(score * 100)));
+      cvBar.style.width = pct + '%';
+      if (score >= 0.8) {
+        cvBar.style.background = 'var(--ok)';
+      } else if (score >= 0.5) {
+        cvBar.style.background = 'var(--warn)';
+      } else {
+        cvBar.style.background = 'var(--danger)';
+      }
+    }
+
+    const cvLast = $('cvLastMsg');
+    if (cvLast) {
+      cvLast.textContent = msg;
+    }
   } catch (err) {
     if ($('statKernel')) $('statKernel').textContent = '读取失败';
     const hint = $('overviewHint');
@@ -1604,10 +1667,10 @@ async function loadSettings() {
       if (applyBtn) applyBtn.classList.add('hidden');
     }
   } catch {
-    if ($('sysVersion')) $('sysVersion').textContent = 'FluxBox: v2.2.03 (Go + eBPF)';
-    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v2.2.03';
-    if ($('brandVersion')) $('brandVersion').textContent = 'v2.2.03 (eBPF)';
-    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'FluxBox: v2.2.03 (Go + eBPF)';
+    if ($('sysVersion')) $('sysVersion').textContent = 'FluxBox: v2.2.04 (Go + eBPF)';
+    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v2.2.04';
+    if ($('brandVersion')) $('brandVersion').textContent = 'v2.2.04 (eBPF)';
+    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'FluxBox: v2.2.04 (Go + eBPF)';
   }
 
   // 获取并展示内核最新版本
@@ -1798,6 +1861,31 @@ function bindEvents() {
     await switchNode(group, e.target.value);
     await loadOverviewGroups();
   });
+
+  // CircumVolve 自进化抗封锁与双向自愈按钮
+  $('btnCvProbe')?.addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
+    try {
+      const res = await api('/kernel/probe', { method: 'POST' });
+      if (res.ok) {
+        toast(`双向拨测成功: F=${res.fitness.toFixed(2)} (RTT: ${res.rttMs}ms)`);
+      } else {
+        toast(`拨测异常: ${res.error || '探测受阻'}`);
+      }
+      await loadOverview();
+    } catch (err) {
+      toast(`拨测失败: ${err.message}`);
+    }
+  }));
+
+  $('btnCvReset')?.addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
+    try {
+      await api('/kernel/reset-breaker', { method: 'POST' });
+      toast('熔断状态已重置，网络规则已重新挂载');
+      await loadOverview();
+    } catch (err) {
+      toast(`重置失败: ${err.message}`);
+    }
+  }));
 
   // 节点页
   $('btnReloadNodes').addEventListener('click', (e) => withBusy(e.currentTarget, async () => {

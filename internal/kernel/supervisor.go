@@ -693,3 +693,44 @@ func (s *Supervisor) runProberLoop(ctx context.Context) {
 	}
 }
 
+// ProbeOnceNow 手动立即执行一次双向拨测并更新状态 (CircumVolve 联动)
+func (s *Supervisor) ProbeOnceNow(ctx context.Context) ProbeResult {
+	if s.prober == nil {
+		return ProbeResult{Error: fmt.Errorf("探针未初始化")}
+	}
+	res := s.prober.ProbeOnce(ctx)
+
+	s.mu.Lock()
+	s.fitnessScore = res.Fitness
+	if res.Error != nil {
+		s.lastProbeMsg = fmt.Sprintf("阻断/失败: %v", res.Error)
+	} else {
+		s.lastProbeMsg = fmt.Sprintf("健康 (F=%.2f, RTT=%v)", res.Fitness, res.RTT)
+	}
+	s.mu.Unlock()
+
+	return res
+}
+
+// ResetBreaker 手动重置熔断状态，重新接管网络栈并恢复正常代理模式
+func (s *Supervisor) ResetBreaker() error {
+	s.mu.Lock()
+	s.circuitLevel = CircuitLevelNormal
+	s.circuitBroken = false
+	s.manualStop = false
+	s.crashTimes = nil
+	s.retryCount = 0
+	if s.prober != nil {
+		s.prober.recordResult(ProbeResult{
+			EvadeScore: 1.0,
+			ValidScore: 1.0,
+			Fitness:    1.0,
+		})
+	}
+	s.mu.Unlock()
+
+	log.Printf("🔄 [手动重置] 用户已手动重置熔断状态，正在恢复网络栈接管...")
+	return netstack.Setup()
+}
+
+

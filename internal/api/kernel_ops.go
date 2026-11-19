@@ -3,6 +3,7 @@ package api
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -81,6 +82,35 @@ func (s *Server) handleKernelAction(w http.ResponseWriter, r *http.Request) {
 
 	case "install":
 		s.handleKernelInstall(w, r)
+		return
+
+	case "probe":
+		ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+		defer cancel()
+		res := s.supervisor.ProbeOnceNow(ctx)
+		errMsg := ""
+		if res.Error != nil {
+			errMsg = res.Error.Error()
+		}
+		s.writeJSON(w, map[string]any{
+			"ok":         res.Error == nil,
+			"fitness":    res.Fitness,
+			"evadeScore": res.EvadeScore,
+			"validScore": res.ValidScore,
+			"overhead":   res.Overhead,
+			"rttMs":      res.RTT.Milliseconds(),
+			"statusCode": res.StatusCode,
+			"testedUrl":  res.TestedURL,
+			"error":      errMsg,
+		})
+		return
+
+	case "reset-breaker":
+		if err := s.supervisor.ResetBreaker(); err != nil {
+			s.writeError(w, http.StatusInternalServerError, fmt.Sprintf("重置熔断失败: %v", err))
+			return
+		}
+		s.writeJSON(w, map[string]any{"ok": true, "message": "熔断已重置，网络规则已重新挂载"})
 		return
 
 	default:

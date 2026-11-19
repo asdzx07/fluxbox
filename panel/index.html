@@ -32,7 +32,7 @@
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
       </div>
       <span>FluxBox</span>
-      <small id="brandVersion">v2.2.03 (eBPF)</small>
+      <small id="brandVersion">v2.2.04 (eBPF)</small>
     </div>
     
     <div class="sb-sec">核心控制台</div>
@@ -190,6 +190,65 @@
             <span class="bdg">实时遥测</span>
           </div>
           <div id="sysResources"><p class="mini-empty">加载中…</p></div>
+        </div>
+      </div>
+
+      <!-- CircumVolve 自进化抗封锁与双向自愈防线看板 -->
+      <div class="card" id="cardCircumvolve" style="margin-top:14px">
+        <div class="card-head">
+          <div style="display:flex;align-items:center;gap:8px">
+            <svg class="kpi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--accent)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <h3 style="margin:0">CircumVolve 自进化抗封锁与双向自愈防线</h3>
+            <span class="bdg" id="cvCircuitBadge" style="margin-left:6px">正常代理</span>
+          </div>
+          <div class="spacer"></div>
+          <div style="display:flex;gap:8px">
+            <button class="small" id="btnCvProbe" title="立即对目标端点执行双向真实度探测">
+              <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              双向拨测
+            </button>
+            <button class="small" id="btnCvReset" title="重置断路器并恢复代理接管">
+              <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+              重置熔断
+            </button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));gap:14px;margin-top:12px">
+          <!-- 左侧：适应度评分指标 -->
+          <div style="background:var(--bg-card-sub, rgba(255,255,255,0.03));border:1px solid var(--border-color);border-radius:8px;padding:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-size:12px;color:var(--text-muted)">链路适应度评分 F(S)</span>
+              <strong id="cvFitnessVal" class="num-mono" style="font-size:18px;color:var(--ok)">1.00</strong>
+            </div>
+            <div class="meter" style="height:8px;margin-bottom:8px"><div id="cvFitnessBar" class="meter-fill" style="width:100%;background:var(--ok)"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">
+              <span>探测详情：<span id="cvLastMsg" style="color:var(--text-primary)">等待探测</span></span>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+              评估准则: <code style="font-size:10px">0.5·C_evade + 0.5·S_valid - P_overhead</code>
+            </div>
+          </div>
+
+          <!-- 右侧：核心抗封锁与分流防线矩阵 -->
+          <div style="background:var(--bg-card-sub, rgba(255,255,255,0.03));border:1px solid var(--border-color);border-radius:8px;padding:14px;display:flex;flex-direction:column;justify-content:center;gap:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px">
+              <span>🛡️ TLS 动态分片 (Fragmentation)</span>
+              <span class="bdg" style="color:var(--ok)">已启用 (打散 SNI)</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px">
+              <span>🌐 免代理直连规避 (Direct Evasion)</span>
+              <span class="bdg" style="color:var(--ok)">已生效 (GitHub/CDN/镜像)</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px">
+              <span>⚡ eBPF TC 硬件级 QUIC 放行/阻断</span>
+              <span class="bdg" style="color:var(--ok)">已挂载 (国内快速放行)</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px">
+              <span>🔄 二级断路器与自愈 (Circuit Breaker)</span>
+              <span class="bdg" id="cvBreakerStatus" style="color:var(--ok)">就绪 (无痛自愈)</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -400,7 +459,7 @@
         <div>
           <div class="page-title-row">
             <h2>核心设置</h2>
-            <span class="version-tag" id="settingCurrentVerTag">v2.2.03</span>
+            <span class="version-tag" id="settingCurrentVerTag">v2.2.04</span>
           </div>
           <p class="note" style="margin-top:2px">底层透明代理网络栈、DNS 防污染分流、广告拦截、版本升级与实时内核终端</p>
         </div>
@@ -648,10 +707,10 @@
                 <span class="bdg" id="panelUpdateBadge">当前已是最新</span>
               </div>
               <div class="vmc-val">
-                <span id="sysVersion">FluxBox: v2.2.03 (Go + eBPF)</span>
+                <span id="sysVersion">FluxBox: v2.2.04 (Go + eBPF)</span>
               </div>
               <div class="vmc-foot">
-                <span>最新版本：<strong id="latestSysVersion">FluxBox: v2.2.03 (Go + eBPF)</strong></span>
+                <span>最新版本：<strong id="latestSysVersion">FluxBox: v2.2.04 (Go + eBPF)</strong></span>
                 <span id="panelCheckTime">刚刚检查</span>
               </div>
             </div>

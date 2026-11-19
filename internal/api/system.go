@@ -64,6 +64,17 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 			"versionOutput": kStatus.Version,
 			"uptime":        formatUptime(kStatus.Uptime),
 			"circuitBroken": kStatus.CircuitBroken,
+			"circuitLevel":  kStatus.CircuitLevel,
+			"fitnessScore":  kStatus.FitnessScore,
+			"lastProbeMsg":  kStatus.LastProbeMsg,
+		},
+		"circumvolve": map[string]any{
+			"circuitLevel":  kStatus.CircuitLevel,
+			"fitnessScore":  kStatus.FitnessScore,
+			"lastProbeMsg":  kStatus.LastProbeMsg,
+			"fragmentation": true,
+			"directEvasion": true,
+			"bpfBypass":     true,
 		},
 		"dnsmasq": dnsmasq.Status(),
 		"platform": map[string]any{
@@ -174,12 +185,12 @@ func getHostCPUPct() int {
 func (s *Server) handleSystemVersion(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, map[string]any{
 		"ok":           true,
-		"current":      "FluxBox: v2.2.03 (Go + eBPF)",
-		"shortVersion": "v2.2.03 (eBPF)",
-		"semver":       "v2.2.03",
-		"buildNumber":  2203,
+		"current":      "FluxBox: v2.2.04 (Go + eBPF)",
+		"shortVersion": "v2.2.04 (eBPF)",
+		"semver":       "v2.2.04",
+		"buildNumber":  2204,
 		"commitSha":    "ebpf-tc",
-		"latest":       "FluxBox: v2.2.03 (Go + eBPF)",
+		"latest":       "FluxBox: v2.2.04 (Go + eBPF)",
 		"hasUpdate":    false,
 		"checkFailed":  false,
 	})
