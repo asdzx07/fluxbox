@@ -32,7 +32,7 @@
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
       </div>
       <span>FluxBox</span>
-      <small id="brandVersion">v2.2.07 (eBPF)</small>
+      <small id="brandVersion">v2.2.08 (eBPF)</small>
     </div>
     
     <div class="sb-sec">核心控制台</div>
@@ -459,7 +459,7 @@
         <div>
           <div class="page-title-row">
             <h2>核心设置</h2>
-            <span class="version-tag" id="settingCurrentVerTag">v2.2.07</span>
+            <span class="version-tag" id="settingCurrentVerTag">v2.2.08</span>
           </div>
           <p class="note" style="margin-top:2px">底层透明代理网络栈、DNS 防污染分流、广告拦截、版本升级与实时内核终端</p>
         </div>
@@ -494,7 +494,7 @@
       <!-- 子标签页 1: 网络栈与 DNS -->
       <div class="stab-pane active" id="stab-netdns">
         <div class="settings-two-col-grid">
-          <div class="card">
+          <div class="card" style="display:flex;flex-direction:column">
             <div class="card-head">
               <h3>网络与 TUN 透明代理栈</h3>
               <div class="spacer"></div>
@@ -510,54 +510,6 @@
               </div>
 
               <div class="setting-item">
-                <div class="title">局域网流量自动接管 (TUN 自动重定向)</div>
-                <label class="switch">
-                  <input type="checkbox" id="setAutoRedirect">
-                  <span></span>
-                </label>
-              </div>
-
-              <div class="setting-item">
-                <div class="title">TUN 巨帧吞吐加速 (MTU 65535 大包)</div>
-                <label class="switch">
-                  <input type="checkbox" id="setTunAggressive">
-                  <span></span>
-                </label>
-              </div>
-
-              <div class="setting-item">
-                <div class="title">节点服务器 IP 强制直连 (防回环死锁)</div>
-                <label class="switch">
-                  <input type="checkbox" id="setDirectForNodes">
-                  <span></span>
-                </label>
-              </div>
-
-              <div class="setting-item">
-                <div class="title">拦截 QUIC 协议 (UDP 443 降级 TCP)</div>
-                <label class="switch">
-                  <input type="checkbox" id="setRejectQuic">
-                  <span></span>
-                </label>
-              </div>
-
-              <div class="setting-item">
-                <div class="title">严格路由保护 (strict_route 防漏网)</div>
-                <label class="switch">
-                  <input type="checkbox" id="setStrictRoute">
-                  <span></span>
-                </label>
-              </div>
-
-              <div class="setting-item">
-                <div class="title">域名协议深度嗅探 (TLS SNI / HTTP Host)</div>
-                <label class="switch">
-                  <input type="checkbox" id="setSniff">
-                  <span></span>
-                </label>
-              </div>
-
-              <div class="setting-item">
                 <div class="title">接管 IPv6 流量 (关闭可规避 IPv6 泄漏)</div>
                 <label class="switch">
                   <input type="checkbox" id="setIpv6">
@@ -566,19 +518,32 @@
               </div>
 
               <div class="setting-item">
-                <div class="title">内核开机自启与守护保活 (Supervisor)</div>
+                <div class="title">拦截 QUIC 协议 (UDP 443 降级 TCP 提速)</div>
                 <label class="switch">
-                  <input type="checkbox" id="setAutoStart">
+                  <input type="checkbox" id="setRejectQuic">
+                  <span></span>
+                </label>
+              </div>
+
+              <div class="setting-item">
+                <div class="title">TUN 巨帧吞吐加速 (MTU 65535 大包优化)</div>
+                <label class="switch">
+                  <input type="checkbox" id="setTunAggressive">
                   <span></span>
                 </label>
               </div>
             </div>
 
+            <div class="setting-footer-hint" style="margin-top:auto;padding:12px 14px;background:var(--surface-3);border-radius:var(--radius-sm);font-size:11px;color:var(--text-3);line-height:1.5;display:flex;gap:8px;align-items:flex-start">
+              <span style="font-size:13px;line-height:1">🛡️</span>
+              <div><strong>基础保障常驻托管</strong>：节点防回环死锁、TLS SNI 深度嗅探、局域网透明接管、strict_route 防漏网与 Supervisor 守护保活已由底层架构内置全天候托管，免除误配置风险。</div>
+            </div>
+
           </div>
 
-          <div class="card">
+          <div class="card" style="display:flex;flex-direction:column">
             <div class="card-head">
-              <h3>DNS 防污染分流与运行级别</h3>
+              <h3>DNS 防污染与智能分流</h3>
               <div class="spacer"></div>
               <span class="bdg">防泄漏</span>
             </div>
@@ -593,13 +558,11 @@
               </label>
 
               <label class="field">
-                <span class="field-title">内核日志输出级别</span>
-                <select id="setLogLevel">
-                  <option value="info">info（标准推荐）</option>
-                  <option value="warn">warn（仅警告与错误）</option>
-                  <option value="error">error（仅严重错误）</option>
-                  <option value="debug">debug（调试详细信息）</option>
-                  <option value="trace">trace（全量链路追踪）</option>
+                <span class="field-title">IP 解析偏好策略 (Strategy)</span>
+                <select id="setDnsStrategy">
+                  <option value="prefer_ipv4">优先 IPv4（推荐，兼容性最佳）</option>
+                  <option value="ipv4_only">仅 IPv4（彻底屏蔽 AAAA 记录）</option>
+                  <option value="prefer_ipv6">优先 IPv6（纯 IPv6 环境）</option>
                 </select>
               </label>
 
@@ -613,16 +576,7 @@
                 <input id="setDnsProxy" class="num-mono" placeholder="1.1.1.1">
               </label>
 
-              <label class="field">
-                <span class="field-title">IP 解析偏好策略 (Strategy)</span>
-                <select id="setDnsStrategy">
-                  <option value="prefer_ipv4">优先 IPv4（推荐，兼容性最佳）</option>
-                  <option value="ipv4_only">仅 IPv4（彻底屏蔽 AAAA 记录）</option>
-                  <option value="prefer_ipv6">优先 IPv6（纯 IPv6 环境）</option>
-                </select>
-              </label>
-
-              <label class="field">
+              <label class="field" style="grid-column: span 2">
                 <span class="field-title">远程代理 DNS 传输协议</span>
                 <select id="setDnsProxyProtocol">
                   <option value="tcp">TCP 代理隧道传输（防污染推荐）</option>
@@ -631,22 +585,9 @@
               </label>
             </div>
 
-            <div class="setting-list" style="margin-top:auto;padding-top:12px;border-top:1px solid var(--border)">
-              <div class="setting-item" style="padding:9px 6px">
-                <div class="title">海外代理域名启用 FakeIP</div>
-                <label class="switch">
-                  <input type="checkbox" id="setFakeIp">
-                  <span></span>
-                </label>
-              </div>
-
-              <div class="setting-item" style="padding:9px 6px">
-                <div class="title">国内外域名智能分流解析</div>
-                <label class="switch">
-                  <input type="checkbox" id="setDnsSplit">
-                  <span></span>
-                </label>
-              </div>
+            <div class="setting-footer-hint" style="margin-top:auto;padding:12px 14px;background:var(--surface-3);border-radius:var(--radius-sm);font-size:11px;color:var(--text-3);line-height:1.5;display:flex;gap:8px;align-items:flex-start">
+              <span style="font-size:13px;line-height:1">⚡</span>
+              <div><strong>架构保障常驻托管</strong>：海外代理域名 FakeIP 极速映射与国内 geosite/geoip 智能分流解析已由底层 DNS 引擎内置托管，保证国内网站与代理流量互不干扰。</div>
             </div>
           </div>
         </div>
@@ -707,10 +648,10 @@
                 <span class="bdg" id="panelUpdateBadge">当前已是最新</span>
               </div>
               <div class="vmc-val">
-                <span id="sysVersion">FluxBox: v2.2.07 (Go + eBPF)</span>
+                <span id="sysVersion">FluxBox: v2.2.08 (Go + eBPF)</span>
               </div>
               <div class="vmc-foot">
-                <span>最新版本：<strong id="latestSysVersion">FluxBox: v2.2.07 (Go + eBPF)</strong></span>
+                <span>最新版本：<strong id="latestSysVersion">FluxBox: v2.2.08 (Go + eBPF)</strong></span>
                 <span id="panelCheckTime">刚刚检查</span>
               </div>
             </div>
@@ -777,7 +718,7 @@
       <!-- 子标签页 4: 内核运行实时日志 -->
       <div class="stab-pane" id="stab-logs">
         <div class="card terminal-card">
-          <div class="card-head terminal-head">
+          <div class="card-head terminal-head" style="flex-wrap:wrap;gap:8px">
             <div class="term-dots">
               <span class="tdot red"></span>
               <span class="tdot yellow"></span>
@@ -785,9 +726,19 @@
             </div>
             <h3>内核运行实时日志</h3>
             <div class="spacer"></div>
-            <input id="logSearch" placeholder="搜索日志…" style="width:180px">
-            <label class="inline note"><input type="checkbox" id="logAuto" style="width:auto"> 自动刷新</label>
-            <button class="small" id="btnLog">刷新</button>
+            <label class="term-level-selector" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;margin:0">
+              <span class="text-muted" style="font-weight:600">日志级别:</span>
+              <select id="setLogLevel" style="width:auto;padding:3px 8px;font-size:12px;height:28px">
+                <option value="info">info (标准推荐)</option>
+                <option value="warn">warn (仅告警与错误)</option>
+                <option value="error">error (仅严重错误)</option>
+                <option value="debug">debug (调试详细信息)</option>
+                <option value="trace">trace (全量链路追踪)</option>
+              </select>
+            </label>
+            <input id="logSearch" placeholder="搜索日志…" style="width:160px;height:28px">
+            <label class="inline note" style="font-size:12px"><input type="checkbox" id="logAuto" style="width:auto"> 自动刷新</label>
+            <button class="small" id="btnLog" style="height:28px">刷新</button>
           </div>
           <pre class="log" id="kernelLog">—</pre>
         </div>

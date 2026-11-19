@@ -765,6 +765,48 @@ window.resetConnectionRecords = function() {
   loadConnectionsPage();
 };
 
+function formatConnRule(rawRule) {
+  if (!rawRule) return { label: '默认路由', tip: '默认出站' };
+  const str = String(rawRule).trim();
+  if (str === 'final') return { label: '兜底分流', tip: 'final' };
+  
+  // 匹配策略名称：查找 obflip-p-xxx 或自定义策略 tag
+  const pMatch = str.match(/obflip-(?:p-)?([a-zA-Z0-9_-]+)/);
+  if (pMatch && pMatch[1]) {
+    const rawKey = pMatch[1].toLowerCase();
+    const nameMap = {
+      'google': 'Google',
+      'github': 'GitHub',
+      'youtube': 'YouTube',
+      'microsoft': '微软',
+      'apple': 'Apple',
+      'netflix': 'Netflix',
+      'tiktok': 'TikTok',
+      'ai': 'AI 服务',
+      'speed': '测速分流',
+      'games': '游戏加速',
+      'cn': '国内直连',
+      'cnip': '国内 IP',
+      'adobe': 'Adobe'
+    };
+    const prettyName = nameMap[rawKey] || pMatch[1];
+    return { label: prettyName, tip: str };
+  }
+  
+  // 匹配 direct evasion 规避规则
+  if (str.includes('tls-record-fragment') || str.includes('domain_suffix')) {
+    return { label: '直连穿透', tip: str };
+  }
+  
+  // 匹配普通 rule_set
+  const rsMatch = str.match(/rule_set=([a-zA-Z0-9_@!-]+)/);
+  if (rsMatch && rsMatch[1]) {
+    return { label: rsMatch[1].replace('geosite-', '').replace('geoip-', ''), tip: str };
+  }
+  
+  return { label: str.length > 18 ? str.slice(0, 16) + '…' : str, tip: str };
+}
+
 function renderConnections() {
   const countEl = $('connPageCount');
   const listEl = $('connsList');
@@ -817,7 +859,8 @@ function renderConnections() {
     const src = escapeHtml(c.metadata?.sourceIP || '');
     const proto = escapeHtml((c.metadata?.network || '').toUpperCase());
     const chain = (c.chains || []).map(escapeHtml).join(' → ');
-    const rule = escapeHtml(c.rule || '');
+    const rawRule = c.rule || '';
+    const ruleObj = formatConnRule(rawRule);
     const id = encodeURIComponent(c.id || '');
     return `
       <div class="conn-item">
@@ -825,7 +868,7 @@ function renderConnections() {
           <div class="conn-header">
             <span class="conn-target" title="${host}${port}">${host}${port}</span>
             <span class="tag muted conn-proto">${proto}</span>
-            ${rule ? `<span class="tag conn-rule" title="${rule}">${rule}</span>` : ''}
+            <span class="tag conn-rule" title="${escapeHtml(ruleObj.tip)}">${escapeHtml(ruleObj.label)}</span>
           </div>
           <div class="conn-meta-sub">
             <span>源: ${src}</span>
@@ -1682,10 +1725,10 @@ async function loadSettings() {
       if (applyBtn) applyBtn.classList.add('hidden');
     }
   } catch {
-    if ($('sysVersion')) $('sysVersion').textContent = 'FluxBox: v2.2.07 (Go + eBPF)';
-    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v2.2.07';
-    if ($('brandVersion')) $('brandVersion').textContent = 'v2.2.07 (eBPF)';
-    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'FluxBox: v2.2.07 (Go + eBPF)';
+    if ($('sysVersion')) $('sysVersion').textContent = 'FluxBox: v2.2.08 (Go + eBPF)';
+    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v2.2.08';
+    if ($('brandVersion')) $('brandVersion').textContent = 'v2.2.08 (eBPF)';
+    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'FluxBox: v2.2.08 (Go + eBPF)';
   }
 
   // 获取并展示内核最新版本
@@ -2276,14 +2319,14 @@ function bindEvents() {
       const patch = {
         network: {
           ipv6: $('setIpv6') ? $('setIpv6').checked : false,
-          rejectQuic: $('setRejectQuic') ? $('setRejectQuic').checked : true,
+          rejectQuic: $('setRejectQuic') ? $('setRejectQuic').checked : false,
           directBypass: $('setDirectBypass') ? $('setDirectBypass').checked : true,
-          directForNodes: $('setDirectForNodes') ? $('setDirectForNodes').checked : true,
-          sniff: $('setSniff') ? $('setSniff').checked : true,
+          directForNodes: true,
+          sniff: true,
           tun: {
-            autoRedirect: $('setAutoRedirect') ? $('setAutoRedirect').checked : true,
+            autoRedirect: true,
             aggressive: Boolean($('setTunAggressive')?.checked),
-            strictRoute: Boolean($('setStrictRoute')?.checked),
+            strictRoute: true,
           },
         },
         dns: {
@@ -2293,15 +2336,15 @@ function bindEvents() {
           proxy: $('setDnsProxy')?.value.trim() || '1.1.1.1',
           strategy: $('setDnsStrategy') ? $('setDnsStrategy').value : 'prefer_ipv4',
           proxyProtocol: $('setDnsProxyProtocol') ? $('setDnsProxyProtocol').value : 'tcp',
-          split: $('setDnsSplit') ? $('setDnsSplit').checked : true,
-          fakeIp: $('setFakeIp') ? $('setFakeIp').checked : false,
+          split: true,
+          fakeIp: true,
           adblock: $('setAdblock') ? $('setAdblock').checked : false,
           adblockAllow: $('setAdblockAllow') ? $('setAdblockAllow').value.split('\n').map((s) => s.trim()).filter(Boolean) : [],
           adblockCustom: $('setAdblockCustom') ? $('setAdblockCustom').value.split('\n').map((s) => s.trim()).filter(Boolean) : [],
         },
         kernel: {
-          logLevel: $('setLogLevel') ? $('setLogLevel').value : 'warn',
-          autoStart: $('setAutoStart') ? $('setAutoStart').checked : true,
+          logLevel: $('setLogLevel') ? $('setLogLevel').value : 'info',
+          autoStart: true,
         },
       };
       await api('/settings', { method: 'PUT', body: patch });
