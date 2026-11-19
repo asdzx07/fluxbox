@@ -277,7 +277,7 @@ func TestTLSRecordFragmentAndDirectEvasion(t *testing.T) {
 			if rMap["outbound"] == "直连" {
 				if suffixes, ok := rMap["domain_suffix"].([]any); ok && len(suffixes) > 0 {
 					for _, s := range suffixes {
-						if s == "github.com" {
+						if s == "docker.io" {
 							foundDirectEvasionRoute = true
 							break
 						}
@@ -287,7 +287,7 @@ func TestTLSRecordFragmentAndDirectEvasion(t *testing.T) {
 		}
 	}
 	if !foundDirectEvasionRoute {
-		t.Errorf("未能找到包含 github.com 且带有 tls_record_fragment: true 的直连出站规则！")
+		t.Errorf("未能找到包含 docker.io 且带有 tls_record_fragment: true 的直连出站规则！")
 	}
 
 	// 3. 验证 DNS 规则：包含针对直连规避域名的安全 DNS 解析
@@ -307,7 +307,7 @@ func TestTLSRecordFragmentAndDirectEvasion(t *testing.T) {
 		}
 		if suffixes, ok := rMap["domain_suffix"].([]any); ok {
 			for _, s := range suffixes {
-				if s == "github.com" {
+				if s == "docker.io" {
 					if rMap["server"] == "dns-proxy" {
 						foundDirectEvasionDNS = true
 						break
@@ -317,6 +317,6 @@ func TestTLSRecordFragmentAndDirectEvasion(t *testing.T) {
 		}
 	}
 	if !foundDirectEvasionDNS {
-		t.Errorf("未能找到针对 github.com 走安全 DNS (dns-proxy) 的解析规则！")
+		t.Errorf("未能找到针对 docker.io 走安全 DNS (dns-proxy) 的解析规则！")
 	}
 }

@@ -14,14 +14,10 @@ import (
 const FwmarkBypass = 0x2024
 
 // DirectEvasionSuffixes 对应 CircumVolve 论文成果落地的免代理直连规避域名
-// 涵盖仅受 SNI 干扰阻断但无需隐藏真实来源 IP 的海外开发、代码托管、开源库与公共 CDN 服务
-// 配合 sing-box 1.15 原生 tls_record_fragment 直连穿透，大幅卸载主力代理节点流量
+// 涵盖仅受 SNI 干扰阻断但无需隐藏真实来源 IP 的海外开发镜像、开源库与公共 CDN 服务
+// 注意：GitHub 域名已彻底释放回用户自定义分流策略（p-github / geosite-github），由用户自由调度走代理或直连
+// 配合 sing-box 原生 tls_record_fragment 直连穿透，大幅卸载主力代理节点流量
 var DirectEvasionSuffixes = []string{
-	"github.com",
-	"githubassets.com",
-	"githubusercontent.com",
-	"raw.githubusercontent.com",
-	"gist.github.com",
 	"docker.com",
 	"docker.io",
 	"npmjs.org",
@@ -30,7 +26,6 @@ var DirectEvasionSuffixes = []string{
 	"crates.io",
 	"golang.org",
 	"pkg.go.dev",
-	"gitlab.com",
 	"jsdelivr.net",
 	"cdnjs.cloudflare.com",
 	"unpkg.com",

@@ -27,7 +27,7 @@ import (
 var panelFS embed.FS
 
 var (
-	Version   = "v2.2.05-ebpf"
+	Version   = "v2.2.06-ebpf"
 	Commit    = "dev"
 	startTime = time.Now()
 )
