@@ -13,6 +13,34 @@ import (
 // FwmarkBypass = 0x2024 (8228): sing-box 自身发出的流量标记，被 eBPF 直接放行防死锁
 const FwmarkBypass = 0x2024
 
+// DirectEvasionSuffixes 对应 CircumVolve 论文成果落地的免代理直连规避域名
+// 涵盖仅受 SNI 干扰阻断但无需隐藏真实来源 IP 的海外开发、代码托管、开源库与公共 CDN 服务
+// 配合 sing-box 1.15 原生 tls_record_fragment 直连穿透，大幅卸载主力代理节点流量
+var DirectEvasionSuffixes = []string{
+	"github.com",
+	"githubassets.com",
+	"githubusercontent.com",
+	"raw.githubusercontent.com",
+	"gist.github.com",
+	"docker.com",
+	"docker.io",
+	"npmjs.org",
+	"npmjs.com",
+	"pypi.org",
+	"crates.io",
+	"golang.org",
+	"pkg.go.dev",
+	"gitlab.com",
+	"jsdelivr.net",
+	"cdnjs.cloudflare.com",
+	"unpkg.com",
+	"wikipedia.org",
+	"wikimedia.org",
+	"archive.org",
+	"arxiv.org",
+	"sciencedirect.com",
+}
+
 // Settings 对应前端 /api/settings 的配置模型
 type Settings struct {
 	Network struct {
@@ -195,7 +223,7 @@ func GenerateConfig(in BuildInput) ([]byte, []string, error) {
 	outbounds := buildOutbounds(in.Nodes, in.Groups, allNodeTags, in.Settings.Network.IPv6)
 
 	// 4. 构建 DNS 模块 (含 FakeIP、防污染分流、HTTPS 记录屏蔽、广告拦截)
-	dnsConfig := buildDNS(in.Settings, nodeServerDomains)
+	dnsConfig := buildDNS(in.Settings, nodeServerDomains, len(in.Nodes) > 0)
 
 	// 5. 构建 Route 路由规则 (分流策略、Flip 热重载规则集映射)
 	routeConfig := buildRoute(in, flipDir, nodeServerDomains, nodeServerIPs)
@@ -371,6 +399,16 @@ func buildOutbounds(nodes []map[string]any, groups []GroupConfig, allTags []stri
 				cleanedNode["tag"] = name
 			}
 		}
+
+		// CircumVolve (CCS 2026) 成果落地：对所有 TLS 代理出站注入 TLS 记录层分片 (Record Fragmentation)
+		// 打散 ClientHello 中的 SNI 明文与握手特征，防止 GFW 骨干网单包识别、打标与针对性阻断
+		if tlsMap, ok := cleanedNode["tls"].(map[string]any); ok && tlsMap != nil {
+			if enabled, hasEnabled := tlsMap["enabled"].(bool); !hasEnabled || enabled {
+				tlsMap["record_fragment"] = true
+				cleanedNode["tls"] = tlsMap
+			}
+		}
+
 		out = append(out, cleanedNode)
 	}
 
@@ -387,7 +425,7 @@ func buildOutbounds(nodes []map[string]any, groups []GroupConfig, allTags []stri
 	return out
 }
 
-func buildDNS(s Settings, nodeServers []string) map[string]any {
+func buildDNS(s Settings, nodeServers []string, hasNodes bool) map[string]any {
 	directDNS := s.DNS.DirectAddress
 	if directDNS == "" {
 		directDNS = "223.5.5.5"
@@ -503,9 +541,15 @@ func buildDNS(s Settings, nodeServers []string) map[string]any {
 	}
 
 	finalDNS := "dns-proxy"
-	if len(nodeServers) == 0 {
+	if !hasNodes {
 		finalDNS = "dns-direct"
 	}
+
+	// 6. 对免代理直连规避域名强制走无污染安全 DNS (finalDNS) 解析真实 IP，防止 UDP 53 旁路投毒
+	rules = append(rules, map[string]any{
+		"domain_suffix": DirectEvasionSuffixes,
+		"server":        finalDNS,
+	})
 
 	return map[string]any{
 		"servers":  servers,
@@ -525,6 +569,12 @@ func buildRoute(in BuildInput, flipDir string, nodeServerDomains, nodeServerIPs 
 		{
 			"domain_suffix": []string{".cn", ".baidu.com", ".qq.com", ".weixin.qq.com", ".taobao.com", ".jd.com", ".bilibili.com", ".aliyun.com", ".apple.com", ".icloud.com"},
 			"outbound":      "直连",
+		},
+		// CircumVolve (CCS 2026) 落地：免代理直连规避出站 (通过 TLS 记录层分片穿透 SNI 阻断)
+		{
+			"domain_suffix":       DirectEvasionSuffixes,
+			"tls_record_fragment": true,
+			"outbound":            "直连",
 		},
 	}
 
