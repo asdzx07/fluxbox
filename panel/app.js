@@ -1682,10 +1682,10 @@ async function loadSettings() {
       if (applyBtn) applyBtn.classList.add('hidden');
     }
   } catch {
-    if ($('sysVersion')) $('sysVersion').textContent = 'FluxBox: v2.2.06 (Go + eBPF)';
-    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v2.2.06';
-    if ($('brandVersion')) $('brandVersion').textContent = 'v2.2.06 (eBPF)';
-    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'FluxBox: v2.2.06 (Go + eBPF)';
+    if ($('sysVersion')) $('sysVersion').textContent = 'FluxBox: v2.2.07 (Go + eBPF)';
+    if ($('settingCurrentVerTag')) $('settingCurrentVerTag').textContent = 'v2.2.07';
+    if ($('brandVersion')) $('brandVersion').textContent = 'v2.2.07 (eBPF)';
+    if ($('latestSysVersion')) $('latestSysVersion').textContent = 'FluxBox: v2.2.07 (Go + eBPF)';
   }
 
   // 获取并展示内核最新版本

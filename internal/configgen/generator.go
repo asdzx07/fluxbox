@@ -36,6 +36,31 @@ var DirectEvasionSuffixes = []string{
 	"sciencedirect.com",
 }
 
+// GithubCleanHosts GitHub 官方亚太与全球极速 CDN 节点优选静态 IP 映射表
+// 包含 Microsoft Azure 官方核心 Anycast IP 与 Fastly 亚太低延迟边缘节点
+// 配合 TLS 记录层分片穿透，彻底消除国内运营商国际出口丢包与 Local DNS 污染
+var GithubCleanHosts = map[string][]string{
+	"github.com":                    {"20.205.243.166"},
+	"api.github.com":                {"20.205.243.168"},
+	"codeload.github.com":           {"20.205.243.165"},
+	"alive.github.com":              {"140.82.113.26"},
+	"assets-cdn.github.com":         {"185.199.108.153", "185.199.109.153", "185.199.110.153", "185.199.111.153"},
+	"githubassets.com":              {"185.199.108.154", "185.199.109.154", "185.199.110.154", "185.199.111.154"},
+	"githubusercontent.com":         {"185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133"},
+	"raw.githubusercontent.com":     {"185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133"},
+	"gist.githubusercontent.com":    {"185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133"},
+	"camo.githubusercontent.com":    {"185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133"},
+	"objects.githubusercontent.com": {"185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133"},
+	"media.githubusercontent.com":   {"185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133"},
+	"avatars.githubusercontent.com": {"185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133"},
+	"avatars0.githubusercontent.com": {"185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133"},
+	"avatars1.githubusercontent.com": {"185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133"},
+	"avatars2.githubusercontent.com": {"185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133"},
+	"avatars3.githubusercontent.com": {"185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133"},
+	"avatars4.githubusercontent.com": {"185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133"},
+	"avatars5.githubusercontent.com": {"185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133"},
+}
+
 // Settings 对应前端 /api/settings 的配置模型
 type Settings struct {
 	Network struct {
@@ -470,6 +495,13 @@ func buildDNS(s Settings, nodeServers []string, hasNodes bool) map[string]any {
 		servers = append(servers, fakeServer)
 	}
 
+	// 注入 GitHub 官方亚太与全球极速 CDN 节点优选静态 DNS 传输（方案 B 核心闭环）
+	servers = append(servers, map[string]any{
+		"tag":        "dns-hosts",
+		"type":       "hosts",
+		"predefined": GithubCleanHosts,
+	})
+
 	var rules []map[string]any
 
 	// 1. 吸收勘察报告设计：屏蔽 HTTPS/SVCB 查询记录，防止浏览器绕过透明代理分流
@@ -477,6 +509,16 @@ func buildDNS(s Settings, nodeServers []string, hasNodes bool) map[string]any {
 		"query_type": []string{"HTTPS", "SVCB"},
 		"action":     "predefined",
 		"rcode":      "NOERROR",
+	})
+
+	// 1.1 GitHub 官方优质 CDN 优选解析 (免代理高速引擎：0ms 瞬间直达 Clean IP，杜绝国内运营商出口丢包)
+	var githubDomains []string
+	for d := range GithubCleanHosts {
+		githubDomains = append(githubDomains, d)
+	}
+	rules = append(rules, map[string]any{
+		"domain": githubDomains,
+		"server": "dns-hosts",
 	})
 
 	// 2. 节点服务器自身域名强制走国内直连 DNS，防止死锁
@@ -631,7 +673,7 @@ func buildRoute(in BuildInput, flipDir string, nodeServerDomains, nodeServerIPs 
 		}
 
 		// 组合条件：(命中策略规则集 OR 命中域名后缀) AND 命中 Flip 热切换开关
-		rules = append(rules, map[string]any{
+		policyRule := map[string]any{
 			"type": "logical",
 			"mode": "and",
 			"rules": []map[string]any{
@@ -643,7 +685,37 @@ func buildRoute(in BuildInput, flipDir string, nodeServerDomains, nodeServerIPs 
 				{"rule_set": []string{flipTag}},
 			},
 			"outbound": targetOutbound,
-		})
+		}
+
+		// 【方案 B 完整闭环】：当策略出口为「直连」时，若该策略属于 GitHub 或包含 GitHub 域名/规则集，自动启用 TLS 记录层分片穿透
+		// 配合 dns-hosts 的官方亚太 Clean IP 映射，实现 0 代理流量消耗、秒级高速直连穿透
+		if targetOutbound == "直连" {
+			isGithubPolicy := false
+			if strings.Contains(strings.ToLower(p.Name), "github") || strings.Contains(strings.ToLower(p.ID), "github") {
+				isGithubPolicy = true
+			}
+			if !isGithubPolicy {
+				for _, rs := range p.Rulesets {
+					if rs == "geosite-github" || rs == "geosite-gitlab" {
+						isGithubPolicy = true
+						break
+					}
+				}
+			}
+			if !isGithubPolicy {
+				for _, dom := range p.DomainSuffix {
+					if strings.Contains(strings.ToLower(dom), "github") || strings.Contains(strings.ToLower(dom), "gitlab") {
+						isGithubPolicy = true
+						break
+					}
+				}
+			}
+			if isGithubPolicy {
+				policyRule["tls_record_fragment"] = true
+			}
+		}
+
+		rules = append(rules, policyRule)
 	}
 
 	// 国内流量兜底直连：始终包含 geosite-cn 与 geoip-cn，防止国内纯 IP 流量倒灌跌落至代理出站

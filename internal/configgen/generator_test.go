@@ -319,4 +319,66 @@ func TestTLSRecordFragmentAndDirectEvasion(t *testing.T) {
 	if !foundDirectEvasionDNS {
 		t.Errorf("未能找到针对 docker.io 走安全 DNS (dns-proxy) 的解析规则！")
 	}
+
+	// 4. 验证 GitHub 免代理高速直连引擎闭环：dns.servers 中存在 dns-hosts 且包含优选 IP
+	dnsServers, ok := dns["servers"].([]map[string]any)
+	if !ok {
+		// 可能是 []any
+		if rawServers, ok2 := dns["servers"].([]any); ok2 {
+			dnsServers = make([]map[string]any, 0, len(rawServers))
+			for _, s := range rawServers {
+				if sm, ok := s.(map[string]any); ok {
+					dnsServers = append(dnsServers, sm)
+				}
+			}
+		}
+	}
+	foundDnsHosts := false
+	for _, s := range dnsServers {
+		if s["tag"] == "dns-hosts" && s["type"] == "hosts" {
+			foundDnsHosts = true
+			break
+		}
+	}
+	if !foundDnsHosts {
+		t.Errorf("未在 dns.servers 中找到 tag=dns-hosts 的优选静态解析服务！")
+	}
+
+	// 5. 验证当用户策略设置 Github 为直连时，动态注入 tls_record_fragment: true
+	inWithGithubDirect := in
+	inWithGithubDirect.Policies = []PolicyConfig{
+		{
+			ID:       "p-github",
+			Name:     "Github",
+			Enabled:  true,
+			Target:   "direct", // 设置为直连
+			Rulesets: []string{"geosite-github"},
+		},
+	}
+	cfgBytesDirect, _, err := GenerateConfig(inWithGithubDirect)
+	if err != nil {
+		t.Fatalf("GenerateConfig 失败: %v", err)
+	}
+	var cfgDirect map[string]any
+	if err := json.Unmarshal(cfgBytesDirect, &cfgDirect); err != nil {
+		t.Fatalf("解析生成的 JSON 失败: %v", err)
+	}
+	routeDirect := cfgDirect["route"].(map[string]any)
+	rulesDirect := routeDirect["rules"].([]any)
+	foundGithubDirectFragment := false
+	for _, r := range rulesDirect {
+		rm, ok := r.(map[string]any)
+		if !ok {
+			continue
+		}
+		if rm["outbound"] == "直连" {
+			if frag, ok := rm["tls_record_fragment"].(bool); ok && frag {
+				foundGithubDirectFragment = true
+				break
+			}
+		}
+	}
+	if !foundGithubDirectFragment {
+		t.Errorf("当用户策略为直连且命中 Github 时，未能自动注入 tls_record_fragment: true！")
+	}
 }
