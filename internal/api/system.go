@@ -174,12 +174,12 @@ func getHostCPUPct() int {
 func (s *Server) handleSystemVersion(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, map[string]any{
 		"ok":           true,
-		"current":      "FluxBox: v2.2.02 (Go + eBPF)",
-		"shortVersion": "v2.2.02 (eBPF)",
-		"semver":       "v2.2.02",
-		"buildNumber":  2202,
+		"current":      "FluxBox: v2.2.03 (Go + eBPF)",
+		"shortVersion": "v2.2.03 (eBPF)",
+		"semver":       "v2.2.03",
+		"buildNumber":  2203,
 		"commitSha":    "ebpf-tc",
-		"latest":       "FluxBox: v2.2.02 (Go + eBPF)",
+		"latest":       "FluxBox: v2.2.03 (Go + eBPF)",
 		"hasUpdate":    false,
 		"checkFailed":  false,
 	})

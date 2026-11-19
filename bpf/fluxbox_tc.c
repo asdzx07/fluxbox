@@ -133,38 +133,46 @@ int fluxbox_tc_ingress(struct __sk_buff *skb) {
         }
     }
 
-    // 5. 硬件级屏蔽 QUIC (UDP 443)
-    __u32 cfg_quic_key = 1;
-    __u32 *reject_quic = bpf_map_lookup_elem(&global_cfg_map, &cfg_quic_key);
-    if (reject_quic && *reject_quic == 1 && iph->protocol == IPPROTO_UDP) {
+    // 5. 判定是否为 UDP 443 (QUIC) 报文
+    int is_quic = 0;
+    if (iph->protocol == IPPROTO_UDP) {
         struct udphdr *udph = (void *)iph + (iph->ihl * 4);
         if ((void *)(udph + 1) <= data_end && udph->dest == bpf_htons(443)) {
-            inc_stat(2);
-            return TC_ACT_SHOT;
+            is_quic = 1;
         }
     }
 
     // 6.1 【第一级火箭】如果是 FakeIP (198.18.0.0/15，包含 198.19.0.0/16)，100% 必走代理！
-    // 免去任何查表开销，0.001 微秒直接打标送入 sing-box！
+    // 免去任何查表开销，0.001 微秒直接判定！
     __u32 dst_host_order = bpf_ntohl(dst_ip);
     if ((dst_host_order & 0xFFFE0000) == 0xC6120000) { // 198.18.0.0/15
+        // 若为海外受限目标的 QUIC (UDP 443)，执行硬件级丢弃，强迫客户端 1RTT 内无感降级到受保护的 TCP TLS
+        if (is_quic) {
+            __u32 cfg_quic_key = 1;
+            __u32 *reject_quic = bpf_map_lookup_elem(&global_cfg_map, &cfg_quic_key);
+            if (reject_quic && *reject_quic == 1) {
+                inc_stat(2);
+                return TC_ACT_SHOT;
+            }
+        }
         skb->mark = FWMARK_TPROXY;
         inc_stat(1);
         return TC_ACT_OK;
     }
 
-    // 6.2 【第二级火箭】查 O(1) 动态学习 LRU 哈希表（包含已学习的 Apple/Steam/CDN 海外直连 IP）
+    // 6.2 【第二级火箭】查 O(1) 动态学习 LRU 哈希表与 LPM Trie 树 (中国大陆 8,000+ CIDR 与直连 IP)
     __u32 cfg_bypass_key = 0;
     __u32 *direct_bypass = bpf_map_lookup_elem(&global_cfg_map, &cfg_bypass_key);
     if (!direct_bypass || *direct_bypass == 1) {
         __u8 *learned = bpf_map_lookup_elem(&learned_ip_map, &dst_ip);
         if (learned && *learned == 1) {
+            // 命中直连白名单：如果是国内 QUIC/HTTP3，直接放行直连，绝不误杀！
             skb->mark = FWMARK_BYPASS;
             inc_stat(0);
             return TC_ACT_OK;
         }
 
-        // 6.3 【第三级火箭】查 LPM Trie 树（大陆 chnroutes CIDR 与私有保留网段兜底）
+        // 查 LPM Trie 树（大陆 chnroutes CIDR 与私有保留网段兜底）
         struct ipv4_lpm_key lpm_key = { .prefixlen = 32 };
         __builtin_memcpy(lpm_key.addr, &dst_ip, 4);
         __u8 *is_direct = bpf_map_lookup_elem(&direct_cidr_map, &lpm_key);
@@ -172,9 +180,20 @@ int fluxbox_tc_ingress(struct __sk_buff *skb) {
             // 顺手把命中的 IP 写入 O(1) 的 LRU 哈希表，该 IP 后续成千上万个包免查 LPM 树！
             __u8 one = 1;
             bpf_map_update_elem(&learned_ip_map, &dst_ip, &one, BPF_ANY);
+            // 命中中国大陆 CIDR：直接放行直连，国内 B站/抖音 HTTP/3 畅享硬件线速直通，零误杀！
             skb->mark = FWMARK_BYPASS;
             inc_stat(0);
             return TC_ACT_OK;
+        }
+    }
+
+    // 6.3 剩余海外未识别流量：若为海外 QUIC 且开启了 reject_quic，执行精准硬件级丢弃，促使回退 TCP
+    if (is_quic) {
+        __u32 cfg_quic_key = 1;
+        __u32 *reject_quic = bpf_map_lookup_elem(&global_cfg_map, &cfg_quic_key);
+        if (reject_quic && *reject_quic == 1) {
+            inc_stat(2);
+            return TC_ACT_SHOT;
         }
     }
 
